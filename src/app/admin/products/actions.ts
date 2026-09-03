@@ -17,7 +17,7 @@ export async function uploadToSupabase(file: File, bucket: string = "product-ima
 
   if (error) {
     console.error("Upload error details:", error);
-    return "";
+    throw new Error(`STORAGE UPLOAD ERROR (${file.name}): ${error.message}. Please create bucket 'product-images' in Supabase Storage with public access enabled.`);
   }
 
   const { data: { publicUrl } } = supabase.storage
