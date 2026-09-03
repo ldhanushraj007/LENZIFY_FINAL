@@ -30,9 +30,12 @@ export default function NewProductForm({ categories, lenses }: { categories: any
   const [productType, setProductType] = useState("frame");
   const [primaryPreview, setPrimaryPreview] = useState<string | null>(null);
   const [additionalPreviews, setAdditionalPreviews] = useState<string[]>([]);
-  const [state, formAction] = useActionState(async (prevState: any, formData: FormData) => {
-    return await createProduct(formData);
-  }, null);
+  const [state, formAction] = useActionState<{ error?: string } | null, FormData>(
+    async (prevState, formData) => {
+      return await createProduct(formData);
+    },
+    null
+  );
 
   const handlePrimaryChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
