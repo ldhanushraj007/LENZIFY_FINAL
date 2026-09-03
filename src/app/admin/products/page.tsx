@@ -25,7 +25,7 @@ export default async function AdminProductsPage({
   // Build Query
   let dbQuery = supabase
     .from("products")
-    .select("*, categories(name)")
+    .select("*, categories(name), product_images(image_url, is_primary)")
     .order("created_at", { ascending: false });
 
   if (query) {
@@ -97,7 +97,7 @@ export default async function AdminProductsPage({
               className="bg-white border border-brand-navy/5 p-6 flex flex-col lg:flex-row items-center gap-10 group hover:border-secondary transition-all duration-700 hover:-translate-y-1 shadow-sm"
             >
               <div className="relative w-32 h-32 bg-brand-background border border-brand-navy/5 overflow-hidden shrink-0">
-                <Image src={p.primary_image} alt={p.name} fill className="object-cover group-hover:scale-110 transition-transform duration-1000" />
+                <Image src={p.primary_image || p.image || (p.product_images?.[0]?.image_url) || "/placeholder.jpg"} alt={p.name} fill className="object-cover group-hover:scale-110 transition-transform duration-1000" />
               </div>
 
               <div className="flex-1 flex flex-col lg:flex-row items-center justify-between w-full gap-10">
