@@ -1,3 +1,5 @@
+"use client";
+
 import { useState, useActionState } from "react";
 import { useFormStatus } from "react-dom";
 import { Package, Tag, Maximize2, Info, Camera, Zap, ChevronRight, Save, Layers, Loader2, Cpu } from "lucide-react";
