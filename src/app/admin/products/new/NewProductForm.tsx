@@ -120,7 +120,7 @@ export default function NewProductForm({ categories, lenses }: { categories: any
   const displayTypes = categories.filter(c => c.type === 'display').map(c => c.name);
 
   return (
-    <form action={createProduct} className="grid grid-cols-1 lg:grid-cols-12 gap-12">
+    <form action={createProduct} encType="multipart/form-data" className="grid grid-cols-1 lg:grid-cols-12 gap-12">
       <div className="lg:col-span-8 space-y-12">
          {/* Product Type Selector */}
          <section className="bg-white border border-brand-navy/5 p-8 shadow-sm">

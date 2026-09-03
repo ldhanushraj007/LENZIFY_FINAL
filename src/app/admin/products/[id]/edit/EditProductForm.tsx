@@ -156,7 +156,7 @@ export default function EditProductForm({
   };
 
   return (
-    <form action={formAction} className="grid grid-cols-1 lg:grid-cols-12 gap-12">
+    <form action={formAction} encType="multipart/form-data" className="grid grid-cols-1 lg:grid-cols-12 gap-12">
       <div className="lg:col-span-8 space-y-12">
         {state?.error && (
           <div className="bg-red-50 border border-red-200 p-6 flex items-center gap-4 animate-in fade-in slide-in-from-top-4 duration-500">
