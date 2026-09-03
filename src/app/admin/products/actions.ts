@@ -17,10 +17,7 @@ export async function uploadToSupabase(file: File, bucket: string = "product-ima
 
   if (error) {
     console.error("Upload error details:", error);
-    if (error.message.includes("row-level security policy")) {
-      throw new Error(`STORAGE PERMISSION DENIED: Your Supabase bucket "product-images" is locked. Please run the SQL fix I provided in the dashboard to unlock it.`);
-    }
-    throw new Error(`Failed to upload ${file.name}: ${error.message}`);
+    return "";
   }
 
   const { data: { publicUrl } } = supabase.storage

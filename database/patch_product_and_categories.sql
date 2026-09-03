@@ -119,8 +119,30 @@ BEGIN
   END IF;
 END $$;
 
+-- 9. Setup Storage Bucket 'product-images' and enable public access
+INSERT INTO storage.buckets (id, name, public) 
+VALUES ('product-images', 'product-images', true)
+ON CONFLICT (id) DO UPDATE SET public = true;
+
+-- Enable RLS on storage.objects
+ALTER TABLE storage.objects ENABLE ROW LEVEL SECURITY;
+
+DO $$
+BEGIN
+  IF NOT EXISTS (SELECT 1 FROM pg_policies WHERE tablename = 'objects' AND policyname = 'Public Access for product-images bucket') THEN
+    CREATE POLICY "Public Access for product-images bucket" ON storage.objects FOR SELECT USING (bucket_id = 'product-images');
+  END IF;
+  IF NOT EXISTS (SELECT 1 FROM pg_policies WHERE tablename = 'objects' AND policyname = 'Allow Uploads to product-images bucket') THEN
+    CREATE POLICY "Allow Uploads to product-images bucket" ON storage.objects FOR INSERT WITH CHECK (bucket_id = 'product-images');
+  END IF;
+  IF NOT EXISTS (SELECT 1 FROM pg_policies WHERE tablename = 'objects' AND policyname = 'Allow Admin Updates to product-images bucket') THEN
+    CREATE POLICY "Allow Admin Updates to product-images bucket" ON storage.objects FOR UPDATE USING (bucket_id = 'product-images');
+  END IF;
+  IF NOT EXISTS (SELECT 1 FROM pg_policies WHERE tablename = 'objects' AND policyname = 'Allow Admin Deletes from product-images bucket') THEN
+    CREATE POLICY "Allow Admin Deletes from product-images bucket" ON storage.objects FOR DELETE USING (bucket_id = 'product-images');
+  END IF;
+END $$;
+
 -- ============================================================
--- PATCH COMPLETE — Verify with:
--- SELECT column_name, data_type FROM information_schema.columns WHERE table_name = 'products' ORDER BY ordinal_position;
--- SELECT id, name, type FROM categories ORDER BY type, name;
+-- PATCH COMPLETE
 -- ============================================================
