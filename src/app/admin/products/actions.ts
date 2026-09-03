@@ -96,8 +96,8 @@ export async function createProduct(formData: FormData) {
 
   // Handle Image Uploads
   let primary_image_url = "";
-  const primaryFile = formData.get("primary_image_file") as File;
-  if (primaryFile && primaryFile.size > 0) {
+  const primaryFile = formData.get("primary_image_file");
+  if (primaryFile && primaryFile instanceof File && primaryFile.size > 0 && primaryFile.name !== "undefined") {
     primary_image_url = await uploadToSupabase(primaryFile);
   }
 
