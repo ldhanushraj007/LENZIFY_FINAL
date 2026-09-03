@@ -131,7 +131,6 @@ export async function createProduct(formData: FormData) {
     is_new_arrival,
     is_editors_choice,
     primary_image: primary_image_url,
-    image: primary_image_url,
     is_enabled,
     images_360: (() => {
       try {
@@ -333,7 +332,6 @@ export async function updateProduct(id: string, formData: FormData) {
       const uploaded_url = await uploadToSupabase(primaryFile);
       const primary_image_url = `${uploaded_url}?v=${Date.now()}`;
       updatePayload.primary_image = primary_image_url;
-      updatePayload.image = primary_image_url;
       
       // Update product_images table as well
       await supabase.from("product_images").delete().eq("product_id", id).eq("is_primary", true);
