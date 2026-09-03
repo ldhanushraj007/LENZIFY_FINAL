@@ -10,10 +10,16 @@ export async function uploadToSupabase(file: File, bucket: string = "product-ima
   const fileName = `${Date.now()}-${Math.random().toString(36).substring(2, 15)}.${fileExt}`;
   const filePath = `${fileName}`;
 
-  console.log(`Uploading ${file.name} to ${bucket}/${filePath}...`);
+  const bytes = await file.arrayBuffer();
+  const buffer = Buffer.from(bytes);
+
+  console.log(`Uploading ${file.name} (${file.size} bytes) to ${bucket}/${filePath}...`);
   const { data, error } = await supabase.storage
     .from(bucket)
-    .upload(filePath, file);
+    .upload(filePath, buffer, {
+      contentType: file.type || 'image/jpeg',
+      upsert: true
+    });
 
   if (error) {
     console.error("Upload error details:", error);
