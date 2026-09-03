@@ -107,6 +107,13 @@ export async function createProduct(formData: FormData) {
     }
   }
 
+  if (!primary_image_url && additional_image_urls.length > 0) {
+    primary_image_url = additional_image_urls[0];
+  }
+  if (!primary_image_url) {
+    primary_image_url = "/placeholder.jpg";
+  }
+
   const { data: product, error: productError } = await supabase.from("products").insert({
     name,
     sku,
