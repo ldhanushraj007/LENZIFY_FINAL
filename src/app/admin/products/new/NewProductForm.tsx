@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useActionState } from "react";
+import { useState } from "react";
 import { useFormStatus } from "react-dom";
 import { Package, Tag, Maximize2, Info, Camera, Zap, ChevronRight, Save, Layers, Loader2, Cpu } from "lucide-react";
 import { createProduct } from "../actions";
@@ -30,12 +30,7 @@ export default function NewProductForm({ categories, lenses }: { categories: any
   const [productType, setProductType] = useState("frame");
   const [primaryPreview, setPrimaryPreview] = useState<string | null>(null);
   const [additionalPreviews, setAdditionalPreviews] = useState<string[]>([]);
-  const [state, formAction] = useActionState<{ error?: string } | null, FormData>(
-    async (prevState, formData) => {
-      return await createProduct(formData);
-    },
-    null
-  );
+
 
   const handlePrimaryChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
@@ -125,14 +120,8 @@ export default function NewProductForm({ categories, lenses }: { categories: any
   const displayTypes = categories.filter(c => c.type === 'display').map(c => c.name);
 
   return (
-    <form action={formAction} className="grid grid-cols-1 lg:grid-cols-12 gap-12">
+    <form action={createProduct} className="grid grid-cols-1 lg:grid-cols-12 gap-12">
       <div className="lg:col-span-8 space-y-12">
-        {state?.error && (
-          <div className="bg-red-50 border border-red-200 p-6 flex items-center gap-4 animate-in fade-in slide-in-from-top-4 duration-500">
-             <Cpu size={18} className="text-red-500 shrink-0" />
-             <p className="text-[10px] font-bold uppercase tracking-widest text-red-600">{state.error}</p>
-          </div>
-        )}
          {/* Product Type Selector */}
          <section className="bg-white border border-brand-navy/5 p-8 shadow-sm">
             <h3 className="text-[10px] font-bold uppercase tracking-[0.3em] text-brand-navy mb-4">Product Type Designation</h3>
