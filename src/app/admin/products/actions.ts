@@ -26,9 +26,12 @@ export async function uploadToSupabase(file: File, bucket: string = "product-ima
     throw new Error(`STORAGE UPLOAD ERROR (${file.name}): ${error.message}. Please create bucket 'product-images' in Supabase Storage with public access enabled.`);
   }
 
-  const { data: { publicUrl } } = supabase.storage
+  const { data: publicUrlData } = supabase.storage
     .from(bucket)
     .getPublicUrl(filePath);
+
+  const publicUrl = publicUrlData?.publicUrl || `${process.env.NEXT_PUBLIC_SUPABASE_URL}/storage/v1/object/public/${bucket}/${filePath}`;
+  console.log("Uploaded file public URL:", publicUrl);
 
   return publicUrl;
 }
@@ -101,12 +104,12 @@ export async function createProduct(formData: FormData) {
     primary_image_url = await uploadToSupabase(primaryFile);
   }
 
-  const additionalFiles = formData.getAll("additional_images_files") as File[];
+  const additionalFiles = formData.getAll("additional_images_files");
   const additional_image_urls: string[] = [];
   for (const file of additionalFiles) {
-    if (file && file.size > 0) {
+    if (file && file instanceof File && file.size > 0 && file.name !== "undefined") {
       const url = await uploadToSupabase(file);
-      additional_image_urls.push(url);
+      if (url) additional_image_urls.push(url);
     }
   }
 
