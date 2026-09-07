@@ -218,7 +218,7 @@ export async function createProduct(formData: FormData) {
     if (sectorError) console.error("Error linking sectors:", sectorError);
   }
 
-  revalidateTag('home-data');
+  revalidateTag('home-data', 'default');
   revalidatePath("/admin/products");
   revalidatePath("/products");
   revalidatePath("/");
@@ -398,7 +398,7 @@ export async function updateProduct(id: string, _prevState: any, formData: FormD
     console.log("Successfully updated product row:", product.id);
 
     // Aggressive revalidation
-    revalidateTag('home-data');
+    revalidateTag('home-data', 'default');
     revalidatePath('/');
     revalidatePath('/products');
     revalidatePath(`/product/${id}`);
@@ -435,7 +435,7 @@ export async function deleteProduct(id: string) {
   const { error } = await supabase.from("products").delete().eq("id", id);
   if (error) return { error: error.message };
   
-  revalidateTag('home-data');
+  revalidateTag('home-data', 'default');
   revalidatePath("/admin/products");
   revalidatePath("/products");
   revalidatePath("/");
@@ -461,7 +461,7 @@ export async function duplicateProduct(id: string) {
         await supabase.from("product_images").insert(imagesToInsert);
     }
     
-    revalidateTag('home-data');
+    revalidateTag('home-data', 'default');
     revalidatePath("/admin/products");
     revalidatePath("/products");
     revalidatePath("/");
@@ -473,7 +473,7 @@ export async function toggleProductStatus(id: string, currentStatus: boolean) {
   const { error } = await supabase.from("products").update({ is_enabled: !currentStatus }).eq("id", id);
   if (error) return { error: error.message };
   
-  revalidateTag('home-data');
+  revalidateTag('home-data', 'default');
   revalidatePath("/admin/products");
   revalidatePath("/products");
   revalidatePath("/");
@@ -540,7 +540,7 @@ export async function importProducts(csvContent: string) {
         if (error) console.error(`Sync error for ${item.sku}:`, error);
     }
 
-    revalidateTag('home-data');
+    revalidateTag('home-data', 'default');
     revalidatePath("/admin/products");
     revalidatePath("/products");
     return { success: true };
