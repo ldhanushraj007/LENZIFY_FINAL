@@ -418,7 +418,7 @@ export async function updateProduct(id: string, _prevState: any, formData: FormD
 
 // Direct version for use without useActionState — reads product_id from hidden input
 // This ensures file uploads in FormData are NOT stripped by React's state management
-export async function updateProductDirect(formData: FormData) {
+export async function updateProductDirect(formData: FormData): Promise<void> {
   const id = formData.get("product_id") as string;
   const file = formData.get("primary_image_file") as File;
   console.log("=== updateProductDirect called ===");
@@ -427,7 +427,7 @@ export async function updateProductDirect(formData: FormData) {
   console.log("  file size:", file?.size);
   console.log("  file type:", file?.type);
   if (!id) throw new Error("Missing product_id");
-  return updateProduct(id, null, formData);
+  await updateProduct(id, null, formData);
 }
 
 export async function deleteProduct(id: string) {
