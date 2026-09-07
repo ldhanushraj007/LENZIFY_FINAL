@@ -2,6 +2,7 @@ import type { NextConfig } from "next";
 
 const nextConfig: NextConfig = {
   images: {
+    unoptimized: true,
     remotePatterns: [
       {
         protocol: "https",
@@ -30,6 +31,14 @@ const nextConfig: NextConfig = {
       {
         protocol: "https",
         hostname: "lglknxmkgoixyhksfbjy.supabase.co",
+      },
+      {
+        protocol: "https",
+        hostname: "ehrtrbfadqhgfruseidf.supabase.co",
+      },
+      {
+        protocol: "https",
+        hostname: "*.supabase.co",
       },
     ],
   },

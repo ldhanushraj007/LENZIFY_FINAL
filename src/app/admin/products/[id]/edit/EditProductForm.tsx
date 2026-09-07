@@ -1,9 +1,9 @@
 "use client";
 
-import { useState, useActionState } from "react";
+import { useState } from "react";
 import { useFormStatus } from "react-dom";
 import { Package, Tag, Maximize2, Info, Camera, Zap, Save, Layers, Loader2, Cpu } from "lucide-react";
-import { updateProduct } from "../../actions";
+import { updateProductDirect } from "../../actions";
 
 function SubmitButton() {
   const { pending } = useFormStatus();
@@ -44,9 +44,7 @@ export default function EditProductForm({
   const [productType, setProductType] = useState(product.product_type || "frame");
   const [primaryPreview, setPrimaryPreview] = useState<string | null>(null);
   const [additionalPreviews, setAdditionalPreviews] = useState<string[]>([]);
-  const [state, formAction] = useActionState(async (prevState: any, formData: FormData) => {
-    return await updateProduct(product.id, formData);
-  }, null);
+  // Use direct server action (no useActionState) so FormData file bytes are NOT stripped
 
   const handlePrimaryChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
@@ -156,12 +154,13 @@ export default function EditProductForm({
   };
 
   return (
-    <form action={formAction} encType="multipart/form-data" className="grid grid-cols-1 lg:grid-cols-12 gap-12">
+    <form action={updateProductDirect} className="grid grid-cols-1 lg:grid-cols-12 gap-12">
+      <input type="hidden" name="product_id" value={product.id} />
       <div className="lg:col-span-8 space-y-12">
-        {state?.error && (
+        {false && (
           <div className="bg-red-50 border border-red-200 p-6 flex items-center gap-4 animate-in fade-in slide-in-from-top-4 duration-500">
              <Cpu size={18} className="text-red-500" />
-             <p className="text-[10px] font-bold uppercase tracking-widest text-red-600">{state.error}</p>
+             <p className="text-[10px] font-bold uppercase tracking-widest text-red-600">Update failed</p>
           </div>
         )}
          {/* Product Type Selector */}

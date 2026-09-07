@@ -6,7 +6,7 @@ import { redirect } from "next/navigation";
 
 export async function uploadToSupabase(file: File, bucket: string = "product-images") {
   const supabase = await createAdminClient();
-  const fileExt = file.name.split('.').pop();
+  const fileExt = file.name.split('.').pop() || 'jpg';
   const fileName = `${Date.now()}-${Math.random().toString(36).substring(2, 15)}.${fileExt}`;
   const filePath = `${fileName}`;
 
@@ -23,7 +23,7 @@ export async function uploadToSupabase(file: File, bucket: string = "product-ima
 
   if (error) {
     console.error("Upload error details:", error);
-    throw new Error(`STORAGE UPLOAD ERROR (${file.name}): ${error.message}. Please create bucket 'product-images' in Supabase Storage with public access enabled.`);
+    throw new Error(`STORAGE UPLOAD ERROR (${file.name}): ${error.message}. Please check bucket 'product-images' in Supabase Storage.`);
   }
 
   const { data: publicUrlData } = supabase.storage
@@ -175,7 +175,11 @@ export async function createProduct(formData: FormData) {
 
   if (productError) {
     console.error("Error creating product:", productError);
-    redirect(`/admin/products/new?error=${encodeURIComponent(productError.message)}`);
+    const isDuplicateSKU = productError.code === "23505" && productError.message?.includes("products_sku_key");
+    const friendlyMessage = isDuplicateSKU
+      ? `SKU "${sku}" is already taken. Please use a different unique SKU.`
+      : productError.message;
+    redirect(`/admin/products/new?error=${encodeURIComponent(friendlyMessage)}`);
   }
 
   // Handle compatible lenses
@@ -214,7 +218,7 @@ export async function createProduct(formData: FormData) {
     if (sectorError) console.error("Error linking sectors:", sectorError);
   }
 
-  revalidateTag('home-data', 'max');
+  revalidateTag('home-data');
   revalidatePath("/admin/products");
   revalidatePath("/products");
   revalidatePath("/");
@@ -223,7 +227,7 @@ export async function createProduct(formData: FormData) {
   redirect("/admin/products?success=true");
 }
 
-export async function updateProduct(id: string, formData: FormData) {
+export async function updateProduct(id: string, _prevState: any, formData: FormData) {
   const supabase = await createAdminClient();
 
   try {
@@ -394,7 +398,7 @@ export async function updateProduct(id: string, formData: FormData) {
     console.log("Successfully updated product row:", product.id);
 
     // Aggressive revalidation
-    revalidateTag('home-data', 'max');
+    revalidateTag('home-data');
     revalidatePath('/');
     revalidatePath('/products');
     revalidatePath(`/product/${id}`);
@@ -412,12 +416,26 @@ export async function updateProduct(id: string, formData: FormData) {
   redirect(redirectUrl);
 }
 
+// Direct version for use without useActionState — reads product_id from hidden input
+// This ensures file uploads in FormData are NOT stripped by React's state management
+export async function updateProductDirect(formData: FormData) {
+  const id = formData.get("product_id") as string;
+  const file = formData.get("primary_image_file") as File;
+  console.log("=== updateProductDirect called ===");
+  console.log("  product_id:", id);
+  console.log("  file name:", file?.name);
+  console.log("  file size:", file?.size);
+  console.log("  file type:", file?.type);
+  if (!id) throw new Error("Missing product_id");
+  return updateProduct(id, null, formData);
+}
+
 export async function deleteProduct(id: string) {
   const supabase = await createAdminClient();
   const { error } = await supabase.from("products").delete().eq("id", id);
   if (error) return { error: error.message };
   
-  revalidateTag('home-data', 'max');
+  revalidateTag('home-data');
   revalidatePath("/admin/products");
   revalidatePath("/products");
   revalidatePath("/");
@@ -443,7 +461,7 @@ export async function duplicateProduct(id: string) {
         await supabase.from("product_images").insert(imagesToInsert);
     }
     
-    revalidateTag('home-data', 'max');
+    revalidateTag('home-data');
     revalidatePath("/admin/products");
     revalidatePath("/products");
     revalidatePath("/");
@@ -455,7 +473,7 @@ export async function toggleProductStatus(id: string, currentStatus: boolean) {
   const { error } = await supabase.from("products").update({ is_enabled: !currentStatus }).eq("id", id);
   if (error) return { error: error.message };
   
-  revalidateTag('home-data', 'max');
+  revalidateTag('home-data');
   revalidatePath("/admin/products");
   revalidatePath("/products");
   revalidatePath("/");
@@ -522,7 +540,7 @@ export async function importProducts(csvContent: string) {
         if (error) console.error(`Sync error for ${item.sku}:`, error);
     }
 
-    revalidateTag('home-data', 'max');
+    revalidateTag('home-data');
     revalidatePath("/admin/products");
     revalidatePath("/products");
     return { success: true };

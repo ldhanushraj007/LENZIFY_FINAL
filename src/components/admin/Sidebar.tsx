@@ -178,6 +178,7 @@ export default function Sidebar() {
           <button
             onClick={() => setSidebarOpen(false)}
             className="p-1 rounded-lg text-[#888888] hover:bg-[#F4F6F8] hover:text-[#111111] lg:hidden"
+            suppressHydrationWarning
           >
             <X size={18} />
           </button>

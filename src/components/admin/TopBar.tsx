@@ -55,6 +55,7 @@ export default function TopBar() {
       <button
         onClick={toggleSidebar}
         className="p-1 rounded-lg text-[#888888] hover:bg-[#F4F6F8] hover:text-[#111111] lg:hidden mr-1 flex-shrink-0"
+        suppressHydrationWarning
       >
         <Menu size={20} />
       </button>

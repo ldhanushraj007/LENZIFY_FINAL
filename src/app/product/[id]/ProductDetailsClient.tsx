@@ -93,7 +93,15 @@ export default function ProductDetailsClient({
   const [viewMode, setViewMode] = useState<"static" | "360">("static");
   const [showLensFlow, setShowLensFlow] = useState(false);
 
-  const initialPrimaryImage = product.primary_image || product.product_images?.find((img: any) => img.is_primary)?.image_url || product.product_images?.[0]?.image_url || "/placeholder.jpg";
+  const getPrimaryImage = () => {
+    const p = product.primary_image;
+    if (p && p !== "/placeholder.jpg" && !p.startsWith("/placeholder")) return p;
+    const primaryImg = product.product_images?.find((img: any) => img.is_primary);
+    const bestImg = primaryImg || product.product_images?.[0];
+    if (bestImg?.image_url && bestImg.image_url !== "/placeholder.jpg") return bestImg.image_url;
+    return "/placeholder.jpg";
+  };
+  const initialPrimaryImage = getPrimaryImage();
   const [mainImageSrc, setMainImageSrc] = useState(initialPrimaryImage);
 
   const handleAddToCart = async (lensData?: any, isBuyNow: boolean = false) => {

@@ -38,12 +38,21 @@ export default function ProductCard({ product }: ProductCardProps) {
   const { user } = useAuth();
 
   const getInitialImage = () => {
-    if (product.primary_image) return product.primary_image;
-    if (product.image) return product.image;
-    if (product.product_images && product.product_images.length > 0) {
-      const primary = product.product_images.find(img => img.is_primary);
-      return primary ? primary.image_url : product.product_images[0].image_url;
+    // Check primary_image but skip the generic placeholder — it means no real image was saved
+    const primaryImg = product.primary_image;
+    if (primaryImg && primaryImg !== "/placeholder.jpg" && !primaryImg.startsWith("/placeholder")) {
+      return primaryImg;
     }
+    // Fall through to the product_images junction table (has the real uploaded URL)
+    if (product.product_images && product.product_images.length > 0) {
+      const primary = product.product_images.find((img: any) => img.is_primary);
+      const best = primary || product.product_images[0];
+      if (best?.image_url && best.image_url !== "/placeholder.jpg") {
+        return best.image_url;
+      }
+    }
+    // Legacy fallback
+    if (product.image && product.image !== "/placeholder.jpg") return product.image;
     return "/placeholder.jpg";
   };
 
