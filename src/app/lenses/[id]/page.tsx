@@ -6,6 +6,7 @@ import { createClient as createSupabaseClient } from "@supabase/supabase-js";
 import LensPackageSelector from "@/components/store/LensPackageSelector";
 
 export const dynamic = "force-dynamic";
+export const revalidate = 0;
 
 const FEATURE_ICONS = [Shield, Activity, Eye, Sparkles];
 
@@ -17,17 +18,19 @@ export default async function LensDetailPage({ params }: { params: Promise<{ id:
     process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
   );
 
-  const { data: lens, error } = await supabase
-    .from("lenses")
-    .select("*")
-    .eq("id", id)
-    .single();
+  const [lensRes, allLensesRes] = await Promise.all([
+    supabase.from("lenses").select("*").eq("id", id).single(),
+    supabase.from("lenses").select("*").eq("is_active", true),
+  ]);
 
-  if (error && error.code !== "PGRST116") {
+  const lens = lensRes.data;
+  const allLenses = allLensesRes.data || [];
+
+  if (lensRes.error && lensRes.error.code !== "PGRST116") {
     return (
       <div className="pt-32 text-center">
         <h1 className="text-2xl font-bold text-red-500">Error loading lens</h1>
-        <p className="text-gray-500 mt-2">{error?.message}</p>
+        <p className="text-gray-500 mt-2">{lensRes.error?.message}</p>
       </div>
     );
   }
@@ -38,13 +41,16 @@ export default async function LensDetailPage({ params }: { params: Promise<{ id:
   const isSingleVision = lens.name.toLowerCase().includes("single");
   const isBifocal = lens.name.toLowerCase().includes("bifocal");
   
-  // Starting price normalized per pricing specification
-  const startingPrice = isProgressive 
-    ? 1799 
-    : (isSingleVision ? 799 : (isBifocal ? 999 : lens.price));
+  // Starting price dynamically prioritizing database price over fallbacks
+  const progressiveSilver = allLenses.find((l: any) => l.tier === "silver" || l.name === "Progressive Silver");
+  const startingPrice = (lens.price && lens.price > 0)
+    ? lens.price
+    : (isProgressive 
+        ? (progressiveSilver?.price || 1799) 
+        : (isSingleVision ? 799 : (isBifocal ? 999 : (lens.base_price || 799))));
 
   const slug = lens.name.toLowerCase().replace(/[\s()\/]+/g, "-").replace(/-+/g, "-");
-  const editorial = Object.entries(LENS_CONTENT).find(([key]) => slug.includes(key))?.[1] || {
+  const baseEditorial = Object.entries(LENS_CONTENT).find(([key]) => slug.includes(key))?.[1] || {
     name: lens.name,
     headline: "Precision crafted for clarity and comfort.",
     description: lens.description || "Premium quality lenses tailored for your unique visual needs.",
@@ -55,6 +61,20 @@ export default async function LensDetailPage({ params }: { params: Promise<{ id:
     feature_details: (lens.features || ["High-Contrast Clarity", "UV Protection", "Scratch Resistant", "Durable Build"]).map((f: string) => ({
       title: f, detail: "Premium quality certified to optical health standards."
     }))
+  };
+
+  const customFeatures = Array.isArray(lens.features) && lens.features.length > 0 ? lens.features : null;
+  const editorial = {
+    ...baseEditorial,
+    headline: lens.description || baseEditorial.headline,
+    what_it_is: lens.description || baseEditorial.what_it_is,
+    features: customFeatures || baseEditorial.features,
+    feature_details: customFeatures 
+      ? customFeatures.map((f: any) => ({
+          title: typeof f === "string" ? f : f.title || "Optical Feature",
+          detail: typeof f === "object" && f.detail ? f.detail : "Verified optical enhancement calibrated to clinical prescription tolerances."
+        }))
+      : baseEditorial.feature_details
   };
 
   const categoryLabel = lens.sub_category || lens.category || "Premium Lens";
@@ -162,6 +182,7 @@ export default async function LensDetailPage({ params }: { params: Promise<{ id:
             lensName={lens.name}
             lensId={lens.id}
             basePrice={startingPrice}
+            availableLenses={allLenses}
           />
         </div>
       </section>

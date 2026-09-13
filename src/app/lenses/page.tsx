@@ -1,5 +1,8 @@
-import ProductGrid from "@/components/shop/ProductGrid";
 import { Suspense } from "react";
+import ProductGrid from "@/components/shop/ProductGrid";
+
+export const dynamic = "force-dynamic";
+export const revalidate = 0;
 
 export const metadata = {
   title: "Lenses | LENZIFY",

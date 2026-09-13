@@ -4,6 +4,18 @@ import { createAdminClient } from "@/lib/supabase/server";
 import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
 
+function revalidateLensRoutes(lensId?: string) {
+  revalidatePath("/admin/lenses");
+  if (lensId) {
+    revalidatePath(`/lenses/${lensId}`);
+    revalidatePath(`/admin/lenses/${lensId}/edit`);
+  }
+  revalidatePath("/lenses");
+  revalidatePath("/replace-lenses");
+  revalidatePath("/products");
+  revalidatePath("/");
+}
+
 export async function createLens(formData: FormData) {
   const supabase = await createAdminClient();
 
@@ -46,6 +58,7 @@ export async function createLens(formData: FormData) {
     name,
     description,
     price,
+    base_price: price,
     features,
     category,
     is_active,
@@ -58,13 +71,22 @@ export async function createLens(formData: FormData) {
 
   let { error } = await supabase.from("lenses").insert(insertPayload);
 
-  if (error && (error.message?.includes("power_ranges") || error.message?.includes("tier") || error.message?.includes("field_of_view"))) {
-    delete insertPayload.power_ranges;
-    delete insertPayload.tier;
-    delete insertPayload.field_of_view;
-    delete insertPayload.performance_ratings;
-    delete insertPayload.parent_lens_id;
+  if (error && error.message?.includes("base_price")) {
+    delete insertPayload.base_price;
     const retry = await supabase.from("lenses").insert(insertPayload);
+    error = retry.error;
+  }
+
+  if (error && (error.message?.includes("does not exist") || error.code === "42703")) {
+    const corePayload: any = {
+      name,
+      description,
+      price,
+      features,
+      category,
+      is_active,
+    };
+    const retry = await supabase.from("lenses").insert(corePayload);
     error = retry.error;
   }
 
@@ -73,7 +95,7 @@ export async function createLens(formData: FormData) {
     redirect(`/admin/lenses/new?error=${encodeURIComponent(error.message)}`);
   }
 
-  revalidatePath("/admin/lenses");
+  revalidateLensRoutes();
   redirect("/admin/lenses");
 }
 
@@ -116,6 +138,7 @@ export async function updateLens(id: string, formData: FormData) {
     name,
     description,
     price,
+    base_price: price,
     features,
     category,
     is_active,
@@ -128,7 +151,13 @@ export async function updateLens(id: string, formData: FormData) {
 
   let { error } = await supabase.from("lenses").update(updatePayload).eq("id", id);
 
-  if (error && (error.message?.includes("power_ranges") || error.message?.includes("tier") || error.message?.includes("field_of_view"))) {
+  if (error && error.message?.includes("base_price")) {
+    delete updatePayload.base_price;
+    const retry = await supabase.from("lenses").update(updatePayload).eq("id", id);
+    error = retry.error;
+  }
+
+  if (error && (error.message?.includes("does not exist") || error.code === "42703")) {
     delete updatePayload.power_ranges;
     delete updatePayload.tier;
     delete updatePayload.field_of_view;
@@ -138,18 +167,12 @@ export async function updateLens(id: string, formData: FormData) {
     error = retry.error;
   }
 
-  if (error && error.message?.includes("power_ranges")) {
-    delete updatePayload.power_ranges;
-    const retry = await supabase.from("lenses").update(updatePayload).eq("id", id);
-    error = retry.error;
-  }
-
   if (error) {
     console.error("Error updating lens:", error);
     redirect(`/admin/lenses/${id}/edit?error=${encodeURIComponent(error.message)}`);
   }
 
-  revalidatePath("/admin/lenses");
+  revalidateLensRoutes(id);
   redirect("/admin/lenses");
 }
 
@@ -163,16 +186,20 @@ export async function deleteLens(id: string) {
     return { error: error.message };
   }
 
-  revalidatePath("/admin/lenses");
+  revalidateLensRoutes(id);
   return { success: true };
 }
 
 export async function updateLensPrice(id: string, price: number) {
   const supabase = await createAdminClient();
-  const { error } = await supabase.from("lenses").update({ price }).eq("id", id);
+  let { error } = await supabase.from("lenses").update({ price, base_price: price }).eq("id", id);
+  if (error && error.message?.includes("base_price")) {
+    const res = await supabase.from("lenses").update({ price }).eq("id", id);
+    error = res.error;
+  }
   if (error) return { error: error.message };
-  revalidatePath("/admin/lenses");
-  revalidatePath(`/lenses/${id}`);
+
+  revalidateLensRoutes(id);
   return { success: true };
 }
 
@@ -188,5 +215,5 @@ export async function toggleLensStatus(id: string, currentStatus: boolean) {
     return { error: error.message };
   }
   
-  revalidatePath("/admin/lenses");
+  revalidateLensRoutes(id);
 }

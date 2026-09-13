@@ -63,33 +63,33 @@ export default function LensSelectionFlow({ product, availableLenses, onClose, o
         tier: "silver",
         name: "Progressive Silver",
         displayName: "Silver",
-        price: 1799,
-        field_of_view: "Narrow",
+        price: silver?.price ?? 1799,
+        field_of_view: silver?.field_of_view || "Narrow",
         fovLabel: "Narrow Corridor",
         ratings: silver?.performance_ratings || { distance: 7, intermediate: 5, reading: 6, constant: 6 },
-        description: "Excellent all-purpose progressive design with fast adaptation.",
+        description: silver?.description || "Excellent all-purpose progressive design with fast adaptation.",
         lens: silver || { id: "progressive-silver", name: "Progressive Silver", price: 1799 },
       },
       {
         tier: "gold",
         name: "Progressive Gold",
         displayName: "Gold",
-        price: 2799,
-        field_of_view: "Wide",
+        price: gold?.price ?? 2799,
+        field_of_view: gold?.field_of_view || "Wide",
         fovLabel: "Wide Corridor",
         ratings: gold?.performance_ratings || { distance: 8, intermediate: 6, reading: 7, constant: 6 },
-        description: "Recommended for presbyopes choosing their first progressive design.",
+        description: gold?.description || "Recommended for presbyopes choosing their first progressive design.",
         lens: gold || { id: "progressive-gold", name: "Progressive Gold", price: 2799 },
       },
       {
         tier: "platinum",
         name: "Progressive Platinum",
         displayName: "Platinum",
-        price: 4299,
-        field_of_view: "Widest",
+        price: platinum?.price ?? 4299,
+        field_of_view: platinum?.field_of_view || "Widest",
         fovLabel: "Widest Panoramic View",
         ratings: platinum?.performance_ratings || { distance: 9, intermediate: 8, reading: 8, constant: 8 },
-        description: "Ultra-premium everyday lens with maximum visual field clarity.",
+        description: platinum?.description || "Ultra-premium everyday lens with maximum visual field clarity.",
         lens: platinum || { id: "progressive-platinum", name: "Progressive Platinum", price: 4299 },
       },
     ];
@@ -158,38 +158,26 @@ export default function LensSelectionFlow({ product, availableLenses, onClose, o
     const tierKey = selectedTier?.tier?.toLowerCase() || "";
 
     if (typeName.includes("progressive")) {
-      if (tierKey === "silver") {
-        return {
-          standard: { price: 1799, label: "Standard", desc: "All 4 core coatings included" },
-          photochromatic: { price: 2799, label: "+ Photochromatic", desc: "Light-responsive tint with all coatings" },
-          photochromatic_bluecut: { price: 3499, label: "+ Photochromatic + Blue Cut", desc: "Full digital protection + light-adaptive tint" },
-        };
-      } else if (tierKey === "gold") {
-        return {
-          standard: { price: 2799, label: "Standard", desc: "All 4 core coatings included" },
-          photochromatic: { price: 3799, label: "+ Photochromatic", desc: "Light-responsive tint with all coatings" },
-          photochromatic_bluecut: { price: 4499, label: "+ Photochromatic + Blue Cut", desc: "Full digital protection + light-adaptive tint" },
-        };
-      } else {
-        // Platinum
-        return {
-          standard: { price: 4299, label: "Standard", desc: "All 4 core coatings included" },
-          photochromatic: { price: 5299, label: "+ Photochromatic", desc: "Light-responsive tint with all coatings" },
-          photochromatic_bluecut: { price: 5999, label: "+ Photochromatic + Blue Cut", desc: "Full digital protection + light-adaptive tint" },
-        };
-      }
-    } else if (typeName.includes("bifocal")) {
+      const activeTierPrice = selectedTier?.lens?.price ?? (tierKey === "silver" ? 1799 : (tierKey === "gold" ? 2799 : 4299));
       return {
-        standard: { price: 999, label: "Standard", desc: "All 4 core coatings included" },
-        photochromatic: { price: 1799, label: "+ Photochromatic", desc: "Light-responsive tint with all coatings" },
-        photochromatic_bluecut: { price: 2499, label: "+ Photochromatic + Blue Cut", desc: "Full digital protection + light-adaptive tint" },
+        standard: { price: activeTierPrice, label: "Standard", desc: "All 4 core coatings included" },
+        photochromatic: { price: activeTierPrice + 1000, label: "+ Photochromatic", desc: "Light-responsive tint with all coatings" },
+        photochromatic_bluecut: { price: activeTierPrice + 1700, label: "+ Photochromatic + Blue Cut", desc: "Full digital protection + light-adaptive tint" },
+      };
+    } else if (typeName.includes("bifocal")) {
+      const base = selectedType?.price ?? 999;
+      return {
+        standard: { price: base, label: "Standard", desc: "All 4 core coatings included" },
+        photochromatic: { price: base + 800, label: "+ Photochromatic", desc: "Light-responsive tint with all coatings" },
+        photochromatic_bluecut: { price: base + 1500, label: "+ Photochromatic + Blue Cut", desc: "Full digital protection + light-adaptive tint" },
       };
     } else {
       // Single Vision or other standard type
+      const base = selectedType?.price ?? 799;
       return {
-        standard: { price: 799, label: "Standard", desc: "All 4 core coatings included" },
-        photochromatic: { price: 1199, label: "+ Photochromatic", desc: "Light-responsive tint with all coatings" },
-        photochromatic_bluecut: { price: 1799, label: "+ Photochromatic + Blue Cut", desc: "Full digital protection + light-adaptive tint" },
+        standard: { price: base, label: "Standard", desc: "All 4 core coatings included" },
+        photochromatic: { price: base + 400, label: "+ Photochromatic", desc: "Light-responsive tint with all coatings" },
+        photochromatic_bluecut: { price: base + 1000, label: "+ Photochromatic + Blue Cut", desc: "Full digital protection + light-adaptive tint" },
       };
     }
   };

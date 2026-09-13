@@ -9,12 +9,14 @@ interface LensPackageSelectorProps {
   lensName: string;
   lensId: string;
   basePrice: number;
+  availableLenses?: any[];
 }
 
 export default function LensPackageSelector({
   lensName,
   lensId,
   basePrice,
+  availableLenses = [],
 }: LensPackageSelectorProps) {
   const nameLower = lensName.toLowerCase();
   const isProgressive = nameLower.includes("progressive");
@@ -25,25 +27,27 @@ export default function LensPackageSelector({
     "standard" | "photochromatic" | "photochromatic_bluecut"
   >("standard");
 
+  const base = basePrice > 0 ? basePrice : (isBifocal ? 999 : 799);
+
   const singleVisionPackages = [
     {
       key: "standard" as const,
       name: "Standard",
-      price: 799,
+      price: base,
       includedText: "All 4 core coatings included at no extra cost",
       details: "UV Block, Blue Cut, Scratch Shield & Anti-Reflective Coating.",
     },
     {
       key: "photochromatic" as const,
       name: "+ Photochromatic",
-      price: 1199,
+      price: base + 400,
       includedText: "All 4 coatings + Light-responsive Photochromatic lens",
       details: "Transitions automatically from clear indoors to sunglasses in UV light.",
     },
     {
       key: "photochromatic_bluecut" as const,
       name: "+ Photochromatic + Blue Cut",
-      price: 1799,
+      price: base + 1000,
       includedText: "All 4 coatings + Photochromatic + Maximum Digital Blue Light filtration",
       details: "Advanced adaptive darkening combined with high-grade blue-violet ray defense.",
     },
@@ -53,21 +57,21 @@ export default function LensPackageSelector({
     {
       key: "standard" as const,
       name: "Standard",
-      price: 999,
+      price: base,
       includedText: "All 4 core coatings included at no extra cost",
       details: "Dual-focal segment with UV Block, Blue Cut, Scratch Shield & Anti-Reflective.",
     },
     {
       key: "photochromatic" as const,
       name: "+ Photochromatic",
-      price: 1799,
+      price: base + 800,
       includedText: "All 4 coatings + Light-responsive Photochromatic bifocal lens",
       details: "Smooth reading & distance focus with automatic outdoor darkening.",
     },
     {
       key: "photochromatic_bluecut" as const,
       name: "+ Photochromatic + Blue Cut",
-      price: 2499,
+      price: base + 1500,
       includedText: "All 4 coatings + Photochromatic + Maximum Digital Blue Light filtration",
       details: "Dual vision focal zones, digital glare defense, and sunlight transition.",
     },
@@ -254,42 +258,53 @@ export default function LensPackageSelector({
             </p>
           </div>
 
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-6 lg:gap-8 items-stretch">
-            {[
+          {(() => {
+            const silverLens = availableLenses.find((l: any) => l.tier === "silver" || l.name === "Progressive Silver");
+            const goldLens = availableLenses.find((l: any) => l.tier === "gold" || l.name === "Progressive Gold");
+            const platinumLens = availableLenses.find((l: any) => l.tier === "platinum" || l.name === "Progressive Platinum");
+
+            const progressiveTiersData = [
               {
                 tier: "SILVER",
-                price: 1799,
-                label: "NARROWER FIELD OF VIEW",
+                price: silverLens?.price ?? 1799,
+                label: silverLens?.field_of_view ? `${silverLens.field_of_view.toUpperCase()} FIELD OF VIEW` : "NARROWER FIELD OF VIEW",
                 measureLine: "├───┤",
                 corridorWidth: "28%",
                 corridorSvgWidth: 16,
                 description:
+                  silverLens?.description ||
                   "Excellent all-purpose progressive design with fast adaptation and strong performance in all visual fields.",
-                ratings: { distance: 7, intermediate: 5, reading: 6, constant: 6 },
+                ratings: silverLens?.performance_ratings || { distance: 7, intermediate: 5, reading: 6, constant: 6 },
               },
               {
                 tier: "GOLD",
-                price: 2799,
-                label: "WIDE FIELD OF VIEW",
+                price: goldLens?.price ?? 2799,
+                label: goldLens?.field_of_view ? `${goldLens.field_of_view.toUpperCase()} FIELD OF VIEW` : "WIDE FIELD OF VIEW",
                 measureLine: "├───────┤",
                 corridorWidth: "55%",
                 corridorSvgWidth: 32,
                 description:
+                  goldLens?.description ||
                   "Recommended for presbyopes choosing their first progressive design.",
-                ratings: { distance: 8, intermediate: 6, reading: 7, constant: 6 },
+                ratings: goldLens?.performance_ratings || { distance: 8, intermediate: 6, reading: 7, constant: 6 },
               },
               {
                 tier: "PLATINUM",
-                price: 4299,
-                label: "WIDEST FIELD OF VIEW",
+                price: platinumLens?.price ?? 4299,
+                label: platinumLens?.field_of_view ? `${platinumLens.field_of_view.toUpperCase()} FIELD OF VIEW` : "WIDEST FIELD OF VIEW",
                 measureLine: "├───────────┤",
                 corridorWidth: "82%",
                 corridorSvgWidth: 48,
                 description:
+                  platinumLens?.description ||
                   "Designed to excel in all visual departments, this is the ultra-premium everyday lens.",
-                ratings: { distance: 9, intermediate: 8, reading: 8, constant: 8 },
+                ratings: platinumLens?.performance_ratings || { distance: 9, intermediate: 8, reading: 8, constant: 8 },
               },
-            ].map((col) => (
+            ];
+
+            return (
+              <div className="grid grid-cols-1 md:grid-cols-3 gap-6 lg:gap-8 items-stretch">
+                {progressiveTiersData.map((col) => (
               <div
                 key={col.tier}
                 className="bg-white border-2 border-slate-200 rounded-3xl p-6 sm:p-8 hover:border-[#004AAD] transition-all duration-300 shadow-sm flex flex-col justify-between h-full space-y-6"
@@ -439,6 +454,8 @@ export default function LensPackageSelector({
               </div>
             ))}
           </div>
+            );
+          })()}
         </section>
       )}
     </div>
