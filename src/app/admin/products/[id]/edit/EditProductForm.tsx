@@ -167,10 +167,14 @@ export default function EditProductForm({
          <section className="bg-white border border-brand-navy/5 p-8 shadow-sm">
             <h3 className="text-[10px] font-bold uppercase tracking-[0.3em] text-brand-navy mb-4">Product Type Designation</h3>
             <div className="grid grid-cols-3 gap-6">
-               {["frame", "lens", "accessory"].map(type => (
-                 <label key={type} className={`cursor-pointer border-2 p-6 transition-all ${productType === type ? 'border-secondary bg-secondary/5' : 'border-brand-navy/5 hover:border-brand-navy/20'}`}>
-                    <input type="radio" name="product_type" value={type} className="hidden" checked={productType === type} onChange={() => setProductType(type)} />
-                    <span className="text-[11px] font-bold uppercase tracking-widest text-brand-navy block text-center">{type}</span>
+               {[
+                 { id: "frame", label: "Frame" },
+                 { id: "contact-lens", label: "Contact Lenses" },
+                 { id: "accessory", label: "Accessory" }
+               ].map(({ id: type, label }) => (
+                 <label key={type} className={`cursor-pointer border-2 p-6 transition-all ${(productType === type || (type === "contact-lens" && productType === "lens")) ? 'border-secondary bg-secondary/5' : 'border-brand-navy/5 hover:border-brand-navy/20'}`}>
+                    <input type="radio" name="product_type" value={type} className="hidden" checked={productType === type || (type === "contact-lens" && productType === "lens")} onChange={() => setProductType(type)} />
+                    <span className="text-[11px] font-bold uppercase tracking-widest text-brand-navy block text-center">{label}</span>
                  </label>
                ))}
             </div>

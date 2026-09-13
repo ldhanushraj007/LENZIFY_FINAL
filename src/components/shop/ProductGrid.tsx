@@ -36,6 +36,64 @@ const parseArray = (val: any): string[] => {
   return [];
 };
 
+export interface ParsedColor {
+  name: string;
+  hex: string;
+}
+
+const parseColorItem = (val: any): ParsedColor | null => {
+  if (!val) return null;
+  let item = val;
+  if (typeof item === "string") {
+    try {
+      item = JSON.parse(item);
+    } catch {
+      const trimmed = val.trim();
+      if (!trimmed) return null;
+      return {
+        name: trimmed,
+        hex: trimmed.startsWith("#") ? trimmed : "#000000",
+      };
+    }
+  }
+  if (item && typeof item === "object") {
+    const name = item.name || item.label || item.color || "";
+    let hex = item.hex || item.colorHex || "";
+    if (!hex && typeof name === "string" && name.startsWith("#")) {
+      hex = name;
+    }
+    if (!hex) hex = "#000000";
+    if (name) {
+      return { name: String(name).trim(), hex: String(hex).trim() };
+    }
+  }
+  return null;
+};
+
+const parseSizeItem = (val: any): string[] => {
+  if (!val) return [];
+  let item = val;
+  if (typeof item === "string") {
+    try {
+      item = JSON.parse(item);
+    } catch {
+      item = { label: val };
+    }
+  }
+  let label = "";
+  if (item && typeof item === "object") {
+    label = item.label || item.size || item.name || "";
+  } else if (typeof item === "string") {
+    label = item;
+  }
+  if (!label) return [];
+
+  return String(label)
+    .split(",")
+    .map((s) => s.trim())
+    .filter(Boolean);
+};
+
 // ---------------------------------------------------------------------------
 // Sub-components
 // ---------------------------------------------------------------------------
@@ -186,6 +244,7 @@ export default function ProductGrid({ initialCategory, initialGender }: ProductG
   const [selectedSizes, setSelectedSizes] = useState<string[]>([]);
   const [selectedFrameTypes, setSelectedFrameTypes] = useState<string[]>([]);
   const [selectedMaterials, setSelectedMaterials] = useState<string[]>([]);
+  const [selectedShapes, setSelectedShapes] = useState<string[]>([]);
   const [selectedCollections, setSelectedCollections] = useState<string[]>(
     searchCollection ? [searchCollection] : []
   );
@@ -302,7 +361,7 @@ export default function ProductGrid({ initialCategory, initialGender }: ProductG
     return Array.from(
       new Set([...productTypeCategories, ...fromCats, ...fromProps])
     )
-      .filter(Boolean)
+      .filter((t) => Boolean(t) && t.toLowerCase() !== "frame")
       .sort();
   }, [productTypeCategories, products]);
 
@@ -325,31 +384,54 @@ export default function ProductGrid({ initialCategory, initialGender }: ProductG
 
   const brands = useMemo(
     () =>
-      Array.from(new Set(products.map((p) => p.brand).filter(Boolean))),
+      Array.from(new Set(products.map((p) => p.brand).filter(Boolean))).sort(),
     [products]
   );
-  const colors = useMemo(
-    () =>
-      Array.from(
-        new Set(products.flatMap((p) => p.colors || []).filter(Boolean))
-      ),
-    [products]
-  );
-  const sizes = useMemo(
-    () =>
-      Array.from(
-        new Set(products.flatMap((p) => p.sizes || []).filter(Boolean))
-      ),
-    [products]
-  );
+
+  const colors = useMemo(() => {
+    const map = new Map<string, ParsedColor>();
+    products.forEach((p) => {
+      const pColors = p.colors || [];
+      pColors.forEach((c: any) => {
+        const parsed = parseColorItem(c);
+        if (parsed) {
+          const key = parsed.name.toLowerCase();
+          if (!map.has(key)) {
+            map.set(key, parsed);
+          }
+        }
+      });
+    });
+    return Array.from(map.values()).sort((a, b) => a.name.localeCompare(b.name));
+  }, [products]);
+
+  const sizes = useMemo(() => {
+    const allSizes = products.flatMap((p) => {
+      const pSizes = p.sizes || [];
+      return pSizes.flatMap((s: any) => parseSizeItem(s));
+    });
+    const distinct = Array.from(new Set(allSizes.filter(Boolean)));
+    return distinct.sort((a, b) => {
+      const numA = parseFloat(a);
+      const numB = parseFloat(b);
+      if (!isNaN(numA) && !isNaN(numB)) return numA - numB;
+      return a.localeCompare(b);
+    });
+  }, [products]);
+
   const frameTypes = useMemo(
     () =>
-      Array.from(new Set(products.map((p) => p.frame_type).filter(Boolean))),
+      Array.from(new Set(products.map((p) => p.frame_type).filter(Boolean))).sort(),
     [products]
   );
   const materials = useMemo(
     () =>
-      Array.from(new Set(products.map((p) => p.material).filter(Boolean))),
+      Array.from(new Set(products.map((p) => p.material).filter(Boolean))).sort(),
+    [products]
+  );
+  const shapes = useMemo(
+    () =>
+      Array.from(new Set(products.map((p) => p.shape).filter(Boolean))).sort(),
     [products]
   );
 
@@ -370,6 +452,7 @@ export default function ProductGrid({ initialCategory, initialGender }: ProductG
     setSelectedSizes([]);
     setSelectedFrameTypes([]);
     setSelectedMaterials([]);
+    setSelectedShapes([]);
     setSelectedCollections([]);
   };
 
@@ -381,6 +464,7 @@ export default function ProductGrid({ initialCategory, initialGender }: ProductG
     selectedSizes.length +
     selectedFrameTypes.length +
     selectedMaterials.length +
+    selectedShapes.length +
     selectedCollections.length +
     (priceRange.max < 25000 ? 1 : 0);
 
@@ -424,13 +508,14 @@ export default function ProductGrid({ initialCategory, initialGender }: ProductG
 
     if (selectedGenders.length > 0) {
       result = result.filter((p) => {
-        const pGenders = parseArray(p.gender);
+        const pGenders = parseArray(p.gender).map((g) => g.toLowerCase());
+        const selectedLower = selectedGenders.map((g) => g.toLowerCase());
         return (
-          pGenders.some((g) => selectedGenders.includes(g)) ||
+          pGenders.some((g) => selectedLower.includes(g)) ||
           p.product_categories?.some(
             (pc: any) =>
               pc.categories?.type === "gender" &&
-              selectedGenders.includes(pc.categories.name)
+              selectedLower.includes(pc.categories.name.toLowerCase())
           )
         );
       });
@@ -462,36 +547,68 @@ export default function ProductGrid({ initialCategory, initialGender }: ProductG
 
     if (selectedCollections.length > 0) {
       result = result.filter((p) => {
-        const pCollections = parseArray(p.collection);
+        const pCollections = parseArray(p.collection).map((c) => c.toLowerCase());
+        const selectedLower = selectedCollections.map((c) => c.toLowerCase());
         return (
-          pCollections.some((col) => selectedCollections.includes(col)) ||
+          pCollections.some((col) => selectedLower.includes(col)) ||
           p.product_categories?.some(
             (pc: any) =>
               pc.categories?.type === "collection" &&
-              selectedCollections.includes(pc.categories.name)
+              selectedLower.includes(pc.categories.name.toLowerCase())
           )
         );
       });
     }
 
     if (selectedBrands.length > 0) {
-      result = result.filter((p) => selectedBrands.includes(p.brand));
+      result = result.filter((p) =>
+        selectedBrands.some(
+          (b) => b.toLowerCase() === (p.brand || "").toLowerCase()
+        )
+      );
     }
     if (selectedColors.length > 0) {
-      result = result.filter(
-        (p) => p.colors && selectedColors.some((c) => p.colors.includes(c))
-      );
+      result = result.filter((p) => {
+        if (!p.colors || !Array.isArray(p.colors)) return false;
+        const pColorNames = p.colors
+          .map((c: any) => parseColorItem(c)?.name.toLowerCase())
+          .filter(Boolean);
+        return selectedColors.some((selectedName) =>
+          pColorNames.includes(selectedName.toLowerCase())
+        );
+      });
     }
     if (selectedSizes.length > 0) {
-      result = result.filter(
-        (p) => p.sizes && selectedSizes.some((s) => p.sizes.includes(s))
-      );
+      result = result.filter((p) => {
+        if (!p.sizes || !Array.isArray(p.sizes)) return false;
+        const pSizeTokens = p.sizes
+          .flatMap((s: any) => parseSizeItem(s))
+          .map((s: string) => s.toLowerCase());
+        return selectedSizes.some((selectedSize) =>
+          pSizeTokens.includes(selectedSize.toLowerCase())
+        );
+      });
     }
     if (selectedFrameTypes.length > 0) {
-      result = result.filter((p) => selectedFrameTypes.includes(p.frame_type));
+      result = result.filter((p) =>
+        selectedFrameTypes.some(
+          (ft) => ft.toLowerCase() === (p.frame_type || "").toLowerCase()
+        )
+      );
     }
     if (selectedMaterials.length > 0) {
-      result = result.filter((p) => selectedMaterials.includes(p.material));
+      result = result.filter((p) =>
+        selectedMaterials.some(
+          (m) => m.toLowerCase() === (p.material || "").toLowerCase()
+        )
+      );
+    }
+    if (selectedShapes.length > 0) {
+      result = result.filter((p) =>
+        selectedShapes.some(
+          (sh) => sh.toLowerCase() === (p.shape || "").toLowerCase()
+        )
+      );
     }
 
     result = result.filter((p) => {
@@ -533,6 +650,7 @@ export default function ProductGrid({ initialCategory, initialGender }: ProductG
     selectedSizes,
     selectedFrameTypes,
     selectedMaterials,
+    selectedShapes,
     priceRange,
     viewMode,
   ]);
@@ -692,26 +810,75 @@ export default function ProductGrid({ initialCategory, initialGender }: ProductG
         </FilterSection>
       )}
 
+      {shapes.length > 0 && (
+        <FilterSection title="Shape" activeCount={selectedShapes.length}>
+          {shapes.map((opt) => (
+            <CheckboxOption
+              key={opt}
+              opt={opt}
+              checked={selectedShapes.includes(opt)}
+              onChange={() => toggleFilter(setSelectedShapes, opt)}
+            />
+          ))}
+        </FilterSection>
+      )}
+
       {colors.length > 0 && (
         <FilterSection title="Colors" activeCount={selectedColors.length}>
-          <div className="flex flex-wrap gap-2 pt-1 pb-2">
-            {colors.map((color) => (
-              <button
-                key={color}
-                title={color}
-                onClick={() => toggleFilter(setSelectedColors, color)}
-                className={`w-6 h-6 rounded-full border-2 transition-all ${
-                  selectedColors.includes(color)
-                    ? "border-[#03173D] ring-2 ring-[#03173D]/20"
-                    : "border-transparent hover:border-[#E8EAF2]"
-                }`}
-                style={{
-                  backgroundColor: color.startsWith("#") ? color : undefined,
-                  background: !color.startsWith("#") ? color : undefined,
-                }}
-              />
-            ))}
+          <div className="flex flex-wrap gap-2.5 pt-1 pb-2">
+            {colors.map((colorObj) => {
+              const isSelected = selectedColors.includes(colorObj.name);
+              const hexLower = (colorObj.hex || "").toLowerCase();
+              const isLight =
+                hexLower === "#ffffff" ||
+                hexLower === "#fafafa" ||
+                colorObj.name.toLowerCase().includes("transparent");
+              return (
+                <button
+                  key={colorObj.name}
+                  type="button"
+                  title={colorObj.name}
+                  onClick={() => toggleFilter(setSelectedColors, colorObj.name)}
+                  className={`w-7 h-7 rounded-full border transition-all flex items-center justify-center relative shadow-xs ${
+                    isSelected
+                      ? "border-[#004AAD] ring-2 ring-[#004AAD] ring-offset-1 scale-105"
+                      : isLight
+                      ? "border-slate-300 hover:border-slate-400"
+                      : "border-black/10 hover:border-black/30"
+                  }`}
+                  style={{
+                    backgroundColor: colorObj.hex,
+                  }}
+                >
+                  {isSelected && (
+                    <Check
+                      size={12}
+                      className={isLight ? "text-slate-800" : "text-white"}
+                    />
+                  )}
+                </button>
+              );
+            })}
           </div>
+          {selectedColors.length > 0 && (
+            <div className="flex flex-wrap gap-1.5 mt-2 pt-2 border-t border-slate-100">
+              {selectedColors.map((colName) => (
+                <span
+                  key={colName}
+                  className="text-[10px] bg-slate-100 text-slate-700 px-2.5 py-0.5 rounded-full inline-flex items-center gap-1 font-medium"
+                >
+                  {colName}
+                  <button
+                    type="button"
+                    onClick={() => toggleFilter(setSelectedColors, colName)}
+                    className="hover:text-red-500 font-bold ml-0.5"
+                  >
+                    ×
+                  </button>
+                </span>
+              ))}
+            </div>
+          )}
         </FilterSection>
       )}
 

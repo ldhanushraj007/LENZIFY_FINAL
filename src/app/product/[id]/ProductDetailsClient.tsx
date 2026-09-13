@@ -105,20 +105,28 @@ export default function ProductDetailsClient({
   const [mainImageSrc, setMainImageSrc] = useState(initialPrimaryImage);
 
   const handleAddToCart = async (lensData?: any, isBuyNow: boolean = false) => {
-    if (!currentUser) {
-      router.push(`/auth/login?redirect=${encodeURIComponent(window.location.pathname)}`);
-      return;
-    }
     const displayPrice = (product.discount_price || product.price) + (lensData?.lens_price || 0);
 
-    // 1. Optimistic Update
-    addItem({
-      id: product.id,
+    const cartItemId = `${product.id}-${selectedColor || ''}-${selectedSize || ''}-${lensData?.lens_id || ''}`;
+    const cartItem = {
+      id: cartItemId,
+      product_id: product.id,
       name: product.name,
+      brand: product.brand || "LENZIFY",
       price: displayPrice,
-      image: mainImageSrc,
-      quantity: 1
-    } as any);
+      image: mainImageSrc || "/placeholder.jpg",
+      category: "Eyewear",
+      quantity: 1,
+      stock: product.stock,
+      selected_color: selectedColor,
+      selected_size: selectedSize,
+      lens_name: lensData?.lens_config?.type?.name || lensData?.lens_name,
+      lens_config: lensData?.lens_config,
+      prescription: lensData?.prescription_json,
+    };
+
+    // 1. Always add to local persistent cart
+    addItem(cartItem as any);
 
     const toastId = toast.loading('Adding to cart...', {
       style: {
@@ -132,7 +140,9 @@ export default function ProductDetailsClient({
     });
 
     try {
-      const res = await addToCart(product.id, {
+      // 2. If logged in, sync with Supabase cart table
+      if (currentUser) {
+        await addToCart(product.id, {
           quantity: 1,
           color: selectedColor,
           size: selectedSize,
@@ -140,30 +150,10 @@ export default function ProductDetailsClient({
           lens_id: lensData?.lens_id || null,
           lens_config: lensData?.lens_config || null,
           prescription_json: lensData?.prescription_json || null
-      });
-
-      if (res.success) {
-        toast.success(`Added to cart: ${product.name}`, {
-          id: toastId,
-          style: {
-            background: '#ffffff',
-            color: '#111111',
-            border: '1px solid #E8EAF2',
-            borderRadius: '12px',
-            fontSize: '12px',
-            fontWeight: '600',
-          }
         });
-        setShowLensFlow(false);
-        router.push(isBuyNow ? "/cart?buyNow=true" : "/cart");
-      } else {
-        throw new Error("Failed to add to cart");
       }
-    } catch (err) {
-      // Rollback
-      const { removeItem } = useCartStore.getState();
-      removeItem(product.id);
-      toast.error("Could not add to cart", {
+
+      toast.success(`Added to cart: ${product.name}`, {
         id: toastId,
         style: {
           background: '#ffffff',
@@ -174,6 +164,24 @@ export default function ProductDetailsClient({
           fontWeight: '600',
         }
       });
+      setShowLensFlow(false);
+      router.push(isBuyNow ? "/cart?buyNow=true" : "/cart");
+    } catch (err) {
+      console.error("Cart sync notice:", err);
+      // Item is still successfully added to local cart!
+      toast.success(`Added to cart: ${product.name}`, {
+        id: toastId,
+        style: {
+          background: '#ffffff',
+          color: '#111111',
+          border: '1px solid #E8EAF2',
+          borderRadius: '12px',
+          fontSize: '12px',
+          fontWeight: '600',
+        }
+      });
+      setShowLensFlow(false);
+      router.push(isBuyNow ? "/cart?buyNow=true" : "/cart");
     }
   };
 

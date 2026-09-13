@@ -10,7 +10,7 @@ export async function generateMetadata({ params }: { params: Promise<{ id: strin
   const supabase = await createClient();
   const { data: product } = await supabase
     .from("products")
-    .select("name, description, price, offer_price, brand, product_images(image_url)")
+    .select("name, description, price, offer_price, brand, primary_image, product_images(image_url)")
     .eq("id", id)
     .single();
 
@@ -19,7 +19,7 @@ export async function generateMetadata({ params }: { params: Promise<{ id: strin
   }
 
   const siteUrl = process.env.NEXT_PUBLIC_SITE_URL || 'https://lenzify.in';
-  const imageUrl = (product as any).product_images?.[0]?.image_url || `${siteUrl}/placeholder.jpg`;
+  const imageUrl = (product as any).primary_image || (product as any).product_images?.[0]?.image_url || `${siteUrl}/placeholder.jpg`;
   const price = product.offer_price || product.price;
 
   return {

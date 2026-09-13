@@ -25,9 +25,15 @@ function greet() {
 export default async function AdminDashboardPage() {
   const statsData = await getDashboardStats();
   const supabase = await createClient();
-  const { data: { user } } = await supabase.auth.getUser();
-
-  const name = user?.user_metadata?.name?.split(" ")[0] || "Admin";
+  let name = "Admin";
+  try {
+    const { data } = await supabase.auth.getUser();
+    if (data?.user?.user_metadata?.name) {
+      name = data.user.user_metadata.name.split(" ")[0];
+    }
+  } catch {
+    name = "Admin";
+  }
 
   const quickActions = [
     { label: "Add Product",    icon: Plus,      href: "/admin/products/new",      color: "bg-blue-50 text-blue-600" },

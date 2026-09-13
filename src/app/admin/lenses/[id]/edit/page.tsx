@@ -1,8 +1,10 @@
-import { updateLens } from "../../actions";
-import { ArrowLeft, Save, Cpu } from "lucide-react";
+import { updateLens, deleteLens } from "../../actions";
+import { ArrowLeft, Save, Cpu, Trash2 } from "lucide-react";
 import Link from "next/link";
 import { createClient } from "@/lib/supabase/server";
-import { notFound } from "next/navigation";
+import { notFound, redirect } from "next/navigation";
+import PowerRangeEditor from "@/components/admin/PowerRangeEditor";
+import ProgressiveTierFields from "@/components/admin/ProgressiveTierFields";
 
 export default async function EditLensPage({
   params,
@@ -29,6 +31,19 @@ export default async function EditLensPage({
           <p className="text-[10px] font-bold uppercase tracking-[0.4em] text-secondary italic">Catalog</p>
           <h1 className="text-4xl md:text-5xl font-serif italic text-brand-navy tracking-tight">Edit <span className="text-secondary">{lens.name}</span></h1>
         </div>
+        <form action={async () => {
+          "use server";
+          await deleteLens(id);
+          redirect("/admin/lenses");
+        }}>
+          <button
+            type="submit"
+            className="px-6 py-4 bg-red-50 hover:bg-red-100 text-red-600 border border-red-200 text-[10px] font-bold uppercase tracking-[0.2em] flex items-center gap-2 transition-all"
+          >
+            <Trash2 size={14} />
+            Deactivate / Delete Lens
+          </button>
+        </form>
       </header>
 
       {error && (
@@ -55,6 +70,18 @@ export default async function EditLensPage({
            </div>
 
            <div className="space-y-2 group">
+              <label className="text-[9px] font-bold uppercase tracking-widest text-brand-text-muted italic">Category</label>
+              <select name="category" defaultValue={lens.category || "type"} className="w-full bg-brand-background border border-brand-navy/10 px-6 py-4 text-[11px] font-medium tracking-wider outline-none focus:border-secondary transition-all">
+                 <option value="type">Primary Vision Type (Single, Bi, Pro)</option>
+                 <option value="feature">Add-on Feature (Blue Cut, Photochromic)</option>
+                 <option value="coating">Optic Coating (Anti-Glare, UV)</option>
+                 <option value="material">Lens Material (Polycarbonate, CR-39)</option>
+                 <option value="thickness">Refractive Index (1.5, 1.6, 1.74)</option>
+                 <option value="tint">Color / Tint (Grey, Brown)</option>
+              </select>
+           </div>
+
+           <div className="space-y-2 group">
               <label className="text-[9px] font-bold uppercase tracking-widest text-brand-text-muted italic">Description</label>
               <textarea name="description" rows={3} defaultValue={lens.description || ""} className="w-full bg-brand-background border border-brand-navy/10 px-6 py-4 text-[11px] font-medium tracking-wider outline-none focus:border-secondary transition-all resize-none" />
            </div>
@@ -63,6 +90,19 @@ export default async function EditLensPage({
               <label className="text-[9px] font-bold uppercase tracking-widest text-brand-text-muted italic">Features (JSON Array)</label>
               <textarea name="features" rows={3} defaultValue={JSON.stringify(lens.features || [], null, 2)} className="w-full bg-brand-background border border-brand-navy/10 px-6 py-4 text-[10px] font-mono tracking-wider outline-none focus:border-secondary transition-all resize-none" />
            </div>
+
+           {/* Power Range Setup */}
+           <div className="pt-4 border-t border-brand-navy/5">
+              <PowerRangeEditor initialRanges={lens.power_ranges || []} />
+           </div>
+
+           {/* Progressive Tier & Performance Ratings Setup */}
+           <ProgressiveTierFields
+              initialTier={lens.tier}
+              initialFieldOfView={lens.field_of_view}
+              initialRatings={lens.performance_ratings}
+              defaultOpen={lens.name?.toLowerCase().includes("progressive") || !!lens.tier}
+           />
 
            <label className="flex items-center justify-between p-4 border border-secondary/20 bg-secondary/5 hover:bg-secondary/10 transition-all cursor-pointer group/opt">
                 <span className="text-[10px] font-bold uppercase tracking-widest text-secondary">Active</span>

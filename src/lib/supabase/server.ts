@@ -1,9 +1,29 @@
 import { createServerClient, type CookieOptions } from '@supabase/ssr'
 import { cookies } from 'next/headers'
-import dns from 'dns'
+import dns from 'node:dns'
 
 // FIX: Prevents UND_ERR_CONNECT_TIMEOUT on Windows Node 18+ when resolving outbound connections like Supabase API
-dns.setDefaultResultOrder('ipv4first')
+try {
+  dns.setDefaultResultOrder('ipv4first')
+} catch {
+  // Ignore in environments where not supported
+}
+
+// Resilient fetch wrapper to handle transient DNS or socket issues on Windows / Undici
+export const resilientFetch: typeof fetch = async (input, init) => {
+  let lastError: any;
+  for (let attempt = 0; attempt < 3; attempt++) {
+    try {
+      return await fetch(input, init);
+    } catch (err: any) {
+      lastError = err;
+      if (attempt < 2) {
+        await new Promise((resolve) => setTimeout(resolve, 150 * (attempt + 1)));
+      }
+    }
+  }
+  throw lastError;
+};
 
 export async function createClient() {
   const cookieStore = await cookies()
@@ -26,6 +46,9 @@ export async function createClient() {
           }
         },
       },
+      global: {
+        fetch: resilientFetch,
+      },
     }
   )
 }
@@ -42,6 +65,9 @@ export async function createAdminClient() {
       cookies: {
         getAll() { return [] },
         setAll() { }
+      },
+      global: {
+        fetch: resilientFetch,
       },
     }
   )

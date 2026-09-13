@@ -3,6 +3,7 @@ import Link from "next/link";
 import { ArrowRight, Shield, Activity, Eye, Sparkles, ChevronRight, Zap, CheckCircle2, Info, Users, ListChecks } from "lucide-react";
 import { LENS_CONTENT } from "@/lib/data/lenses";
 import { createClient as createSupabaseClient } from "@supabase/supabase-js";
+import LensPackageSelector from "@/components/store/LensPackageSelector";
 
 export const dynamic = "force-dynamic";
 
@@ -32,6 +33,15 @@ export default async function LensDetailPage({ params }: { params: Promise<{ id:
   }
 
   if (!lens) return notFound();
+
+  const isProgressive = lens.name.toLowerCase().includes("progressive");
+  const isSingleVision = lens.name.toLowerCase().includes("single");
+  const isBifocal = lens.name.toLowerCase().includes("bifocal");
+  
+  // Starting price normalized per pricing specification
+  const startingPrice = isProgressive 
+    ? 1799 
+    : (isSingleVision ? 799 : (isBifocal ? 999 : lens.price));
 
   const slug = lens.name.toLowerCase().replace(/[\s()\/]+/g, "-").replace(/-+/g, "-");
   const editorial = Object.entries(LENS_CONTENT).find(([key]) => slug.includes(key))?.[1] || {
@@ -77,7 +87,7 @@ export default async function LensDetailPage({ params }: { params: Promise<{ id:
             <div className="flex flex-wrap items-center gap-4 pt-3">
               <div className="bg-white/10 border border-white/10 rounded-2xl px-6 py-3">
                 <p className="text-[10px] text-white/40 uppercase tracking-widest font-semibold mb-0.5">Starting from</p>
-                <p className="text-2xl font-bold text-white">₹{lens.price.toLocaleString()}</p>
+                <p className="text-2xl font-bold text-white">₹{startingPrice.toLocaleString()}</p>
               </div>
               <div className="flex gap-3">
                 <Link
@@ -118,7 +128,7 @@ export default async function LensDetailPage({ params }: { params: Promise<{ id:
             {/* Price callout */}
             <div className="bg-white border border-[#ECECEC] rounded-2xl p-7 space-y-4 shadow-sm self-start">
               <p className="text-[10px] font-bold uppercase tracking-widest text-[#004AAD]">Pricing</p>
-              <p className="text-3xl font-bold text-[#111111]">₹{lens.price.toLocaleString()}</p>
+              <p className="text-3xl font-bold text-[#111111]">₹{startingPrice.toLocaleString()}</p>
               <p className="text-sm text-[#888888]">Per lens, starting price. Final price depends on prescription complexity.</p>
               <div className="space-y-2 pt-2 border-t border-[#F0F0F0]">
                 <div className="flex items-center gap-2">
@@ -142,6 +152,17 @@ export default async function LensDetailPage({ params }: { params: Promise<{ id:
               </Link>
             </div>
           </div>
+        </div>
+      </section>
+
+      {/* Coating Enhancements & Upgrade Packages / Progressive Tiers */}
+      <section className="py-16 bg-white border-b border-[#ECECEC]">
+        <div className="container mx-auto px-6 lg:px-12">
+          <LensPackageSelector
+            lensName={lens.name}
+            lensId={lens.id}
+            basePrice={startingPrice}
+          />
         </div>
       </section>
 

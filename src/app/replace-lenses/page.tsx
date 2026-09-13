@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect, Suspense } from "react";
+import { useState, useEffect, useMemo, useRef, Suspense } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import { ArrowRight, ArrowLeft, Upload, CheckCircle2, ShieldCheck, Truck, Eye, Camera, Info, Clock, Calendar, CreditCard, Wallet, X } from "lucide-react";
 import { cn } from "@/lib/utils";
@@ -20,9 +20,13 @@ const steps = [
 
 const supabase = createClient();
 
+type PackageKey = "standard" | "photochromatic" | "photochromatic_bluecut";
+
 function ReplaceLensesContent() {
   const router = useRouter();
   const searchParams = useSearchParams();
+  const prefillLensId = searchParams.get("lensId");
+  const hasPrefilled = useRef(false);
   const [currentStep, setCurrentStep] = useState(1);
   const [loading, setLoading] = useState(true);
   const [submitting, setSubmitting] = useState(false);
@@ -31,6 +35,11 @@ function ReplaceLensesContent() {
   // Data from DB
   const [lenses, setLenses] = useState<any[]>([]);
   const [coatings, setCoatings] = useState<any[]>([]);
+
+  // Selections
+  const [selectedParentLens, setSelectedParentLens] = useState<any>(null);
+  const [selectedTier, setSelectedTier] = useState<any>(null);
+  const [selectedPackage, setSelectedPackage] = useState<PackageKey>("standard");
 
   // Form State
   const [formData, setFormData] = useState({
@@ -72,6 +81,100 @@ function ReplaceLensesContent() {
   const [pickupFee, setPickupFee] = useState(50);
   const [deliveryFee, setDeliveryFee] = useState(50);
 
+  // Filter main lens types (parent lenses only, exclude standalone Blue Cut, Photochromic, and child Progressive tiers)
+  const mainLensTypes = useMemo(() => {
+    return lenses.filter(l => {
+      const nameLower = l.name?.toLowerCase() || "";
+      if (nameLower === "blue cut") return false;
+      if (nameLower.includes("photochro")) return false; // Photochromic is an upgrade package only
+      if (l.tier && ["silver", "gold", "platinum"].includes(l.tier.toLowerCase())) return false;
+      if (nameLower.startsWith("progressive ") && (nameLower.includes("silver") || nameLower.includes("gold") || nameLower.includes("platinum"))) return false;
+      return true;
+    });
+  }, [lenses]);
+
+  // Progressive tiers lookup
+  const progressiveTiers = useMemo(() => {
+    const silver = lenses.find(l => l.tier === "silver" || l.name === "Progressive Silver");
+    const gold = lenses.find(l => l.tier === "gold" || l.name === "Progressive Gold");
+    const platinum = lenses.find(l => l.tier === "platinum" || l.name === "Progressive Platinum");
+
+    return [
+      {
+        tier: "silver",
+        name: "Progressive Silver",
+        displayName: "Silver",
+        price: 1799,
+        fovLabel: "Narrow Corridor",
+        description: "Excellent all-purpose progressive design with fast adaptation.",
+        lens: silver || { id: "c2505ad1-7ea6-4213-8dca-9818e39f483d", name: "Progressive Silver", price: 1799 },
+      },
+      {
+        tier: "gold",
+        name: "Progressive Gold",
+        displayName: "Gold",
+        price: 2799,
+        fovLabel: "Wide Corridor",
+        description: "Recommended for presbyopes choosing their first progressive design.",
+        lens: gold || { id: "6c87ecd2-f547-4742-9472-5589eb879628", name: "Progressive Gold", price: 2799 },
+      },
+      {
+        tier: "platinum",
+        name: "Progressive Platinum",
+        displayName: "Platinum",
+        price: 4299,
+        fovLabel: "Widest Panoramic View",
+        description: "Ultra-premium everyday lens with maximum visual field clarity.",
+        lens: platinum || { id: "019c03ca-6320-4b95-bce4-865b4237594d", name: "Progressive Platinum", price: 4299 },
+      },
+    ];
+  }, [lenses]);
+
+  // Package Flat Pricing Lookup
+  const getPackagePricing = () => {
+    const typeName = selectedParentLens?.name?.toLowerCase() || "";
+    const tierKey = selectedTier?.tier?.toLowerCase() || "";
+
+    if (typeName.includes("progressive")) {
+      if (tierKey === "silver") {
+        return {
+          standard: { price: 1799, label: "Standard", desc: "All 4 core coatings included" },
+          photochromatic: { price: 2799, label: "+ Photochromatic", desc: "Light-responsive tint with all coatings" },
+          photochromatic_bluecut: { price: 3499, label: "+ Photochromatic + Blue Cut", desc: "Full digital protection + light-adaptive tint" },
+        };
+      } else if (tierKey === "gold") {
+        return {
+          standard: { price: 2799, label: "Standard", desc: "All 4 core coatings included" },
+          photochromatic: { price: 3799, label: "+ Photochromatic", desc: "Light-responsive tint with all coatings" },
+          photochromatic_bluecut: { price: 4499, label: "+ Photochromatic + Blue Cut", desc: "Full digital protection + light-adaptive tint" },
+        };
+      } else {
+        // Platinum
+        return {
+          standard: { price: 4299, label: "Standard", desc: "All 4 core coatings included" },
+          photochromatic: { price: 5299, label: "+ Photochromatic", desc: "Light-responsive tint with all coatings" },
+          photochromatic_bluecut: { price: 5999, label: "+ Photochromatic + Blue Cut", desc: "Full digital protection + light-adaptive tint" },
+        };
+      }
+    } else if (typeName.includes("bifocal")) {
+      return {
+        standard: { price: 999, label: "Standard", desc: "All 4 core coatings included" },
+        photochromatic: { price: 1799, label: "+ Photochromatic", desc: "Light-responsive tint with all coatings" },
+        photochromatic_bluecut: { price: 2499, label: "+ Photochromatic + Blue Cut", desc: "Full digital protection + light-adaptive tint" },
+      };
+    } else {
+      // Single Vision or other standard type
+      return {
+        standard: { price: 799, label: "Standard", desc: "All 4 core coatings included" },
+        photochromatic: { price: 1199, label: "+ Photochromatic", desc: "Light-responsive tint with all coatings" },
+        photochromatic_bluecut: { price: 1799, label: "+ Photochromatic + Blue Cut", desc: "Full digital protection + light-adaptive tint" },
+      };
+    }
+  };
+
+  const packagePricing = getPackagePricing();
+  const currentPackagePrice = packagePricing[selectedPackage]?.price || 799;
+
   useEffect(() => {
     const initAuth = async () => {
       const { data: { user: authUser } } = await supabase.auth.getUser();
@@ -97,12 +200,70 @@ function ReplaceLensesContent() {
         setDeliveryFee(fee);
       }
 
-      const prefillLensId = searchParams.get("lensId");
       if (prefillLensId) {
-        const lensExists = lensesData.some(l => l.id === prefillLensId);
-        if (lensExists) {
-          setFormData(prev => ({ ...prev, lens_id: prefillLensId }));
-          toast.success("Lens pre-selected from your preference.");
+        const found = lensesData.find(l => l.id === prefillLensId);
+        if (found) {
+          const isProg = found.name?.toLowerCase().includes("progressive");
+          if (isProg) {
+            const parentProg = lensesData.find(l => l.name === "Progressive") || found;
+            setSelectedParentLens(parentProg);
+            const matchingTier = [
+              { tier: "silver", id: "c2505ad1-7ea6-4213-8dca-9818e39f483d", name: "Progressive Silver" },
+              { tier: "gold", id: "6c87ecd2-f547-4742-9472-5589eb879628", name: "Progressive Gold" },
+              { tier: "platinum", id: "019c03ca-6320-4b95-bce4-865b4237594d", name: "Progressive Platinum" }
+            ].find(t => t.id === prefillLensId || found.name?.toLowerCase().includes(t.tier));
+            
+            const silver = lensesData.find(l => l.tier === "silver" || l.name === "Progressive Silver");
+            const gold = lensesData.find(l => l.tier === "gold" || l.name === "Progressive Gold");
+            const platinum = lensesData.find(l => l.tier === "platinum" || l.name === "Progressive Platinum");
+
+            const pTiers = [
+              {
+                tier: "silver",
+                name: "Progressive Silver",
+                displayName: "Silver",
+                price: 1799,
+                fovLabel: "Narrow Corridor",
+                description: "Excellent all-purpose progressive design with fast adaptation.",
+                lens: silver || { id: "c2505ad1-7ea6-4213-8dca-9818e39f483d", name: "Progressive Silver", price: 1799 },
+              },
+              {
+                tier: "gold",
+                name: "Progressive Gold",
+                displayName: "Gold",
+                price: 2799,
+                fovLabel: "Wide Corridor",
+                description: "Recommended for presbyopes choosing their first progressive design.",
+                lens: gold || { id: "6c87ecd2-f547-4742-9472-5589eb879628", name: "Progressive Gold", price: 2799 },
+              },
+              {
+                tier: "platinum",
+                name: "Progressive Platinum",
+                displayName: "Platinum",
+                price: 4299,
+                fovLabel: "Widest Panoramic View",
+                description: "Ultra-premium everyday lens with maximum visual field clarity.",
+                lens: platinum || { id: "019c03ca-6320-4b95-bce4-865b4237594d", name: "Progressive Platinum", price: 4299 },
+              },
+            ];
+
+            const tierObj = pTiers.find(t => t.tier === matchingTier?.tier) || pTiers[0];
+            setSelectedTier(tierObj);
+            setFormData(prev => ({ ...prev, lens_id: tierObj.lens.id }));
+          } else {
+            setSelectedParentLens(found);
+            setFormData(prev => ({ ...prev, lens_id: found.id }));
+          }
+          if (!hasPrefilled.current) {
+            hasPrefilled.current = true;
+            toast.success("Lens pre-selected from your preference.");
+          }
+        }
+      } else if (lensesData.length > 0) {
+        const sv = lensesData.find(l => l.name?.toLowerCase() === "single vision");
+        if (sv) {
+          setSelectedParentLens(sv);
+          setFormData(prev => ({ ...prev, lens_id: sv.id }));
         }
       }
 
@@ -121,17 +282,12 @@ function ReplaceLensesContent() {
         document.body.removeChild(script);
       }
     };
-  }, [supabase, searchParams]);
+  }, [prefillLensId]);
 
   const calculateTotal = () => {
-    const selectedLens = lenses.find(l => l.id === formData.lens_id);
-    const lensPrice = selectedLens ? Number(selectedLens.price) : 0;
-    const coatingsPrice = formData.coating_ids.reduce((acc, id) => {
-      const coating = coatings.find(c => c.id === id);
-      return acc + (coating ? Number(coating.price) : 0);
-    }, 0);
+    const lensPrice = selectedParentLens ? currentPackagePrice : 0;
     const extraLogisticsFee = formData.is_delivery_different ? pickupFee : 0;
-    return lensPrice + coatingsPrice + pickupFee + deliveryFee + extraLogisticsFee;
+    return lensPrice + pickupFee + deliveryFee + extraLogisticsFee;
   };
 
   const nextStep = () => {
@@ -215,13 +371,13 @@ function ReplaceLensesContent() {
       const filePath = `${folder}/${fileName}`;
 
       const { error: uploadError } = await supabase.storage
-        .from('replacement-files')
+        .from('product-images')
         .upload(filePath, file);
 
       if (uploadError) throw uploadError;
 
       const { data: { publicUrl } } = supabase.storage
-        .from('replacement-files')
+        .from('product-images')
         .getPublicUrl(filePath);
 
       return publicUrl;
@@ -265,15 +421,12 @@ function ReplaceLensesContent() {
 
     setSubmitting(true);
     const total = calculateTotal();
-    const selectedLens = lenses.find(l => l.id === formData.lens_id);
-
+    const activeLensId = selectedTier ? selectedTier.lens.id : (selectedParentLens?.id || formData.lens_id);
     const baseOrderData = {
       ...formData,
-      lens_price: selectedLens ? Number(selectedLens.price) : 0,
-      coatings_price: formData.coating_ids.reduce((acc, id) => {
-        const coating = coatings.find(c => c.id === id);
-        return acc + (coating ? Number(coating.price) : 0);
-      }, 0),
+      lens_id: activeLensId,
+      lens_price: currentPackagePrice,
+      coatings_price: 0,
       pickup_fee: pickupFee,
       delivery_fee: deliveryFee,
       total_price: total
@@ -474,58 +627,189 @@ function ReplaceLensesContent() {
                 </motion.div>
               )}
 
-              {/* STEP 2: LENS & COATINGS */}
+              {/* STEP 2: LENS & UPGRADE PACKAGES */}
               {currentStep === 2 && (
-                <motion.div key="s2" initial={{ opacity: 0, x: 20 }} animate={{ opacity: 1, x: 0 }} exit={{ opacity: 0, x: -20 }} className="space-y-10">
-                  <div className="space-y-5">
+                <motion.div key="s2" initial={{ opacity: 0, x: 20 }} animate={{ opacity: 1, x: 0 }} exit={{ opacity: 0, x: -20 }} className="space-y-8">
+                  {/* Main Lens Types */}
+                  <div className="space-y-4">
                     <label className="text-[#004AAD] text-xs font-semibold uppercase tracking-widest block">Select Lens Type</label>
                     <div className="space-y-4">
-                      {lenses.map(lens => (
-                        <button
-                          key={lens.id}
-                          onClick={() => setFormData({ ...formData, lens_id: lens.id })}
-                          className={cn(
-                            "w-full p-6 border rounded-2xl text-left transition-all flex justify-between items-center",
-                            formData.lens_id === lens.id
-                              ? "bg-[#004AAD]/10 border-[#004AAD] text-[#004AAD]"
-                              : "bg-[#F8F9FC] border-[#E8EAF2] text-[#111111] hover:border-[#004AAD]/50"
-                          )}
-                        >
-                          <div>
-                            <h3 className="text-sm font-semibold mb-1">{lens.name}</h3>
-                            <p className="text-xs text-[#666666]">{lens.description}</p>
+                      {mainLensTypes.map(lens => {
+                        const isThisProgressive = lens.name.toLowerCase().includes("progressive");
+                        const isSelected = selectedParentLens?.id === lens.id;
+
+                        return (
+                          <div key={lens.id} className="space-y-3">
+                            <button
+                              onClick={() => {
+                                setSelectedParentLens(lens);
+                                if (!isThisProgressive) {
+                                  setSelectedTier(null);
+                                  setFormData({ ...formData, lens_id: lens.id });
+                                } else {
+                                  const tier = selectedTier || progressiveTiers[0];
+                                  setSelectedTier(tier);
+                                  setFormData({ ...formData, lens_id: tier.lens.id });
+                                }
+                              }}
+                              className={cn(
+                                "w-full p-6 border rounded-2xl text-left transition-all flex justify-between items-center",
+                                isSelected
+                                  ? "bg-[#004AAD]/10 border-[#004AAD] text-[#004AAD] shadow-sm"
+                                  : "bg-[#F8F9FC] border-[#E8EAF2] text-[#111111] hover:border-[#004AAD]/50"
+                              )}
+                            >
+                              <div>
+                                <h3 className="text-sm font-semibold mb-1">{lens.name}</h3>
+                                <p className="text-xs text-[#666666]">
+                                  {lens.description || (isThisProgressive ? "Multifocal lenses with seamless distance, intermediate, and reading zones." : "Standard corrective lenses.")}
+                                </p>
+                              </div>
+                              <span className="text-xl font-serif italic text-[#004AAD]">
+                                {isThisProgressive ? "From ₹1,799" : `₹${Number(lens.price).toLocaleString()}`}
+                              </span>
+                            </button>
+
+                            {/* Inline Progressive Tier Selection */}
+                            {isThisProgressive && isSelected && (
+                              <div className="p-5 bg-white border-2 border-[#004AAD]/30 rounded-2xl space-y-4 ml-1 mr-1">
+                                <div className="flex justify-between items-center border-b border-[#E8EAF2] pb-2">
+                                  <span className="text-xs font-bold text-[#004AAD] uppercase tracking-wider">Select Progressive Tier</span>
+                                  <span className="text-[10px] text-[#666666] font-medium">Corridor width & adaptation</span>
+                                </div>
+                                <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
+                                  {progressiveTiers.map(tier => {
+                                    const isTierSelected = selectedTier?.tier === tier.tier;
+                                    return (
+                                      <div
+                                        key={tier.tier}
+                                        onClick={() => {
+                                          setSelectedTier(tier);
+                                          setFormData({ ...formData, lens_id: tier.lens.id });
+                                        }}
+                                        className={cn(
+                                          "p-4 rounded-xl border-2 transition-all cursor-pointer space-y-2 relative flex flex-col justify-between",
+                                          isTierSelected
+                                            ? "bg-[#004AAD]/5 border-[#004AAD] shadow-sm"
+                                            : "bg-[#F8F9FC] border-[#E8EAF2] hover:border-[#004AAD]/40"
+                                        )}
+                                      >
+                                        <div>
+                                          <div className="flex justify-between items-center mb-1">
+                                            <span className="text-[10px] font-bold uppercase tracking-wider text-[#03173D]">
+                                              {tier.displayName}
+                                            </span>
+                                            <span className="text-xs font-bold text-[#004AAD]">₹{tier.price.toLocaleString()}</span>
+                                          </div>
+                                          <p className="text-[9px] font-semibold text-[#004AAD] uppercase">{tier.fovLabel}</p>
+                                          <p className="text-[10px] text-[#666666] mt-1">{tier.description}</p>
+                                        </div>
+                                        {isTierSelected && (
+                                          <div className="absolute top-2 right-2">
+                                            <CheckCircle2 size={14} className="text-[#004AAD]" />
+                                          </div>
+                                        )}
+                                      </div>
+                                    );
+                                  })}
+                                </div>
+                              </div>
+                            )}
                           </div>
-                          <span className="text-xl font-serif italic text-[#004AAD]">₹{Number(lens.price).toLocaleString()}</span>
-                        </button>
+                        );
+                      })}
+                    </div>
+                  </div>
+
+                  {/* Included Coatings Block */}
+                  <div className="bg-emerald-50/80 border border-emerald-200 rounded-2xl p-6 space-y-4">
+                    <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2">
+                      <div>
+                        <h4 className="text-xs font-bold uppercase tracking-widest text-emerald-950 flex items-center gap-2">
+                          <CheckCircle2 size={16} className="text-emerald-600" />
+                          Included in your lens
+                        </h4>
+                        <p className="text-[10px] text-emerald-800/80 mt-0.5">All essential protective optic armor comes standard with every lens</p>
+                      </div>
+                      <span className="text-[9px] font-bold uppercase tracking-wider bg-emerald-200/60 text-emerald-900 px-3 py-1 rounded-full w-fit">
+                        All coatings included at no extra charge
+                      </span>
+                    </div>
+
+                    <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 pt-1">
+                      {[
+                        "UV Block Protection",
+                        "Blue Cut",
+                        "Scratch Resistant Shield",
+                        "Anti-Reflective Coating",
+                      ].map((coating) => (
+                        <div key={coating} className="bg-white/90 border border-emerald-200/60 rounded-xl p-3 flex items-center gap-2">
+                          <CheckCircle2 size={14} className="text-emerald-600 shrink-0" />
+                          <span className="text-[11px] font-semibold text-emerald-950">{coating}</span>
+                        </div>
                       ))}
                     </div>
                   </div>
 
-                  <div className="space-y-5">
-                    <label className="text-[#004AAD] text-xs font-semibold uppercase tracking-widest block">Lens Coatings (optional)</label>
-                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                      {coatings.map(coating => {
-                        const isSelected = formData.coating_ids.includes(coating.id);
+                  {/* Upgrade Packages */}
+                  <div className="space-y-4">
+                    <div className="flex justify-between items-center">
+                      <label className="text-[#004AAD] text-xs font-semibold uppercase tracking-widest block">
+                        Choose an Upgrade Package
+                      </label>
+                      <span className="text-xs text-[#666666]">Flat package pricing</span>
+                    </div>
+
+                    <div className="grid grid-cols-1 gap-4">
+                      {[
+                        {
+                          key: "standard" as PackageKey,
+                          title: "Standard Package",
+                          subtitle: "All 4 included coatings — UV Block, Blue Cut, Scratch Shield & Anti-Reflective",
+                          price: packagePricing.standard.price,
+                        },
+                        {
+                          key: "photochromatic" as PackageKey,
+                          title: "+ Photochromatic",
+                          subtitle: "Transitions automatically from clear indoors to dark sunglasses outdoors in sunlight",
+                          price: packagePricing.photochromatic.price,
+                        },
+                        {
+                          key: "photochromatic_bluecut" as PackageKey,
+                          title: "+ Photochromatic + Blue Cut",
+                          subtitle: "The ultimate duo: light-adaptive transition tint with maximum digital blue ray filtration",
+                          price: packagePricing.photochromatic_bluecut.price,
+                        },
+                      ].map((pkg) => {
+                        const isPkgSelected = selectedPackage === pkg.key;
                         return (
-                          <button
-                            key={coating.id}
-                            onClick={() => {
-                              const newIds = isSelected
-                                ? formData.coating_ids.filter(id => id !== coating.id)
-                                : [...formData.coating_ids, coating.id];
-                              setFormData({ ...formData, coating_ids: newIds });
-                            }}
+                          <div
+                            key={pkg.key}
+                            onClick={() => setSelectedPackage(pkg.key)}
                             className={cn(
-                              "p-5 border rounded-2xl text-left transition-all relative overflow-hidden",
-                              isSelected
-                                ? "bg-[#004AAD]/10 border-[#004AAD] text-[#004AAD]"
-                                : "bg-[#F8F9FC] border-[#E8EAF2] text-[#111111] hover:border-[#004AAD]/50"
+                              "p-6 rounded-2xl border-2 transition-all cursor-pointer flex flex-col sm:flex-row sm:items-center justify-between gap-4",
+                              isPkgSelected
+                                ? "bg-[#004AAD]/5 border-[#004AAD] shadow-sm ring-1 ring-[#004AAD]/20"
+                                : "bg-white border-[#E8EAF2] hover:border-[#004AAD]/40"
                             )}
                           >
-                            {isSelected && <div className="absolute top-3 right-3 text-[#004AAD]"><CheckCircle2 size={14} /></div>}
-                            <h4 className="text-sm font-semibold mb-1">{coating.name}</h4>
-                            <p className="text-sm font-serif italic text-[#666666]">₹{Number(coating.price).toLocaleString()}</p>
-                          </button>
+                            <div className="flex items-start gap-4">
+                              <div className={cn(
+                                "w-5 h-5 rounded-full border-2 flex items-center justify-center mt-0.5 shrink-0 transition-all",
+                                isPkgSelected ? "border-[#004AAD] bg-[#004AAD]" : "border-slate-300"
+                              )}>
+                                {isPkgSelected && <div className="w-2 h-2 rounded-full bg-white" />}
+                              </div>
+                              <div className="space-y-1">
+                                <h5 className="text-xs font-bold uppercase tracking-wider text-[#03173D]">{pkg.title}</h5>
+                                <p className="text-[11px] text-[#666666] max-w-lg">{pkg.subtitle}</p>
+                              </div>
+                            </div>
+                            <div className="text-right shrink-0 pl-9 sm:pl-0">
+                              <span className="text-lg font-bold text-[#004AAD]">₹{pkg.price.toLocaleString()}</span>
+                              <p className="text-[9px] text-[#888888] font-bold uppercase tracking-wider">Total Lens Price</p>
+                            </div>
+                          </div>
                         );
                       })}
                     </div>
@@ -793,19 +1077,19 @@ function ReplaceLensesContent() {
                       <h4 className="text-[#004AAD] text-xs font-semibold uppercase tracking-widest">Order Summary</h4>
 
                       <div className="flex justify-between items-center py-2">
-                        <span className="text-sm text-[#666666]">{lenses.find(l => l.id === formData.lens_id)?.name}</span>
-                        <span className="text-lg font-serif italic text-[#111111]">₹{Number(lenses.find(l => l.id === formData.lens_id)?.price || 0).toLocaleString()}</span>
+                        <div>
+                          <p className="text-sm font-semibold text-[#111111]">
+                            {selectedParentLens?.name || "Lens"} {selectedTier ? `(${selectedTier.displayName})` : ""}
+                          </p>
+                          <p className="text-xs text-[#004AAD]">{packagePricing[selectedPackage].label}</p>
+                        </div>
+                        <span className="text-lg font-serif italic text-[#111111]">₹{currentPackagePrice.toLocaleString()}</span>
                       </div>
 
-                      {formData.coating_ids.map(id => {
-                        const c = coatings.find(x => x.id === id);
-                        return (
-                          <div key={id} className="flex justify-between items-center py-2 border-t border-[#ECECEC]">
-                            <span className="text-sm text-[#666666]">Coating: {c?.name}</span>
-                            <span className="text-sm font-serif italic text-[#666666]">₹{Number(c?.price || 0).toLocaleString()}</span>
-                          </div>
-                        );
-                      })}
+                      <div className="flex justify-between items-center py-2 border-t border-[#ECECEC]">
+                        <span className="text-sm text-[#666666]">Included Coatings (4)</span>
+                        <span className="text-xs font-bold text-emerald-700 bg-emerald-50 px-2 py-0.5 rounded">FREE</span>
+                      </div>
 
                       <div className="flex justify-between items-center py-4 border-y border-[#ECECEC] bg-[#F8F9FC] px-4 rounded-xl">
                         <div className="flex items-center gap-3">
@@ -894,12 +1178,17 @@ function ReplaceLensesContent() {
                 <p className="text-[#004AAD] text-xs font-semibold uppercase tracking-widest">Order Summary</p>
                 <div className="space-y-4">
                   <div className="flex justify-between text-sm text-[#111111]">
-                    <span>Lens</span>
-                    <span className="font-semibold">₹{Number(lenses.find(l => l.id === formData.lens_id)?.price || 0).toLocaleString()}</span>
+                    <div>
+                      <p className="font-semibold">
+                        {selectedParentLens?.name || "Lens"} {selectedTier ? `(${selectedTier.displayName})` : ""}
+                      </p>
+                      <p className="text-xs text-[#004AAD]">{packagePricing[selectedPackage].label}</p>
+                    </div>
+                    <span className="font-semibold">₹{currentPackagePrice.toLocaleString()}</span>
                   </div>
                   <div className="flex justify-between text-sm text-[#666666]">
-                    <span>Coatings</span>
-                    <span>₹{formData.coating_ids.reduce((acc, id) => acc + Number(coatings.find(c => c.id === id)?.price || 0), 0).toLocaleString()}</span>
+                    <span>Included Coatings (4)</span>
+                    <span className="text-xs font-bold text-emerald-700 bg-emerald-50 px-2 py-0.5 rounded">FREE</span>
                   </div>
                   <div className="flex justify-between text-sm text-[#666666]">
                     <span>Pickup & Delivery</span>

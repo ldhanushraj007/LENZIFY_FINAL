@@ -11,10 +11,9 @@ export async function createLens(formData: FormData) {
   const description = formData.get("description") as string;
   const price = parseFloat(formData.get("price") as string);
   const category = formData.get("category") as string || "type";
-  const sub_category = formData.get("sub_category") as string || null;
   const is_active = formData.get("is_active") === "true";
   
-  // Extract features (it comes as a string array or comma separated, let's assume JSON array from hidden input or textarea)
+  // Extract features
   const featuresRaw = formData.get("features") as string;
   let features = [];
   try {
@@ -23,15 +22,51 @@ export async function createLens(formData: FormData) {
     features = featuresRaw.split(",").map(f => f.trim()).filter(Boolean);
   }
 
-  const { error } = await supabase.from("lenses").insert({
+  // Extract power_ranges
+  const powerRangesRaw = formData.get("power_ranges") as string;
+  let power_ranges = [];
+  try {
+    power_ranges = JSON.parse(powerRangesRaw || "[]");
+  } catch (e) {
+    power_ranges = [];
+  }
+
+  // Extract Progressive tier attributes
+  const tier = (formData.get("tier") as string) || null;
+  const field_of_view = (formData.get("field_of_view") as string) || null;
+  const parent_lens_id = (formData.get("parent_lens_id") as string) || null;
+  let performance_ratings = null;
+  try {
+    const ratingsRaw = formData.get("performance_ratings") as string;
+    if (ratingsRaw) performance_ratings = JSON.parse(ratingsRaw);
+  } catch {}
+
+  // Attempt insert with all attributes; fallback if any columns do not exist yet
+  const insertPayload: any = {
     name,
     description,
     price,
     features,
     category,
-    sub_category,
-    is_active
-  });
+    is_active,
+  };
+  if (power_ranges.length > 0) insertPayload.power_ranges = power_ranges;
+  if (tier) insertPayload.tier = tier;
+  if (field_of_view) insertPayload.field_of_view = field_of_view;
+  if (performance_ratings) insertPayload.performance_ratings = performance_ratings;
+  if (parent_lens_id) insertPayload.parent_lens_id = parent_lens_id;
+
+  let { error } = await supabase.from("lenses").insert(insertPayload);
+
+  if (error && (error.message?.includes("power_ranges") || error.message?.includes("tier") || error.message?.includes("field_of_view"))) {
+    delete insertPayload.power_ranges;
+    delete insertPayload.tier;
+    delete insertPayload.field_of_view;
+    delete insertPayload.performance_ratings;
+    delete insertPayload.parent_lens_id;
+    const retry = await supabase.from("lenses").insert(insertPayload);
+    error = retry.error;
+  }
 
   if (error) {
     console.error("Error creating lens:", error);
@@ -49,7 +84,6 @@ export async function updateLens(id: string, formData: FormData) {
   const description = formData.get("description") as string;
   const price = parseFloat(formData.get("price") as string);
   const category = formData.get("category") as string || "type";
-  const sub_category = formData.get("sub_category") as string || null;
   const is_active = formData.get("is_active") === "true";
 
   const featuresRaw = formData.get("features") as string;
@@ -60,15 +94,55 @@ export async function updateLens(id: string, formData: FormData) {
     features = featuresRaw.split(",").map(f => f.trim()).filter(Boolean);
   }
 
-  const { error } = await supabase.from("lenses").update({
+  const powerRangesRaw = formData.get("power_ranges") as string;
+  let power_ranges = [];
+  try {
+    power_ranges = JSON.parse(powerRangesRaw || "[]");
+  } catch (e) {
+    power_ranges = [];
+  }
+
+  // Extract Progressive tier attributes
+  const tier = (formData.get("tier") as string) || null;
+  const field_of_view = (formData.get("field_of_view") as string) || null;
+  const parent_lens_id = (formData.get("parent_lens_id") as string) || null;
+  let performance_ratings = null;
+  try {
+    const ratingsRaw = formData.get("performance_ratings") as string;
+    if (ratingsRaw) performance_ratings = JSON.parse(ratingsRaw);
+  } catch {}
+
+  const updatePayload: any = {
     name,
     description,
     price,
     features,
     category,
-    sub_category,
-    is_active
-  }).eq("id", id);
+    is_active,
+    power_ranges,
+    tier,
+    field_of_view,
+    performance_ratings,
+    parent_lens_id
+  };
+
+  let { error } = await supabase.from("lenses").update(updatePayload).eq("id", id);
+
+  if (error && (error.message?.includes("power_ranges") || error.message?.includes("tier") || error.message?.includes("field_of_view"))) {
+    delete updatePayload.power_ranges;
+    delete updatePayload.tier;
+    delete updatePayload.field_of_view;
+    delete updatePayload.performance_ratings;
+    delete updatePayload.parent_lens_id;
+    const retry = await supabase.from("lenses").update(updatePayload).eq("id", id);
+    error = retry.error;
+  }
+
+  if (error && error.message?.includes("power_ranges")) {
+    delete updatePayload.power_ranges;
+    const retry = await supabase.from("lenses").update(updatePayload).eq("id", id);
+    error = retry.error;
+  }
 
   if (error) {
     console.error("Error updating lens:", error);
@@ -81,7 +155,8 @@ export async function updateLens(id: string, formData: FormData) {
 
 export async function deleteLens(id: string) {
   const supabase = await createAdminClient();
-  const { error } = await supabase.from("lenses").delete().eq("id", id);
+  // Soft delete so past orders that reference this lens ID don't break
+  const { error } = await supabase.from("lenses").update({ is_active: false }).eq("id", id);
 
   if (error) {
     console.error("Error deleting lens:", error);
@@ -89,6 +164,7 @@ export async function deleteLens(id: string) {
   }
 
   revalidatePath("/admin/lenses");
+  return { success: true };
 }
 
 export async function updateLensPrice(id: string, price: number) {

@@ -8,19 +8,19 @@ import { ChevronRight } from "lucide-react";
 const LENS_TYPES = [
   {
     name: "Bifocal",
-    price: "Starts at ₹1,499",
+    price: "Starts at ₹999",
     image: "/images/editorial/lifestyle_laughing.png",
     id: "5e46d84e-fc97-4ee1-b8b6-b801397ae7b5"
   },
   {
     name: "Progressive",
-    price: "Starts at ₹2,499",
+    price: "Starts at ₹1,799",
     image: "/images/homepage/banner_lenses_1777728807886.png",
     id: "de87ead3-c3f3-48ac-9b4d-a779b9d17cad"
   },
   {
     name: "Single Vision",
-    price: "Starts at ₹999",
+    price: "Starts at ₹799",
     image: "/images/editorial/hero_woman_reading.png",
     id: "98ed43f0-b092-4e8f-bddc-67e6ed6f62b8"
   },
@@ -50,12 +50,6 @@ const ENHANCEMENTS = [
     price: "Starts at ₹1,299",
     image: "/images/homepage/carousel_eyewear_1_1777728338105.png",
     id: "5e621f5d-7ad8-4c7e-854c-bbca08e78004"
-  },
-  {
-    name: "Photochromic (Transition)",
-    price: "Starts at ₹1,999",
-    image: "/images/homepage/carousel_eyewear_2_1777728357207.png",
-    id: "e3c88ace-173b-4a21-9b26-3fbf284d07b7"
   },
   {
     name: "Scratch Resistant",

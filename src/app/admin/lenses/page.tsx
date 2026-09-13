@@ -65,9 +65,9 @@ export default function AdminLensesPage() {
     <div className="space-y-10">
       <header className="flex flex-col md:flex-row md:items-end md:justify-between gap-6 border-b border-brand-navy/5 pb-10">
         <div>
-          <p className="text-[10px] font-bold uppercase tracking-[0.4em] text-secondary italic mb-2">Catalog</p>
-          <h1 className="text-4xl font-serif italic text-brand-navy tracking-tight uppercase">Optical <span className="text-secondary">Lenses</span></h1>
-          <p className="text-[9px] uppercase font-bold tracking-[0.3em] text-brand-text-muted mt-3">{lenses.length} lenses registered</p>
+          <p className="text-[10px] font-bold uppercase tracking-[0.4em] text-secondary italic mb-2">Prescription Optics</p>
+          <h1 className="text-4xl font-serif italic text-brand-navy tracking-tight uppercase">Prescription <span className="text-secondary">Lenses (for Frames)</span></h1>
+          <p className="text-[9px] uppercase font-bold tracking-[0.3em] text-brand-text-muted mt-3">{lenses.length} prescription lenses registered</p>
         </div>
         <Link
           href="/admin/lenses/new"
@@ -100,9 +100,29 @@ export default function AdminLensesPage() {
             <div className="flex justify-between items-start gap-3">
               <div className="flex-1 min-w-0">
                 <h3 className="text-lg font-serif italic text-brand-navy tracking-tight leading-tight">{lens.name}</h3>
-                {lens.sub_category && (
-                  <p className="text-[9px] font-bold uppercase tracking-widest text-brand-navy/30 mt-1">{lens.sub_category}</p>
-                )}
+                <div className="flex flex-wrap items-center gap-1.5 mt-1.5">
+                  {lens.tier && (
+                    <span className={`text-[8px] font-bold uppercase tracking-wider px-2 py-0.5 rounded border ${
+                      lens.tier === "platinum"
+                        ? "bg-purple-50 text-purple-700 border-purple-200"
+                        : lens.tier === "gold"
+                        ? "bg-amber-50 text-amber-700 border-amber-200"
+                        : "bg-slate-100 text-slate-700 border-slate-300"
+                    }`}>
+                      {lens.tier}
+                    </span>
+                  )}
+                  {lens.field_of_view && (
+                    <span className="text-[8px] font-bold uppercase tracking-wider px-2 py-0.5 rounded bg-blue-50 text-blue-700 border border-blue-200">
+                      {lens.field_of_view} FoV
+                    </span>
+                  )}
+                  {lens.category && (
+                    <span className="text-[8px] font-bold uppercase tracking-widest text-brand-navy/40">
+                      {lens.category}
+                    </span>
+                  )}
+                </div>
               </div>
               <div className="flex gap-1.5 shrink-0">
                 <Link

@@ -1,6 +1,6 @@
 "use server";
 
-import { createClient } from "@/lib/supabase/server";
+import { createClient, createAdminClient } from "@/lib/supabase/server";
 import { revalidatePath } from "next/cache";
 
 /**
@@ -158,7 +158,7 @@ export async function updateHomepageSection(key: string, content: any, isActive:
  * Aggregates site-wide metrics for tactical administrative overview.
  */
 export async function getDashboardStats() {
-  const supabase = await createClient();
+  const supabase = await createAdminClient();
 
   const last7DaysDate = new Date(Date.now() - 7 * 24 * 60 * 60 * 1000).toISOString();
 
@@ -168,8 +168,8 @@ export async function getDashboardStats() {
       const { data, error } = await supabase.from("orders").select("total_price").eq("payment_status", "paid");
       if (error) throw error;
       return data || [];
-    } catch (e) {
-      console.error("Error fetching sales data:", e);
+    } catch (e: any) {
+      console.error("Error fetching sales data:", e?.message || e);
       return [];
     }
   };
@@ -179,19 +179,25 @@ export async function getDashboardStats() {
       const { count, error } = await supabase.from("orders").select("*", { count: "exact", head: true });
       if (error) throw error;
       return count || 0;
-    } catch (e) {
-      console.error("Error fetching total orders:", e);
+    } catch (e: any) {
+      console.error("Error fetching total orders:", e?.message || e);
       return 0;
     }
   };
 
   const fetchTotalCustomers = async () => {
     try {
-      const { count, error } = await supabase.from("users").select("*", { count: "exact", head: true }).eq("role", "customer");
-      if (error) throw error;
-      return count || 0;
-    } catch (e) {
-      console.error("Error fetching total customers:", e);
+      // First check profiles table where user profiles and roles are stored
+      const { count, error } = await supabase.from("profiles").select("*", { count: "exact", head: true });
+      if (!error && count !== null) return count;
+
+      // Fallback to users table
+      const usersRes = await supabase.from("users").select("*", { count: "exact", head: true });
+      if (!usersRes.error && usersRes.count !== null) return usersRes.count;
+
+      return 0;
+    } catch (e: any) {
+      console.error("Error fetching total customers:", e?.message || e);
       return 0;
     }
   };
@@ -201,8 +207,8 @@ export async function getDashboardStats() {
       const { data, count, error } = await supabase.from("products").select("id, name, stock, brand", { count: "exact" }).lte("stock", 5).limit(5);
       if (error) throw error;
       return { data: data || [], count: count || 0 };
-    } catch (e) {
-      console.error("Error fetching low stock:", e);
+    } catch (e: any) {
+      console.error("Error fetching low stock:", e?.message || e);
       return { data: [], count: 0 };
     }
   };
@@ -212,8 +218,8 @@ export async function getDashboardStats() {
       const { data, error } = await supabase.from("cart").select("user_id");
       if (error) throw error;
       return data || [];
-    } catch (e) {
-      console.error("Error fetching cart users:", e);
+    } catch (e: any) {
+      console.error("Error fetching cart users:", e?.message || e);
       return [];
     }
   };
@@ -223,8 +229,8 @@ export async function getDashboardStats() {
       const { data, error } = await supabase.from("orders").select("*, users(name)").order("created_at", { ascending: false }).limit(5);
       if (error) throw error;
       return data || [];
-    } catch (e) {
-      console.error("Error fetching recent orders:", e);
+    } catch (e: any) {
+      console.error("Error fetching recent orders:", e?.message || e);
       return [];
     }
   };
@@ -234,8 +240,8 @@ export async function getDashboardStats() {
       const { data, error } = await supabase.from("order_items").select("product_id, quantity, products(name, brand)").limit(10);
       if (error) throw error;
       return data || [];
-    } catch (e) {
-      console.error("Error fetching top selling data:", e);
+    } catch (e: any) {
+      console.error("Error fetching top selling data:", e?.message || e);
       return [];
     }
   };
@@ -245,8 +251,8 @@ export async function getDashboardStats() {
       const { data, error } = await supabase.from("orders").select("created_at, total_price, payment_status").gte("created_at", last7DaysDate);
       if (error) throw error;
       return data || [];
-    } catch (e) {
-      console.error("Error fetching trend orders:", e);
+    } catch (e: any) {
+      console.error("Error fetching trend orders:", e?.message || e);
       return [];
     }
   };

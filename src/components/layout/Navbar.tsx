@@ -199,23 +199,28 @@ export default function Navbar() {
     const fetchLenses = async () => {
       const { data } = await supabase
         .from("lenses")
-        .select("id, name")
+        .select("id, name, tier")
         .eq("is_active", true)
         .eq("category", "type")
         .order("name", { ascending: true });
 
-      if (data) setLenses(data);
+      if (data) {
+        // Filter out standalone Blue Cut, individual progressive tiers, and Photochromic (now an upgrade package)
+        const filtered = data.filter((l: any) => {
+          const nameLower = l.name.toLowerCase();
+          if (nameLower === "blue cut") return false;
+          if (nameLower.includes("photochro")) return false;
+          if (l.tier && ["silver", "gold", "platinum"].includes(l.tier.toLowerCase())) return false;
+          if (nameLower.startsWith("progressive ") && (nameLower.includes("silver") || nameLower.includes("gold") || nameLower.includes("platinum"))) return false;
+          return true;
+        });
+        setLenses(filtered);
+      }
     };
 
     const fetchCoatings = async () => {
-      const { data } = await supabase
-        .from("lenses")
-        .select("id, name")
-        .eq("is_active", true)
-        .eq("category", "feature")
-        .order("name", { ascending: true });
-
-      if (data) setCoatings(data);
+      // Fix 5: Standalone coating pages removed from navigation as all 4 core coatings are standard
+      setCoatings([]);
     };
 
     fetchBrands();
@@ -702,45 +707,40 @@ export default function Navbar() {
             className={cn(
               "absolute top-full bg-white border border-[#E8EAF2] shadow-2xl p-2 flex flex-col gap-1 z-50 rounded-2xl hidden lg:flex min-w-[200px] mt-4",
               activeMenu === "lenses" &&
-                "left-[calc(50%-250px)] min-w-[500px] p-6 grid grid-cols-2 gap-8",
+                "left-[calc(50%-180px)] min-w-[360px] p-4",
               activeMenu === "offers" && "left-[calc(50%+60px)]"
             )}
           >
             {activeMenu === "lenses" && (
-              <>
-                <div className="space-y-4">
-                  <h3 className="text-[10px] font-black uppercase tracking-[0.2em] text-[#666666] px-4">
-                    Lens Types
+              <div className="space-y-3 p-2">
+                <div className="flex items-center justify-between border-b border-[#E8EAF2] pb-2 px-3">
+                  <h3 className="text-[10px] font-black uppercase tracking-[0.2em] text-[#666666]">
+                    Prescription Lens Types
                   </h3>
-                  <div className="flex flex-col gap-1">
-                    {lenses.map((lens) => (
-                      <Link
-                        key={lens.id}
-                        href={`/lenses/${lens.id}`}
-                        className="px-4 py-3 hover:bg-[#F8F9FC] text-xs font-bold uppercase tracking-widest text-[#111111] hover:text-[#004AAD] transition-colors rounded-xl"
-                      >
-                        {lens.name}
-                      </Link>
-                    ))}
-                  </div>
+                  <span className="text-[9px] font-bold text-emerald-700 bg-emerald-50 px-2 py-0.5 rounded">
+                    4 Core Coatings Included Free
+                  </span>
                 </div>
-                <div className="space-y-4 border-l border-[#E8EAF2]">
-                  <h3 className="text-[10px] font-black uppercase tracking-[0.2em] text-[#666666] px-4">
-                    Laboratory Enhancements
-                  </h3>
-                  <div className="flex flex-col gap-1">
-                    {coatings.map((coating) => (
-                      <Link
-                        key={coating.id}
-                        href={`/lenses/${coating.id}`}
-                        className="px-4 py-3 hover:bg-[#F8F9FC] text-xs font-bold uppercase tracking-widest text-[#111111] hover:text-[#004AAD] transition-colors rounded-xl"
-                      >
-                        {coating.name}
-                      </Link>
-                    ))}
-                  </div>
+                <div className="flex flex-col gap-1">
+                  {lenses.map((lens) => (
+                    <Link
+                      key={lens.id}
+                      href={`/lenses/${lens.id}`}
+                      className="px-4 py-3 hover:bg-[#F8F9FC] text-xs font-bold uppercase tracking-widest text-[#111111] hover:text-[#004AAD] transition-colors rounded-xl flex items-center justify-between"
+                    >
+                      <span>{lens.name}</span>
+                      <span className="text-[10px] text-[#004AAD] font-semibold">Explore →</span>
+                    </Link>
+                  ))}
+                  <Link
+                    href="/replace-lenses"
+                    className="px-4 py-3 bg-[#F8F9FC] hover:bg-[#EEF2F6] text-xs font-bold uppercase tracking-widest text-[#004AAD] transition-colors rounded-xl mt-2 flex items-center justify-between"
+                  >
+                    <span>Replace Your Lenses</span>
+                    <span className="text-[10px] font-semibold">Fitting Service →</span>
+                  </Link>
                 </div>
-              </>
+              </div>
             )}
             {activeMenu === "offers" &&
               OFFERS.map((link) => (
@@ -918,21 +918,7 @@ export default function Navbar() {
                         </Link>
                       ))}
                     </div>
-                    <div className="space-y-3">
-                      <p className="text-[10px] font-bold text-[#999999] uppercase">
-                        Coatings
-                      </p>
-                      {coatings.map((coating) => (
-                        <Link
-                          key={coating.id}
-                          href={`/lenses/${coating.id}`}
-                          onClick={() => setIsMobileMenuOpen(false)}
-                          className="block text-sm font-medium text-[#111111] hover:text-[#004AAD] transition-colors"
-                        >
-                          {coating.name}
-                        </Link>
-                      ))}
-                    </div>
+
                     <Link
                       href="/replace-lenses"
                       onClick={() => setIsMobileMenuOpen(false)}

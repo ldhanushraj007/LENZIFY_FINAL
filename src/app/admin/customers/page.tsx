@@ -22,7 +22,22 @@ export default async function AdminCustomersPage({
     dbQuery = dbQuery.or(`name.ilike.%${query}%,email.ilike.%${query}%`);
   }
 
-  const { data: users, error } = await dbQuery;
+  let { data: users, error } = await dbQuery;
+
+  if (!users || users.length === 0) {
+    const { data: profileList } = await supabase.from("profiles").select("*");
+    if (profileList && profileList.length > 0) {
+      users = profileList.map((p: any) => ({
+        id: p.id,
+        name: p.full_name || "Customer",
+        email: p.email || "Registered User",
+        created_at: p.updated_at,
+        is_blocked: false,
+        role: p.role || "customer",
+        orders: []
+      }));
+    }
+  }
 
   // Calculate total spent per user
   const customers = users?.map(u => ({

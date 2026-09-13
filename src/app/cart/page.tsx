@@ -28,18 +28,22 @@ export default function CartPage() {
 
   const syncCartData = async () => {
     try {
+      if (!user) {
+        setLoading(false);
+        return;
+      }
       const cartData = await getCart();
       const mappedItems = (cartData || []).map((item: any) => ({
         id: `${item.product_id}-${item.selected_color || ""}-${item.selected_size || ""}`,
         database_id: item.id,
         product_id: item.product_id,
-        name: item.products.name,
-        brand: item.products.brand || "LENZIFY",
-        price: item.price || item.products.offer_price || item.products.price,
-        image: item.products.product_images?.[0]?.image_url || "/placeholder.jpg",
+        name: item.products?.name || "Product",
+        brand: item.products?.brand || "LENZIFY",
+        price: item.price || item.products?.offer_price || item.products?.price,
+        image: item.products?.primary_image || item.products?.product_images?.[0]?.image_url || "/placeholder.jpg",
         category: "Eyewear",
         quantity: item.quantity,
-        stock: item.products.stock ?? 99,
+        stock: item.products?.stock ?? 99,
         lens_name: item.lenses?.name,
         lens_config: item.lens_config,
         prescription: item.prescription_json,

@@ -1,6 +1,8 @@
 import { createLens } from "../actions";
 import { ArrowLeft, Save, Cpu } from "lucide-react";
 import Link from "next/link";
+import PowerRangeEditor from "@/components/admin/PowerRangeEditor";
+import ProgressiveTierFields from "@/components/admin/ProgressiveTierFields";
 
 export default async function NewLensPage({
   searchParams,
@@ -48,38 +50,28 @@ export default async function NewLensPage({
                  />
               </div>
 
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
-               <div className="space-y-2 group">
-                  <label className="text-[9px] font-bold uppercase tracking-widest text-brand-text-muted italic">Category</label>
-                  <div className="relative">
-                    <select 
-                      name="category" 
-                      required 
-                      className="w-full bg-brand-background border border-brand-navy/10 px-6 py-4 text-[11px] font-medium tracking-wider outline-none focus:border-secondary transition-all appearance-none"
-                    >
-                       <option value="type">Primary Vision Type (Single, Bi, Pro)</option>
-                       <option value="feature">Add-on Feature (Blue Cut, Photochromic)</option>
-                       <option value="coating">Optic Coating (Anti-Glare, UV)</option>
-                       <option value="material">Lens Material (Polycarbonate, CR-39)</option>
-                       <option value="thickness">Refractive Index (1.5, 1.6, 1.74)</option>
-                       <option value="tint">Color / Tint (Grey, Brown)</option>
-                    </select>
-                    <div className="absolute inset-y-0 right-0 flex items-center pr-4 pointer-events-none text-brand-navy/20">
-                       <Save size={12} className="rotate-90" />
-                    </div>
-                  </div>
-               </div>
-               <div className="space-y-2 group">
-                  <label className="text-[9px] font-bold uppercase tracking-widest text-brand-text-muted italic">Sub-Category / Group (Optional)</label>
-                  <input 
-                    name="sub_category" 
-                    placeholder="e.g. Photochromic" 
-                    className="w-full bg-brand-background border border-brand-navy/10 px-6 py-4 text-[11px] font-medium tracking-wider outline-none focus:border-secondary transition-all" 
-                  />
-               </div>
-            </div>
+              <div className="space-y-2 group">
+                 <label className="text-[9px] font-bold uppercase tracking-widest text-brand-text-muted italic">Category</label>
+                 <div className="relative">
+                   <select 
+                     name="category" 
+                     required 
+                     className="w-full bg-brand-background border border-brand-navy/10 px-6 py-4 text-[11px] font-medium tracking-wider outline-none focus:border-secondary transition-all appearance-none"
+                   >
+                      <option value="type">Primary Vision Type (Single, Bi, Pro)</option>
+                      <option value="feature">Add-on Feature (Blue Cut, Photochromic)</option>
+                      <option value="coating">Optic Coating (Anti-Glare, UV)</option>
+                      <option value="material">Lens Material (Polycarbonate, CR-39)</option>
+                      <option value="thickness">Refractive Index (1.5, 1.6, 1.74)</option>
+                      <option value="tint">Color / Tint (Grey, Brown)</option>
+                   </select>
+                   <div className="absolute inset-y-0 right-0 flex items-center pr-4 pointer-events-none text-brand-navy/20">
+                      <Save size={12} className="rotate-90" />
+                   </div>
+                 </div>
+              </div>
 
-            <div className="space-y-2 group">
+              <div className="space-y-2 group md:col-span-2">
                  <label className="text-[9px] font-bold uppercase tracking-widest text-brand-text-muted italic">Price (₹)</label>
                  <input 
                    name="price" 
@@ -111,6 +103,14 @@ export default async function NewLensPage({
                 className="w-full bg-brand-background border border-brand-navy/10 px-6 py-4 text-[10px] font-mono tracking-wider outline-none focus:border-secondary transition-all resize-none" 
               />
            </div>
+
+           {/* Power Range Setup */}
+           <div className="pt-4 border-t border-brand-navy/5">
+              <PowerRangeEditor initialRanges={[]} />
+           </div>
+
+           {/* Progressive Tier & Performance Ratings Setup */}
+           <ProgressiveTierFields />
 
            <label className="flex items-center justify-between p-4 border border-secondary/20 bg-secondary/5 hover:bg-secondary/10 transition-all cursor-pointer group/opt">
                 <span className="text-[10px] font-bold uppercase tracking-widest text-secondary">Active on Launch</span>

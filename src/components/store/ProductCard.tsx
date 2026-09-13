@@ -25,17 +25,50 @@ interface ProductCardProps {
     rating?: number;
     slug?: string;
     discount_price?: number;
-    colors?: string[];
+    colors?: any[];
     stock?: number;
     availability?: string;
   };
 }
+
+const parseColor = (val: any): { name: string; hex: string } | null => {
+  if (!val) return null;
+  let item = val;
+  if (typeof item === "string") {
+    try {
+      item = JSON.parse(item);
+    } catch {
+      const trimmed = val.trim();
+      if (!trimmed) return null;
+      return {
+        name: trimmed,
+        hex: trimmed.startsWith("#") ? trimmed : trimmed,
+      };
+    }
+  }
+  if (item && typeof item === "object") {
+    const name = item.name || item.label || item.color || "";
+    let hex = item.hex || item.colorHex || "";
+    if (!hex && typeof name === "string" && name.startsWith("#")) {
+      hex = name;
+    }
+    if (!hex) hex = "#000000";
+    if (name) {
+      return { name: String(name).trim(), hex: String(hex).trim() };
+    }
+  }
+  return null;
+};
 
 export default function ProductCard({ product }: ProductCardProps) {
   const { addItem, removeItem } = useCartStore();
   const { addItem: addToWishlist, removeItem: removeFromWishlist, isInWishlist } = useWishlistStore();
   const router = useRouter();
   const { user } = useAuth();
+
+  const parsedColors = (product.colors || [])
+    .map(parseColor)
+    .filter((c): c is { name: string; hex: string } => c !== null);
 
   const getInitialImage = () => {
     // Check primary_image but skip the generic placeholder — it means no real image was saved
@@ -112,29 +145,28 @@ export default function ProductCard({ product }: ProductCardProps) {
     });
 
     try {
-      const result = await addToCart(product.id, {
-        quantity: 1,
-        price: displayPrice,
-      });
-
-      if (result.success) {
-        toast.success(`Added: ${product.name}`, {
-          id: toastId,
-          style: {
-            background: "#ffffff",
-            color: "#111111",
-            border: "1px solid #E8EAF2",
-            borderRadius: "12px",
-            fontSize: "12px",
-            fontWeight: "600",
-          },
+      if (user) {
+        await addToCart(product.id, {
+          quantity: 1,
+          price: displayPrice,
         });
-      } else {
-        throw new Error("Failed to add to database");
       }
+
+      toast.success(`Added: ${product.name}`, {
+        id: toastId,
+        style: {
+          background: "#ffffff",
+          color: "#111111",
+          border: "1px solid #E8EAF2",
+          borderRadius: "12px",
+          fontSize: "12px",
+          fontWeight: "600",
+        },
+      });
     } catch (err) {
-      removeItem(product.id);
-      toast.error("Could not add to cart", {
+      console.error("Quick add error:", err);
+      // Item remains in local cart store
+      toast.success(`Added: ${product.name}`, {
         id: toastId,
         style: {
           background: "#ffffff",
@@ -248,7 +280,7 @@ export default function ProductCard({ product }: ProductCardProps) {
         <button
           suppressHydrationWarning
           onClick={handleWishlist}
-          className={`absolute top-3 right-3 w-9 h-9 bg-white rounded-full flex items-center justify-center shadow-md opacity-0 group-hover:opacity-100 translate-y-1 group-hover:translate-y-0 transition-all duration-200 z-20 ${
+          className={`absolute top-3 right-3 w-9 h-9 bg-white rounded-full flex items-center justify-center shadow-md opacity-90 md:opacity-0 md:group-hover:opacity-100 translate-y-0 md:translate-y-1 md:group-hover:translate-y-0 transition-all duration-200 z-20 ${
             wishlisted ? "text-red-500" : "text-[#666666] hover:text-red-500"
           }`}
           aria-label="Toggle wishlist"
@@ -258,14 +290,14 @@ export default function ProductCard({ product }: ProductCardProps) {
 
         {/* Quick Add / Out of Stock Button */}
         {isOutOfStock ? (
-          <div className="absolute bottom-0 left-0 right-0 bg-[#F8F9FC] border-t border-[#ECECEC] text-[#888888] text-xs font-semibold py-3 translate-y-full group-hover:translate-y-0 transition-all duration-300 z-20 flex items-center justify-center gap-2 rounded-b-2xl">
+          <div className="absolute bottom-0 left-0 right-0 bg-[#F8F9FC] border-t border-[#ECECEC] text-[#888888] text-xs font-semibold py-2.5 md:py-3 translate-y-0 md:translate-y-full md:group-hover:translate-y-0 transition-all duration-300 z-20 flex items-center justify-center gap-2 rounded-b-2xl">
             Notify Me
           </div>
         ) : (
           <button
             suppressHydrationWarning
             onClick={handleQuickAdd}
-            className="absolute bottom-0 left-0 right-0 bg-[#03173D] text-white text-xs font-semibold py-3 translate-y-full group-hover:translate-y-0 transition-all duration-300 z-20 flex items-center justify-center gap-2 rounded-b-2xl hover:bg-[#004AAD]"
+            className="absolute bottom-0 left-0 right-0 bg-[#03173D] text-white text-xs font-semibold py-2.5 md:py-3 translate-y-0 md:translate-y-full md:group-hover:translate-y-0 transition-all duration-300 z-20 flex items-center justify-center gap-2 rounded-b-2xl hover:bg-[#004AAD] active:scale-[0.98]"
           >
             <ShoppingBag size={14} />
             Quick Add
@@ -293,22 +325,30 @@ export default function ProductCard({ product }: ProductCardProps) {
             </span>
           </div>
 
-          {product.colors && product.colors.length > 0 && (
+          {parsedColors.length > 0 && (
             <div className="flex items-center gap-1">
-              {(product.colors as string[]).slice(0, 4).map((color: string, i: number) => (
-                <span
-                  key={i}
-                  title={color}
-                  className="w-3.5 h-3.5 rounded-full border border-black/10 inline-block flex-shrink-0"
-                  style={{
-                    backgroundColor: color.startsWith("#") ? color : undefined,
-                    background: !color.startsWith("#") ? color : undefined,
-                  }}
-                />
-              ))}
-              {product.colors.length > 4 && (
+              {parsedColors.slice(0, 4).map((color, i) => {
+                const hexLower = (color.hex || "").toLowerCase();
+                const isLight =
+                  hexLower === "#ffffff" ||
+                  hexLower === "#fafafa" ||
+                  color.name.toLowerCase().includes("transparent");
+                return (
+                  <span
+                    key={i}
+                    title={color.name}
+                    className={`w-3.5 h-3.5 rounded-full inline-block flex-shrink-0 shadow-xs ${
+                      isLight ? "border border-slate-300" : "border border-black/10"
+                    }`}
+                    style={{
+                      backgroundColor: color.hex,
+                    }}
+                  />
+                );
+              })}
+              {parsedColors.length > 4 && (
                 <span className="text-[9px] text-[#666666] font-bold">
-                  +{product.colors.length - 4}
+                  +{parsedColors.length - 4}
                 </span>
               )}
             </div>

@@ -46,7 +46,7 @@ const NAV_GROUPS = [
     items: [
       { name: "Products", icon: Package, href: "/admin/products" },
       { name: "Add Product", icon: PlusCircle, href: "/admin/products/new" },
-      { name: "Optical Lenses", icon: Eye, href: "/admin/lenses" },
+      { name: "Prescription Lenses", icon: Eye, href: "/admin/lenses" },
       { name: "Lens Coatings", icon: Layers, href: "/admin/coatings" },
       { name: "Categories", icon: FolderTree, href: "/admin/categories" },
       { name: "Brands", icon: Tag, href: "/admin/brands" },
