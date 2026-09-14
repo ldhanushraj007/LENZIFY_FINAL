@@ -109,6 +109,14 @@ export default async function OrdersPage() {
                     )}
                   </div>
                   <div className="flex items-center gap-3">
+                    <span className={cn(
+                      "text-xs font-semibold px-2.5 py-1 rounded-full border",
+                      order.payment_method === 'cod'
+                        ? "bg-amber-50 text-amber-800 border-amber-200"
+                        : "bg-blue-50 text-[#004AAD] border-blue-200"
+                    )}>
+                      {order.payment_method === 'cod' ? 'Cash on Delivery' : 'Online'}
+                    </span>
                     <span className={cn("text-xs font-semibold px-3 py-1.5 rounded-full capitalize", statusBadge(order.status))}>
                       {order.status}
                     </span>

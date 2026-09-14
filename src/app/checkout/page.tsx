@@ -24,9 +24,11 @@ import {
   Shield,
   Tag,
   X,
+  Banknote,
 } from "lucide-react";
 
 import { useAuth } from "@/components/providers/AuthProvider";
+import { useCartStore } from "@/store/cartStore";
 
 const STEPS = [
   { id: 1, label: "Address", icon: MapPin },
@@ -39,8 +41,7 @@ export default function CheckoutPage() {
   const { user, loading: authLoading } = useAuth();
   const [loading, setLoading] = useState(true);
   const [orderProcessing, setOrderProcessing] = useState(false);
-  const [activeStep, setActiveStep] = useState(1);
-  const [paymentMethod] = useState<"upi">("upi");
+  const [paymentMethod, setPaymentMethod] = useState<"razorpay" | "cod">("razorpay");
 
   const [addressData, setAddressData] = useState({
     name: "",
@@ -158,7 +159,49 @@ export default function CheckoutPage() {
     const tax = discountedSubtotal * 0.18;
     const totalAmount = discountedSubtotal + tax;
 
-    // UPI / Razorpay Flow
+    // 1. CASH ON DELIVERY (COD) FLOW
+    if (paymentMethod === "cod") {
+      try {
+        const codId = `COD-${Date.now()}-${Math.random().toString(36).substring(2, 7).toUpperCase()}`;
+        const orderRes = await placeOrder({
+          items: cartItems.map(item => ({
+            id: item.product_id,
+            quantity: item.quantity,
+            price: item.price,
+            lens_id: item.lens_id,
+            selected_color: item.selected_color,
+            selected_size: item.selected_size,
+            prescription_json: item.prescription_json || (prescription.left_eye ? {
+              od_sph: prescription.right_eye,
+              os_sph: prescription.left_eye,
+              pd: prescription.pd
+            } : null)
+          })),
+          total_price: totalAmount,
+          address: addressData,
+          prescription: (prescription.left_eye || prescription.file_url) ? prescription : undefined,
+          payment: { id: codId, method: "cod" }
+        });
+
+        if (orderRes.success) {
+          if (couponId) await incrementCouponUsage(couponId);
+          useCartStore.getState().clearCart();
+          toast.success("Order placed successfully with Cash on Delivery!");
+          router.push(`/orders/success?id=${orderRes.order_id}`);
+        } else {
+          console.error("COD Order Placement Error:", orderRes.error);
+          toast.error(orderRes.error || "Order placement failed. Please try again.");
+          setOrderProcessing(false);
+        }
+      } catch (err: any) {
+        console.error("COD Fulfillment Exception:", err);
+        toast.error(`Order processing failed: ${err.message || "Unknown error"}.`);
+        setOrderProcessing(false);
+      }
+      return;
+    }
+
+    // 2. UPI / Razorpay Flow
     try {
       const res = await fetch("/api/checkout", {
         method: "POST",
@@ -232,6 +275,7 @@ export default function CheckoutPage() {
 
             if (orderRes.success) {
               if (couponId) await incrementCouponUsage(couponId);
+              useCartStore.getState().clearCart();
               router.push(`/orders/success?id=${orderRes.order_id}`);
             } else {
               console.error("Order Placement Error:", orderRes.error);
@@ -550,21 +594,81 @@ export default function CheckoutPage() {
                       </div>
                     </div>
 
-                    <div className="p-5 border-2 border-[#03173D] bg-[#F0F4FF] rounded-2xl flex items-center gap-4">
-                      <CreditCard size={22} className="text-[#03173D] shrink-0" />
-                      <div>
-                        <p className="font-semibold text-[#111111] text-sm">UPI / Card / Net Banking</p>
-                        <p className="text-[#666666] text-xs mt-0.5">Instant payment via Razorpay</p>
+                    <div className="space-y-3">
+                      {/* Online Payment Option */}
+                      <div
+                        onClick={() => setPaymentMethod("razorpay")}
+                        className={cn(
+                          "p-5 rounded-2xl flex items-center gap-4 cursor-pointer transition-all border-2",
+                          paymentMethod === "razorpay"
+                            ? "border-[#03173D] bg-[#F0F4FF] shadow-sm"
+                            : "border-[#ECECEC] bg-white hover:border-[#CCCCCC] hover:bg-[#F8F9FC]"
+                        )}
+                      >
+                        <div className={cn(
+                          "w-10 h-10 rounded-xl flex items-center justify-center shrink-0 transition-colors",
+                          paymentMethod === "razorpay" ? "bg-[#03173D] text-white" : "bg-[#F4F6F8] text-[#555555]"
+                        )}>
+                          <CreditCard size={20} />
+                        </div>
+                        <div className="flex-1">
+                          <div className="flex items-center gap-2">
+                            <p className="font-semibold text-[#111111] text-sm">Online Payment</p>
+                            <span className="text-[10px] font-bold uppercase tracking-wider bg-emerald-100 text-emerald-800 px-2 py-0.5 rounded">
+                              Recommended
+                            </span>
+                          </div>
+                          <p className="text-[#666666] text-xs mt-0.5">UPI (Google Pay, PhonePe, Paytm), Cards & Net Banking</p>
+                        </div>
+                        <div className={cn(
+                          "w-5 h-5 rounded-full flex items-center justify-center shrink-0 border transition-all",
+                          paymentMethod === "razorpay"
+                            ? "bg-[#03173D] border-[#03173D]"
+                            : "border-[#CCCCCC] bg-white"
+                        )}>
+                          {paymentMethod === "razorpay" && <CheckCircle2 size={12} className="text-white" />}
+                        </div>
                       </div>
-                      <div className="ml-auto w-5 h-5 rounded-full bg-[#03173D] flex items-center justify-center shrink-0">
-                        <CheckCircle2 size={12} className="text-white" />
+
+                      {/* Cash on Delivery Option */}
+                      <div
+                        onClick={() => setPaymentMethod("cod")}
+                        className={cn(
+                          "p-5 rounded-2xl flex items-center gap-4 cursor-pointer transition-all border-2",
+                          paymentMethod === "cod"
+                            ? "border-[#03173D] bg-[#F0F4FF] shadow-sm"
+                            : "border-[#ECECEC] bg-white hover:border-[#CCCCCC] hover:bg-[#F8F9FC]"
+                        )}
+                      >
+                        <div className={cn(
+                          "w-10 h-10 rounded-xl flex items-center justify-center shrink-0 transition-colors",
+                          paymentMethod === "cod" ? "bg-[#03173D] text-white" : "bg-[#F4F6F8] text-[#555555]"
+                        )}>
+                          <Banknote size={20} />
+                        </div>
+                        <div className="flex-1">
+                          <p className="font-semibold text-[#111111] text-sm">Cash on Delivery (COD)</p>
+                          <p className="text-[#666666] text-xs mt-0.5">Pay in cash or UPI when your package arrives at your doorstep</p>
+                        </div>
+                        <div className={cn(
+                          "w-5 h-5 rounded-full flex items-center justify-center shrink-0 border transition-all",
+                          paymentMethod === "cod"
+                            ? "bg-[#03173D] border-[#03173D]"
+                            : "border-[#CCCCCC] bg-white"
+                        )}>
+                          {paymentMethod === "cod" && <CheckCircle2 size={12} className="text-white" />}
+                        </div>
                       </div>
                     </div>
 
-                    <p className="text-[#666666] text-xs leading-relaxed">
-                      By completing your purchase, you confirm that the information provided is accurate.
-                      Your payment is secured and encrypted.
-                    </p>
+                    <div className="p-4 rounded-xl bg-[#F8F9FC] border border-[#E8EAF2] flex items-start gap-3">
+                      <ShieldCheck size={18} className="text-emerald-600 shrink-0 mt-0.5" />
+                      <p className="text-[#666666] text-xs leading-relaxed">
+                        {paymentMethod === "cod"
+                          ? "Cash on Delivery is available across all serviceable pincodes in India. Please keep exact cash or UPI ready upon delivery."
+                          : "Your payment is secured and encrypted via Razorpay. We do not store your card details."}
+                      </p>
+                    </div>
                   </div>
 
                   <div className="flex flex-col sm:flex-row gap-3">
@@ -577,9 +681,13 @@ export default function CheckoutPage() {
                     <button
                       disabled={orderProcessing}
                       onClick={handlePayment}
-                      className="flex items-center justify-center gap-2 bg-[#03173D] text-white rounded-full px-8 py-3 font-semibold hover:bg-[#004AAD] transition-all flex-1 sm:flex-none disabled:opacity-50 disabled:cursor-not-allowed"
+                      className="flex items-center justify-center gap-2 bg-[#03173D] text-white rounded-full px-8 py-3 font-semibold hover:bg-[#004AAD] transition-all flex-1 sm:flex-none disabled:opacity-50 disabled:cursor-not-allowed shadow-md hover:shadow-lg"
                     >
-                      {orderProcessing ? "Processing..." : "Pay Now"}
+                      {orderProcessing
+                        ? "Placing Order..."
+                        : paymentMethod === "cod"
+                        ? `Place Order (COD) • ₹${totalAmount.toLocaleString("en-IN")}`
+                        : `Pay Now • ₹${totalAmount.toLocaleString("en-IN")}`}
                       {!orderProcessing && <ArrowRight size={16} />}
                     </button>
                   </div>

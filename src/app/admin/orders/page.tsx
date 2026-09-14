@@ -146,12 +146,22 @@ export default async function AdminOrdersPage({
                     ₹{Number(order.total_price || 0).toLocaleString("en-IN")}
                   </td>
                   <td className="px-4 py-4">
-                    <span className={cn(
-                      "inline-block text-[10px] font-semibold capitalize px-2.5 py-1 rounded-full border",
-                      PAYMENT_STYLES[order.payment_status] ?? "bg-gray-50 text-gray-500 border-gray-200"
-                    )}>
-                      {order.payment_status}
-                    </span>
+                    <div className="flex flex-col gap-1 items-start">
+                      <span className={cn(
+                        "text-[10px] font-bold uppercase tracking-wider px-2 py-0.5 rounded border",
+                        order.payment_method === 'cod'
+                          ? "bg-amber-50 text-amber-800 border-amber-200"
+                          : "bg-blue-50 text-[#004AAD] border-blue-200"
+                      )}>
+                        {order.payment_method === 'cod' ? 'COD' : 'ONLINE'}
+                      </span>
+                      <span className={cn(
+                        "inline-block text-[10px] font-semibold capitalize px-2 py-0.5 rounded-full border",
+                        PAYMENT_STYLES[order.payment_status] ?? "bg-gray-50 text-gray-500 border-gray-200"
+                      )}>
+                        {order.payment_status}
+                      </span>
+                    </div>
                   </td>
                   <td className="px-4 py-4">
                     <span className={cn(

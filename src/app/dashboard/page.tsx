@@ -12,7 +12,7 @@ import {
   ShoppingBag,
 } from "lucide-react";
 import Link from "next/link";
-import { cn } from "@/lib/utils";
+import { cn, getIndianGreeting } from "@/lib/utils";
 
 export default async function CustomerDashboardPage() {
   const supabase = await createClient();
@@ -49,8 +49,7 @@ export default async function CustomerDashboardPage() {
     .eq("user_id", user.id);
 
   const name = user.user_metadata?.name || user.email?.split("@")[0] || "there";
-  const hour = new Date().getHours();
-  const greeting = hour < 12 ? "Good morning" : hour < 17 ? "Good afternoon" : "Good evening";
+  const greeting = getIndianGreeting();
 
   const recentOrders = (orders || []).slice(0, 5);
 

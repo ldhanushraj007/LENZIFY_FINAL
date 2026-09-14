@@ -171,9 +171,14 @@ function SuccessContent() {
                   ))}
                 </div>
                 <div className="px-6 py-4 bg-[#F8F9FC] flex justify-between items-center border-t border-[#ECECEC]">
-                  <span className="text-xs font-bold uppercase tracking-widest text-[#666666]">
-                    Total Paid
-                  </span>
+                  <div>
+                    <span className="text-xs font-bold uppercase tracking-widest text-[#666666]">
+                      {order.payment_method === "cod" ? "Payable on Delivery" : "Total Paid"}
+                    </span>
+                    {order.payment_method === "cod" && (
+                      <p className="text-[11px] text-amber-600 font-medium mt-0.5">Cash / UPI at doorstep</p>
+                    )}
+                  </div>
                   <span className="text-lg font-bold text-[#03173D]">
                     ₹{(order.total_price || 0).toLocaleString()}
                   </span>

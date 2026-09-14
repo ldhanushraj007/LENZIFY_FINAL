@@ -13,7 +13,7 @@ import {
   Settings,
 } from "lucide-react";
 import Link from "next/link";
-import { cn } from "@/lib/utils";
+import { cn, getIndianGreeting } from "@/lib/utils";
 
 export default async function ProfilePage() {
   const supabase = await createClient();
@@ -40,6 +40,8 @@ export default async function ProfilePage() {
 
   const metadata = user.user_metadata || {};
   const joinDate = new Date(user.created_at).toLocaleDateString("en-US", { month: "long", year: "numeric" });
+  const greeting = getIndianGreeting();
+  const firstName = metadata.name ? metadata.name.split(" ")[0] : "there";
 
   const navItems = [
     { href: "/profile", label: "Profile", icon: User, active: true },
@@ -54,9 +56,18 @@ export default async function ProfilePage() {
     <div className="bg-[#F8F9FC] min-h-screen pt-20 md:pt-28 pb-16">
       <div className="max-w-6xl mx-auto px-6 lg:px-12">
         {/* Page header */}
-        <div className="mb-8">
-          <p className="text-xs font-semibold uppercase tracking-widest text-[#004AAD] mb-2">Account</p>
-          <h1 className="text-4xl font-[var(--font-hero)] italic text-[#111111]">My Profile</h1>
+        <div className="mb-8 flex flex-col md:flex-row md:items-end justify-between gap-4">
+          <div>
+            <p className="text-xs font-semibold uppercase tracking-widest text-[#004AAD] mb-1">
+              {greeting}, {firstName}!
+            </p>
+            <h1 className="text-4xl font-[var(--font-hero)] italic text-[#111111]">My Profile</h1>
+            <p className="text-sm text-[#666666] mt-1">Manage your account details, security, and preferences.</p>
+          </div>
+          <div className="inline-flex items-center gap-2 px-3.5 py-1.5 rounded-full bg-white border border-[#ECECEC] text-xs font-medium text-[#666666] shadow-sm">
+            <span className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse" />
+            IST (India)
+          </div>
         </div>
 
         <div className="flex flex-col lg:flex-row gap-8 items-start">
@@ -72,6 +83,9 @@ export default async function ProfilePage() {
                     <UserCircle size={48} className="text-[#ECECEC]" />
                   )}
                 </div>
+                <span className="inline-block text-[11px] font-semibold text-[#004AAD] bg-[#004AAD]/5 px-2.5 py-0.5 rounded-full mb-1.5">
+                  {greeting}!
+                </span>
                 <p className="font-semibold text-[#111111]">{metadata.name || "Your Account"}</p>
                 <p className="text-xs text-[#666666] mt-0.5 truncate max-w-[180px]">{user.email}</p>
                 <p className="text-xs text-[#666666] mt-1">Member since {joinDate}</p>

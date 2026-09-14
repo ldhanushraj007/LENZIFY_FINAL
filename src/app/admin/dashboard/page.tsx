@@ -1,5 +1,5 @@
 import { Plus, Tag, Layers, ShoppingBag, ChevronRight, ArrowRight, Package, AlertTriangle } from "lucide-react";
-import { cn } from "@/lib/utils";
+import { cn, getIndianGreeting } from "@/lib/utils";
 import Link from "next/link";
 import { getDashboardStats } from "@/lib/db/admin_actions";
 import { createClient } from "@/lib/supabase/server";
@@ -16,10 +16,7 @@ const STATUS_STYLES: Record<string, string> = {
 };
 
 function greet() {
-  const h = new Date().getHours();
-  if (h < 12) return "Good morning";
-  if (h < 17) return "Good afternoon";
-  return "Good evening";
+  return getIndianGreeting();
 }
 
 export default async function AdminDashboardPage() {
