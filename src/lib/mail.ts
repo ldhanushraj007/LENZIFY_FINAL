@@ -175,3 +175,45 @@ export function getOrderStatusUpdateHtml(
     </div>
   `;
 }
+
+export function getReplacementOrderConfirmationHtml(order: any, customerName: string) {
+  const pickupAddr = order.pickup_address || {};
+  const isDiff = order.is_delivery_different;
+  const deliveryAddr = isDiff ? (order.delivery_address || {}) : pickupAddr;
+
+  return `
+    <div style="font-family: sans-serif; max-width: 600px; margin: 0 auto; color: #333;">
+      <div style="background: #03173D; padding: 24px; text-align: center; border-radius: 12px 12px 0 0;">
+        <h1 style="color: #fff; margin: 0; font-size: 24px; font-style: italic;">LENZIFY</h1>
+      </div>
+      <div style="background: #fff; padding: 32px; border: 1px solid #eee; border-top: none; border-radius: 0 0 12px 12px;">
+        <div style="text-align: center; margin-bottom: 24px;">
+          <span style="font-size: 40px;">👓</span>
+          <h2 style="color: #111; margin: 8px 0;">Lens Replacement Request Confirmed!</h2>
+          <p style="color: #004AAD; font-weight: bold; margin: 0;">Payment: ${order.payment_method === 'cod' ? 'Cash on Pickup / Delivery (COD)' : 'Paid Online'}</p>
+        </div>
+        <p>Hi ${customerName},</p>
+        <p>We have successfully received your lens replacement order. Our courier specialist will visit your location to collect your frames.</p>
+        
+        <div style="background: #f9f9f9; padding: 20px; border-radius: 8px; margin: 20px 0;">
+          <h3 style="margin-top: 0; color: #03173D;">Order Details</h3>
+          <p style="margin: 6px 0;"><strong>Order ID:</strong> #${(order.id || "").slice(0, 8).toUpperCase()}</p>
+          <p style="margin: 6px 0;"><strong>Frame Type:</strong> ${order.frame_type || "Standard"}</p>
+          <p style="margin: 6px 0;"><strong>Pickup Schedule:</strong> ${order.pickup_date || "Scheduled"} (${order.pickup_time_slot || "Standard"})</p>
+          <p style="margin: 6px 0;"><strong>Pickup Address:</strong> ${pickupAddr.address || ""}, ${pickupAddr.city || ""}, ${pickupAddr.pincode || ""}</p>
+          ${isDiff ? `<p style="margin: 6px 0;"><strong>Delivery Address:</strong> ${deliveryAddr.address || ""}, ${deliveryAddr.city || ""}, ${deliveryAddr.pincode || ""}</p>` : ""}
+          <hr style="border: 0; border-top: 1px solid #ddd; margin: 12px 0;">
+          <p style="margin: 6px 0; font-size: 16px; font-weight: bold; color: #111;">Total Amount: ₹${(order.total_price || 0).toLocaleString('en-IN')}</p>
+        </div>
+        
+        <p>Please keep your frames safely packed or ready in their protective case for pickup.</p>
+        <p>Best regards,<br><strong>Team Lenzify</strong></p>
+        <hr style="border: 0; border-top: 1px solid #eee; margin: 32px 0 16px;">
+        <p style="font-size: 11px; color: #999; text-align: center;">
+          Lenzify.in | Precision Optical Surfacing<br>
+          This is an automated confirmation message.
+        </p>
+      </div>
+    </div>
+  `;
+}

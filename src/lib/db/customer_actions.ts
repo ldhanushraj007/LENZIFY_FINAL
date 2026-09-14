@@ -8,20 +8,43 @@ import { revalidatePath } from "next/cache";
  */
 
 export async function getCart() {
-  const supabase = await createClient();
-  const { data: { user } } = await supabase.auth.getUser();
-  if (!user) return [];
+  try {
+    const supabase = await createClient();
+    const { data: { user } } = await supabase.auth.getUser();
+    if (!user) return [];
 
-  const { data, error } = await supabase
-    .from("cart")
-    .select("*, products(name, price, offer_price, product_images(*)), lenses(name, price), lens_config")
-    .eq("user_id", user.id);
+    const { data, error } = await supabase
+      .from("cart")
+      .select("*, products(id, name, brand, price, offer_price, discount_price, stock, frame_type, primary_image, product_images(*))")
+      .eq("user_id", user.id)
+      .order("id", { ascending: false });
 
-  if (error) {
-    console.error("Error fetching cart:", error);
+    if (error) {
+      console.error("Error fetching cart:", error);
+      return [];
+    }
+
+    // Attach lens details if lens_id is present
+    const lensIds = (data || []).map((i: any) => i.lens_id).filter(Boolean);
+    let lensesMap: Record<string, any> = {};
+    if (lensIds.length > 0) {
+      const { data: lenses } = await supabase
+        .from("lenses")
+        .select("id, name, price")
+        .in("id", lensIds);
+      if (lenses) {
+        lensesMap = Object.fromEntries(lenses.map((l: any) => [l.id, l]));
+      }
+    }
+
+    return (data || []).map((item: any) => ({
+      ...item,
+      lenses: item.lens_id ? lensesMap[item.lens_id] || null : null
+    }));
+  } catch (err) {
+    console.error("Unexpected error in getCart:", err);
     return [];
   }
-  return data;
 }
 
 export async function addToCart(product_id: string, options: { 
@@ -33,43 +56,64 @@ export async function addToCart(product_id: string, options: {
   color?: string;
   size?: string;
 }) {
-  const supabase = await createClient();
-  const { data: { user } } = await supabase.auth.getUser();
-  if (!user) return { error: "Login required" };
+  try {
+    const supabase = await createClient();
+    const { data: { user } } = await supabase.auth.getUser();
+    if (!user) return { error: "Login required" };
 
-  // Check if identical item (same product, same lens, same color, and same size selection) already exists
-  const { data: existing } = await supabase
-    .from("cart")
-    .select("id, quantity")
-    .eq("user_id", user.id)
-    .eq("product_id", product_id)
-    .eq("selected_color", options.color || null)
-    .eq("selected_size", options.size || null)
-    .eq("lens_id", options.lens_id || null)
-    .limit(1)
-    .single();
-
-  if (existing && !options.prescription_json && !options.lens_config) {
-    await supabase
+    // Check if identical item (same product, same lens, same color, and same size selection) already exists
+    let query = supabase
       .from("cart")
-      .update({ quantity: (existing.quantity || 0) + (options.quantity || 1) })
-      .eq("id", existing.id);
-  } else {
-    await supabase.from("cart").insert({
-      user_id: user.id,
-      product_id,
-      quantity: options.quantity || 1,
-      lens_id: options.lens_id || null,
-      lens_config: options.lens_config || null,
-      prescription_json: options.prescription_json || null,
-      price: options.price,
-      selected_color: options.color || null,
-      selected_size: options.size || null
-    });
-  }
+      .select("id, quantity")
+      .eq("user_id", user.id)
+      .eq("product_id", product_id);
 
-  revalidatePath("/cart");
-  return { success: true };
+    if (options.color) {
+      query = query.eq("selected_color", options.color);
+    } else {
+      query = query.is("selected_color", null);
+    }
+
+    if (options.size) {
+      query = query.eq("selected_size", options.size);
+    } else {
+      query = query.is("selected_size", null);
+    }
+
+    if (options.lens_id) {
+      query = query.eq("lens_id", options.lens_id);
+    } else {
+      query = query.is("lens_id", null);
+    }
+
+    const { data: existingRows } = await query.limit(1);
+    const existing = existingRows?.[0] || null;
+
+    if (existing && !options.prescription_json && !options.lens_config) {
+      await supabase
+        .from("cart")
+        .update({ quantity: (existing.quantity || 0) + (options.quantity || 1) })
+        .eq("id", existing.id);
+    } else {
+      await supabase.from("cart").insert({
+        user_id: user.id,
+        product_id,
+        quantity: options.quantity || 1,
+        lens_id: options.lens_id || null,
+        lens_config: options.lens_config || null,
+        prescription_json: options.prescription_json || null,
+        price: options.price,
+        selected_color: options.color || null,
+        selected_size: options.size || null
+      });
+    }
+
+    revalidatePath("/cart");
+    return { success: true };
+  } catch (err) {
+    console.error("Error in addToCart:", err);
+    return { error: "Failed to add to cart" };
+  }
 }
 
 export async function removeFromCart(cartItemId: number) {

@@ -53,7 +53,7 @@ export async function createProduct(formData: FormData) {
   const description = formData.get("description") as string;
   
   // Extract Specs
-  const frame_type = formData.getAll("frame_style").join(", ");
+  const frame_type = (formData.get("frame_type") as string) || (formData.getAll("frame_style").join(", ")) || "full_rim";
   const shape = formData.get("shape") as string;
   const material = formData.getAll("material").join(", ");
   const gender = formData.getAll("gender"); 
@@ -245,7 +245,7 @@ export async function updateProduct(id: string, _prevState: any, formData: FormD
     const description = formData.get("description") as string;
     
     // Extract Specs
-    const frame_type = formData.getAll("frame_style").join(", ");
+    const frame_type = (formData.get("frame_type") as string) || (formData.getAll("frame_style").join(", ")) || "full_rim";
     const shape = formData.get("shape") as string;
     const material = formData.getAll("material").join(", ");
     const gender = formData.getAll("gender"); 

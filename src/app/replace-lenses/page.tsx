@@ -8,6 +8,7 @@ import { useSearchParams, useRouter } from "next/navigation";
 import { createClient } from "@/lib/supabase/client";
 import { getLenses, getCoatings, createReplacementOrder } from "./actions";
 import { toast } from "react-hot-toast";
+import { getIndexOptions, getRecommendedIndexValue, IndexOption } from "@/lib/lens-index-pricing";
 
 const steps = [
   { id: 1, title: "Frame Details", icon: <Camera size={18} /> },
@@ -28,23 +29,24 @@ function ReplaceLensesContent() {
   const prefillLensId = searchParams.get("lensId");
   const hasPrefilled = useRef(false);
   const [currentStep, setCurrentStep] = useState(1);
+  const [user, setUser] = useState<any>(null);
   const [loading, setLoading] = useState(true);
   const [submitting, setSubmitting] = useState(false);
-  const [user, setUser] = useState<any>(null);
 
   // Data from DB
   const [lenses, setLenses] = useState<any[]>([]);
   const [coatings, setCoatings] = useState<any[]>([]);
 
   // Selections
-  const [selectedParentLens, setSelectedParentLens] = useState<any>(null);
-  const [selectedTier, setSelectedTier] = useState<any>(null);
+  const [selectedParentLens, setSelectedParentLens] = useState<any | null>(null);
+  const [selectedTier, setSelectedTier] = useState<any | null>(null);
   const [selectedPackage, setSelectedPackage] = useState<PackageKey>("standard");
+  const [selectedIndex, setSelectedIndex] = useState<string>("1.56");
 
   // Form State
   const [formData, setFormData] = useState({
-    frame_type: "",
-    frame_condition: "",
+    frame_type: "Full Rim",
+    frame_condition: "Good",
     frame_images: [] as string[],
     lens_id: "",
     coating_ids: [] as string[],
@@ -80,6 +82,44 @@ function ReplaceLensesContent() {
 
   const [pickupFee, setPickupFee] = useState(50);
   const [deliveryFee, setDeliveryFee] = useState(50);
+
+  const isRimless = (formData.frame_type || "").toLowerCase().includes("rimless");
+
+  const maxSph = useMemo(() => {
+    const od = parseFloat(formData.prescription_data.od_sph);
+    const os = parseFloat(formData.prescription_data.os_sph);
+    const hasOd = !isNaN(od);
+    const hasOs = !isNaN(os);
+    if (!hasOd && !hasOs) return null;
+    return Math.max(hasOd ? Math.abs(od) : 0, hasOs ? Math.abs(os) : 0);
+  }, [formData.prescription_data.od_sph, formData.prescription_data.os_sph]);
+
+  const indexOptions = useMemo(() => {
+    return getIndexOptions({
+      lensType: selectedParentLens?.name,
+      tier: selectedTier?.tier,
+      frameType: isRimless ? "rimless" : "full_rim",
+      sphMax: maxSph
+    });
+  }, [selectedParentLens, selectedTier, isRimless, maxSph]);
+
+  // Keep selectedIndex valid if options change
+  useEffect(() => {
+    if (isRimless) {
+      setSelectedIndex("1.59");
+    } else {
+      const rec = getRecommendedIndexValue(maxSph, false);
+      const availableOpt = indexOptions.find(o => o.indexValue === selectedIndex && o.available);
+      if (!availableOpt) {
+        const matchingRec = indexOptions.find(o => o.indexValue === rec && o.available);
+        setSelectedIndex(matchingRec ? matchingRec.indexValue : indexOptions[0]?.indexValue || "1.56");
+      }
+    }
+  }, [isRimless, maxSph, indexOptions]);
+
+  const selectedIndexOption = useMemo(() => {
+    return indexOptions.find(o => o.indexValue === selectedIndex) || indexOptions[0];
+  }, [indexOptions, selectedIndex]);
 
   // Filter main lens types (parent lenses only, exclude standalone Blue Cut, Photochromic, and child Progressive tiers)
   const mainLensTypes = useMemo(() => {
@@ -274,8 +314,9 @@ function ReplaceLensesContent() {
 
   const calculateTotal = () => {
     const lensPrice = selectedParentLens ? currentPackagePrice : 0;
+    const indexSurcharge = selectedIndexOption?.price || 0;
     const extraLogisticsFee = formData.is_delivery_different ? pickupFee : 0;
-    return lensPrice + pickupFee + deliveryFee + extraLogisticsFee;
+    return lensPrice + indexSurcharge + pickupFee + deliveryFee + extraLogisticsFee;
   };
 
   const nextStep = () => {
@@ -298,8 +339,8 @@ function ReplaceLensesContent() {
       }
       if (formData.prescription_type === "manual") {
         const d = formData.prescription_data;
-        if (!d.od_sph || !d.os_sph || !d.pd) {
-          toast.error("Please fill in the required prescription fields");
+        if (!d.od_sph || !d.os_sph) {
+          toast.error("Please fill in Sphere (SPH) for both eyes");
           return;
         }
       }
@@ -413,7 +454,16 @@ function ReplaceLensesContent() {
     const baseOrderData = {
       ...formData,
       lens_id: activeLensId,
-      lens_price: currentPackagePrice,
+      lens_price: currentPackagePrice + (selectedIndexOption?.price || 0),
+      selected_index: selectedIndexOption?.indexValue || "1.56",
+      index_label: selectedIndexOption?.name || "1.56 Standard",
+      index_price: selectedIndexOption?.price || 0,
+      add_ons: {
+        selected_index: selectedIndexOption?.indexValue || "1.56",
+        index_label: selectedIndexOption?.name || "1.56 Standard",
+        index_price: selectedIndexOption?.price || 0,
+        selected_package: selectedPackage
+      },
       coatings_price: 0,
       pickup_fee: pickupFee,
       delivery_fee: deliveryFee,
@@ -886,7 +936,10 @@ function ReplaceLensesContent() {
                         </div>
                       ))}
                       <div className="pt-8 border-t border-[#ECECEC]">
-                        <label className="text-[#004AAD] text-xs font-semibold uppercase tracking-widest mb-4 block">Pupillary Distance (PD)</label>
+                        <div className="flex items-center justify-between mb-4">
+                          <label className="text-[#004AAD] text-xs font-semibold uppercase tracking-widest block">Pupillary Distance (PD) (Optional)</label>
+                          <span className="text-[11px] text-[#888888]">Leave blank if unavailable</span>
+                        </div>
                         <input
                           type="text"
                           placeholder="62mm"
@@ -897,6 +950,88 @@ function ReplaceLensesContent() {
                       </div>
                     </div>
                   )}
+
+                  {/* Refractive Index Selector (Lens Thickness) */}
+                  <div className="pt-10 border-t border-[#ECECEC] space-y-6">
+                    <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+                      <div>
+                        <h4 className="text-[#004AAD] text-xs font-semibold uppercase tracking-widest">
+                          Refractive Index (Lens Thickness)
+                        </h4>
+                        <p className="text-xs text-[#666666] mt-1">
+                          {isRimless
+                            ? "Rimless Frame Protocol: Polycarbonate 1.59 impact-resistant lenses are required to prevent drill-hole stress cracking."
+                            : "Choose your lens thickness. Higher index lenses provide thinner, lighter aesthetics for stronger powers."}
+                        </p>
+                      </div>
+                      {!isRimless && maxSph !== null && (
+                        <span className="inline-flex items-center gap-1.5 text-[10px] font-bold uppercase tracking-wider bg-[#004AAD] text-white px-3.5 py-1.5 rounded-full self-start sm:self-auto shadow-sm">
+                          ★ Recommended for power: {getRecommendedIndexValue(maxSph, false)}
+                        </span>
+                      )}
+                    </div>
+
+                    <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+                      {indexOptions.map((opt) => {
+                        const isSelected = selectedIndex === opt.indexValue;
+                        const isRec = !isRimless && getRecommendedIndexValue(maxSph, false) === opt.indexValue;
+                        const isAvail = opt.available;
+
+                        return (
+                          <button
+                            key={opt.id}
+                            type="button"
+                            disabled={!isAvail}
+                            onClick={() => {
+                              if (isAvail) setSelectedIndex(opt.indexValue);
+                            }}
+                            className={cn(
+                              "p-5 rounded-2xl border text-left transition-all relative flex flex-col justify-between space-y-4",
+                              !isAvail && "opacity-40 cursor-not-allowed grayscale bg-slate-50",
+                              isSelected
+                                ? "bg-[#03173D] text-white border-[#004AAD] shadow-xl ring-2 ring-[#004AAD]/20"
+                                : isRec
+                                  ? "bg-[#004AAD]/5 border-[#004AAD]/50 text-[#111111] hover:border-[#004AAD]"
+                                  : "bg-white border-[#E8EAF2] text-[#111111] hover:border-[#004AAD]/40"
+                            )}
+                          >
+                            <div>
+                              <div className="flex justify-between items-start mb-1.5">
+                                <span className={cn("text-xs font-bold uppercase", isSelected ? "text-white" : "text-[#111111]")}>
+                                  {opt.name}
+                                </span>
+                                {isRec && isAvail && (
+                                  <span className="text-[8px] font-bold uppercase bg-[#004AAD] text-white px-2 py-0.5 rounded-full">
+                                    ★ Recommended
+                                  </span>
+                                )}
+                                {!isAvail && (
+                                  <span className="text-[8px] font-bold uppercase bg-red-100 text-red-700 px-2 py-0.5 rounded">
+                                    Unavailable
+                                  </span>
+                                )}
+                              </div>
+                              <p className={cn("text-[10px] leading-relaxed", isSelected ? "text-white/70" : "text-[#666666]")}>
+                                {opt.unavailableReason || opt.desc}
+                              </p>
+                            </div>
+
+                            <div className="flex justify-between items-center pt-3 border-t border-black/5">
+                              <span className={cn("text-[9px] uppercase font-bold", isSelected ? "text-[#00AEEF]" : "text-[#888888]")}>
+                                {opt.material}
+                              </span>
+                              <div className="flex items-center gap-2">
+                                <span className={cn("text-xs font-bold", isSelected ? "text-[#00AEEF]" : "text-[#004AAD]")}>
+                                  {opt.price > 0 ? `+₹${opt.price.toLocaleString('en-IN')}` : "Base Price"}
+                                </span>
+                                {isSelected && <CheckCircle2 size={15} className="text-[#00AEEF]" />}
+                              </div>
+                            </div>
+                          </button>
+                        );
+                      })}
+                    </div>
+                  </div>
                 </motion.div>
               )}
 
@@ -1072,6 +1207,16 @@ function ReplaceLensesContent() {
                           <p className="text-xs text-[#004AAD]">{packagePricing[selectedPackage].label}</p>
                         </div>
                         <span className="text-lg font-serif italic text-[#111111]">₹{currentPackagePrice.toLocaleString()}</span>
+                      </div>
+
+                      <div className="flex justify-between items-center py-2 border-t border-[#ECECEC]">
+                        <div>
+                          <p className="text-sm font-semibold text-[#111111]">Refractive Index</p>
+                          <p className="text-xs text-[#004AAD]">{selectedIndexOption?.name}</p>
+                        </div>
+                        <span className="text-sm font-semibold text-[#111111]">
+                          {selectedIndexOption?.price > 0 ? `+₹${selectedIndexOption.price.toLocaleString('en-IN')}` : "Included"}
+                        </span>
                       </div>
 
                       <div className="flex justify-between items-center py-2 border-t border-[#ECECEC]">

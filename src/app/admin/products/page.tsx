@@ -113,10 +113,23 @@ export default async function AdminProductsPage({
 
               <div className="flex-1 flex flex-col lg:flex-row items-center justify-between w-full gap-10">
                 <div className="text-center lg:text-left space-y-1">
-                  <div className="flex items-center justify-center lg:justify-start gap-3">
+                  <div className="flex items-center justify-center lg:justify-start gap-3 flex-wrap">
                     <p className="text-[9px] text-secondary uppercase tracking-[0.3em] font-bold">{p.brand}</p>
                     <span className="w-1 h-1 bg-brand-navy/10 rounded-full" />
                     <p className="text-[9px] text-brand-navy/40 uppercase tracking-[0.3em] font-bold">{p.categories?.name}</p>
+                    {p.frame_type && (
+                      <>
+                        <span className="w-1 h-1 bg-brand-navy/10 rounded-full" />
+                        <span className={cn(
+                          "text-[8px] font-bold uppercase tracking-wider px-2 py-0.5 rounded-sm border",
+                          p.frame_type === 'rimless'
+                            ? "bg-purple-50 text-purple-700 border-purple-200"
+                            : "bg-brand-navy/5 text-brand-navy/70 border-brand-navy/10"
+                        )}>
+                          {p.frame_type.replace('_', ' ')}
+                        </span>
+                      </>
+                    )}
                   </div>
                   <h3 className="text-xl font-serif italic text-brand-navy tracking-tight">{p.name}</h3>
                   <div className="flex items-center gap-4 mt-2">

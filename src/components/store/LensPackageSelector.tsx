@@ -82,23 +82,23 @@ export default function LensPackageSelector({
 
   return (
     <div className="space-y-16 w-full">
-      {/* SECTION 1: WHAT'S INCLUDED (Every Lens Detail Page) */}
-      <section className="bg-gradient-to-br from-emerald-50/90 via-emerald-50/40 to-white border border-emerald-200/80 rounded-3xl p-6 sm:p-8 lg:p-10 shadow-sm space-y-8">
-        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 border-b border-emerald-200/60 pb-6">
+      {/* SECTION 1: 4 CORE COATINGS INCLUDED (On Every Lens at No Extra Charge) */}
+      <section className="bg-gradient-to-br from-[#03173D]/[0.02] via-[#004AAD]/[0.03] to-white border border-[#004AAD]/15 rounded-3xl p-6 sm:p-8 lg:p-10 shadow-sm space-y-8">
+        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 border-b border-[#004AAD]/10 pb-6">
           <div className="space-y-1">
-            <div className="flex items-center gap-2 text-emerald-800">
-              <ShieldCheck size={20} className="text-emerald-600" />
+            <div className="flex items-center gap-2 text-[#004AAD]">
+              <ShieldCheck size={20} className="text-[#004AAD]" />
               <span className="text-[10px] font-black uppercase tracking-[0.3em]">
                 Optic Standard
               </span>
             </div>
-            <h3 className="text-2xl font-serif italic text-emerald-950">
-              What&apos;s Included
+            <h3 className="text-2xl font-serif italic text-brand-navy">
+              All 4 Core Coatings Included
             </h3>
           </div>
-          <span className="inline-flex items-center gap-2 bg-emerald-600 text-white text-[10px] font-black uppercase tracking-widest px-4 py-2 rounded-full shadow-sm self-start sm:self-auto">
-            <CheckCircle2 size={14} />
-            Included in every lens at no extra charge
+          <span className="inline-flex items-center gap-2 bg-[#03173D] text-white text-[10px] font-black uppercase tracking-widest px-4 py-2 rounded-full shadow-sm self-start sm:self-auto">
+            <CheckCircle2 size={14} className="text-emerald-400" />
+            Standard in every lens at ₹0 extra charge
           </span>
         </div>
 
@@ -107,37 +107,46 @@ export default function LensPackageSelector({
             {
               title: "UV Block Protection",
               desc: "100% UV400 shield protects eyes from harmful UVA/UVB radiation.",
+              badge: "UV400 Shield",
             },
             {
               title: "Blue Cut Protection",
               desc: "Filters high-energy blue-violet light from screens and digital devices.",
+              badge: "Digital Defense",
             },
             {
               title: "Scratch Resistant Shield",
-              desc: "Hard diamond-coat barrier reduces everyday abrasions and scratches.",
+              desc: "Hard diamond-coat barrier reduces everyday abrasions and micro-scratches.",
+              badge: "Hard Coat",
             },
             {
               title: "Anti-Reflective Coating",
               desc: "Eliminates glare, surface reflections, and halo effects for crystal clarity.",
+              badge: "Zero Glare",
             },
           ].map((c) => (
             <div
               key={c.title}
-              className="bg-white border border-emerald-200/70 rounded-2xl p-5 sm:p-6 shadow-sm flex flex-col justify-between space-y-4 h-full"
+              className="bg-white border border-[#ECECEC] hover:border-[#004AAD]/40 rounded-2xl p-5 sm:p-6 shadow-sm flex flex-col justify-between space-y-4 h-full transition-all duration-300 group"
             >
               <div className="space-y-2.5">
-                <div className="flex items-center gap-2.5">
-                  <CheckCircle2 size={18} className="text-emerald-600 shrink-0" />
-                  <h4 className="text-xs font-black uppercase tracking-wider text-emerald-950">
-                    {c.title}
-                  </h4>
+                <div className="flex items-center justify-between">
+                  <div className="w-7 h-7 rounded-lg bg-[#004AAD]/10 flex items-center justify-center">
+                    <CheckCircle2 size={16} className="text-[#004AAD] shrink-0" />
+                  </div>
+                  <span className="text-[8px] font-black uppercase tracking-wider text-[#004AAD] bg-[#004AAD]/5 px-2 py-0.5 rounded-full">
+                    {c.badge}
+                  </span>
                 </div>
+                <h4 className="text-xs font-black uppercase tracking-wider text-[#111111] pt-1">
+                  {c.title}
+                </h4>
                 <p className="text-[11px] text-slate-600 leading-relaxed">
                   {c.desc}
                 </p>
               </div>
-              <span className="text-[9px] font-bold text-emerald-700 uppercase tracking-widest pt-2.5 border-t border-emerald-100 block">
-                ₹0 Standard
+              <span className="text-[9px] font-bold text-emerald-600 uppercase tracking-widest pt-2.5 border-t border-slate-100 block">
+                ✓ Included Standard (₹0)
               </span>
             </div>
           ))}

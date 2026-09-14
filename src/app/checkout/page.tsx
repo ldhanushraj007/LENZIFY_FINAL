@@ -594,25 +594,67 @@ export default function CheckoutPage() {
               <h2 className="font-semibold text-[#111111] text-base">Order Summary</h2>
 
               {/* Items */}
-              <div className="space-y-4 max-h-64 overflow-y-auto pr-1">
-                {cartItems.map((item, i) => (
-                  <div key={i} className="flex gap-3">
-                    <div className="w-14 h-14 bg-[#F8F9FC] border border-[#ECECEC] rounded-xl overflow-hidden flex-shrink-0 flex items-center justify-center">
-                      <img
-                        src={item.products?.product_images?.[0]?.image_url || "/placeholder.jpg"}
-                        className="w-full h-full object-contain"
-                        alt={item.products?.name}
-                      />
+              <div className="space-y-4 max-h-72 overflow-y-auto pr-1">
+                {cartItems.map((item, i) => {
+                  const lensCfg = item.lens_config || {};
+                  const indexName = lensCfg.index_label || lensCfg.thickness?.name || (lensCfg.selected_index ? `Index ${lensCfg.selected_index}` : null);
+                  const lensTypeName = item.lenses?.name || lensCfg.type?.name || item.lens_name;
+                  const tierName = lensCfg.tier ? `(${lensCfg.tier.toUpperCase()})` : "";
+                  const frameType = item.products?.frame_type || lensCfg.frame_type;
+
+                  return (
+                    <div key={i} className="flex gap-3 pb-3 border-b border-[#F0F0F0] last:border-b-0">
+                      <div className="w-16 h-16 bg-[#F8F9FC] border border-[#ECECEC] rounded-xl overflow-hidden flex-shrink-0 flex items-center justify-center">
+                        <img
+                          src={item.products?.product_images?.[0]?.image_url || "/placeholder.jpg"}
+                          className="w-full h-full object-contain"
+                          alt={item.products?.name}
+                        />
+                      </div>
+                      <div className="flex-1 min-w-0">
+                        <p className="font-semibold text-[#111111] text-sm truncate">{item.products?.name}</p>
+                        
+                        {/* Variant details (Frame type, color, size) */}
+                        <div className="flex flex-wrap items-center gap-1.5 mt-0.5">
+                          {frameType && (
+                            <span className="text-[9px] font-bold uppercase bg-[#03173D]/5 text-[#03173D] px-1.5 py-0.5 rounded">
+                              {frameType.replace('_', ' ')}
+                            </span>
+                          )}
+                          {item.selected_color && (
+                            <span className="text-[10px] text-[#666666]">
+                              Color: {item.selected_color}
+                            </span>
+                          )}
+                          {item.selected_size && (
+                            <span className="text-[10px] text-[#666666]">
+                              • Size: {item.selected_size}
+                            </span>
+                          )}
+                        </div>
+
+                        {/* Lens Configuration & Chosen Index */}
+                        {lensTypeName && (
+                          <div className="mt-1 space-y-0.5">
+                            <p className="text-xs font-semibold text-[#004AAD]">
+                              {lensTypeName} {tierName} {lensCfg.package_name ? `• ${lensCfg.package_name}` : ""}
+                            </p>
+                            {indexName && (
+                              <p className="text-[10px] font-medium text-emerald-800 bg-emerald-50 border border-emerald-200/60 px-2 py-0.5 rounded inline-block">
+                                Refractive Index: {indexName}
+                              </p>
+                            )}
+                          </div>
+                        )}
+
+                        <p className="text-[#888888] text-xs mt-1">Qty: {item.quantity}</p>
+                      </div>
+                      <p className="font-bold text-[#111111] text-sm flex-shrink-0">
+                        ₹{(item.price || item.products?.offer_price || 0).toLocaleString()}
+                      </p>
                     </div>
-                    <div className="flex-1 min-w-0">
-                      <p className="font-semibold text-[#111111] text-sm truncate">{item.products?.name}</p>
-                      <p className="text-[#666666] text-xs">Qty: {item.quantity}</p>
-                    </div>
-                    <p className="font-semibold text-[#111111] text-sm flex-shrink-0">
-                      ₹{(item.price || item.products?.offer_price || 0).toLocaleString()}
-                    </p>
-                  </div>
-                ))}
+                  );
+                })}
               </div>
 
               {/* Coupon */}

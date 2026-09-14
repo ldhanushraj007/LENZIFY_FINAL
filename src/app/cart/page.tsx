@@ -33,18 +33,22 @@ export default function CartPage() {
         return;
       }
       const cartData = await getCart();
-      const mappedItems = (cartData || []).map((item: any) => ({
-        id: `${item.product_id}-${item.selected_color || ""}-${item.selected_size || ""}`,
+      if (!Array.isArray(cartData)) {
+        setLoading(false);
+        return;
+      }
+      const mappedItems = cartData.map((item: any) => ({
+        id: `${item.product_id}-${item.selected_color || ""}-${item.selected_size || ""}-${item.lens_id || ""}`,
         database_id: item.id,
         product_id: item.product_id,
         name: item.products?.name || "Product",
         brand: item.products?.brand || "LENZIFY",
-        price: item.price || item.products?.offer_price || item.products?.price,
+        price: item.price || item.products?.discount_price || item.products?.offer_price || item.products?.price,
         image: item.products?.primary_image || item.products?.product_images?.[0]?.image_url || "/placeholder.jpg",
         category: "Eyewear",
         quantity: item.quantity,
         stock: item.products?.stock ?? 99,
-        lens_name: item.lenses?.name,
+        lens_name: item.lens_config?.type?.name || item.lens_config?.lens_name || item.lenses?.name,
         lens_config: item.lens_config,
         prescription: item.prescription_json,
         selected_color: item.selected_color,
@@ -229,6 +233,14 @@ export default function CartPage() {
                           )}
                           {item.lens_config && (
                             <>
+                              {(item.lens_config.thickness?.name || item.lens_config.index_label || item.lens_config.selected_index) && (
+                                <div>
+                                  <p className="text-[10px] text-[#666666] uppercase tracking-widest font-medium">Refractive Index</p>
+                                  <p className="text-xs text-[#004AAD] font-semibold mt-0.5">
+                                    {item.lens_config.thickness?.name || item.lens_config.index_label || `Index ${item.lens_config.selected_index}`}
+                                  </p>
+                                </div>
+                              )}
                               {item.lens_config.features?.length > 0 && (
                                 <div>
                                   <p className="text-[10px] text-[#666666] uppercase tracking-widest font-medium">Features</p>

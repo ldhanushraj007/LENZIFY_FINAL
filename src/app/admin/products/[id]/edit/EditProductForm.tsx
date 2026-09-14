@@ -240,7 +240,21 @@ export default function EditProductForm({
                  <h3 className="text-[10px] font-bold uppercase tracking-[0.3em] text-brand-navy">Optical Matrix</h3>
               </div>
               
-              <div className="grid grid-cols-2 lg:grid-cols-3 gap-8 text-center md:text-left mb-8">
+              <div className="grid grid-cols-2 lg:grid-cols-4 gap-8 text-center md:text-left mb-8">
+                  <div className="space-y-2 group">
+                     <label className="text-[9px] font-bold uppercase tracking-widest text-secondary italic">Frame Type *</label>
+                     <select 
+                       name="frame_type" 
+                       required 
+                       defaultValue={product.frame_type || "full_rim"} 
+                       className="w-full bg-brand-background border border-brand-navy/10 px-4 py-3 text-[10px] font-bold tracking-widest uppercase outline-none focus:border-secondary transition-all cursor-pointer"
+                     >
+                       <option value="rimless">Rimless</option>
+                       <option value="half_rim">Half Rim</option>
+                       <option value="full_rim">Full Rim / Full Metal</option>
+                       <option value="shell">Shell</option>
+                     </select>
+                  </div>
                  {[
                    { label: "Geometry", name: "shape", options: ["Round", "Square", "Aviator", "Rectangular", "Cat-Eye"], state: product.shape },
                    { label: "Chroma Profile", name: "color", options: ["Black", "Gold", "Silver", "Tortoise", "Crystal"], state: product.color },

@@ -95,8 +95,15 @@ export default async function RootLayout({
 }: Readonly<{
   children: React.ReactNode;
 }>) {
-  const supabase = await createClient();
-  const { data: { user } } = await supabase.auth.getUser();
+  let user = null;
+  try {
+    const supabase = await createClient();
+    const { data } = await supabase.auth.getUser();
+    user = data?.user || null;
+  } catch (err) {
+    // If Supabase auth network drops or transient socket fails, gracefully fallback to guest session
+    user = null;
+  }
 
   return (
     <html lang="en" className={cn(inter.variable, interLabel.variable, notoSerif.variable, bodoniModa.variable)} suppressHydrationWarning>

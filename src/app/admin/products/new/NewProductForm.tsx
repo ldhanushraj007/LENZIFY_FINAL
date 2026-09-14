@@ -200,7 +200,16 @@ export default function NewProductForm({ categories, lenses }: { categories: any
                  <h3 className="text-[10px] font-bold uppercase tracking-[0.3em] text-brand-navy">Optical Matrix (Specs & Variants)</h3>
               </div>
               
-              <div className="grid grid-cols-2 md:grid-cols-3 gap-8 text-center md:text-left mb-8">
+              <div className="grid grid-cols-2 md:grid-cols-4 gap-8 text-center md:text-left mb-8">
+                 <div className="space-y-2 group">
+                    <label className="text-[9px] font-bold uppercase tracking-widest text-secondary italic">Frame Type *</label>
+                    <select name="frame_type" required defaultValue="full_rim" className="w-full bg-brand-background border border-brand-navy/10 px-4 py-3 text-[10px] font-bold tracking-widest uppercase outline-none focus:border-secondary transition-all cursor-pointer" suppressHydrationWarning>
+                      <option value="rimless">Rimless</option>
+                      <option value="half_rim">Half Rim</option>
+                      <option value="full_rim">Full Rim / Full Metal</option>
+                      <option value="shell">Shell</option>
+                    </select>
+                 </div>
                  {[
                    { label: "Unit Geometry", name: "shape", options: ["Round", "Square", "Aviator", "Rectangular", "Cat-Eye"] },
                    { label: "Chroma Profile", name: "color", options: ["Black", "Gold", "Silver", "Tortoise", "Crystal"] },

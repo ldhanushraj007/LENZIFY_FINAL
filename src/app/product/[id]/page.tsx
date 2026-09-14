@@ -104,7 +104,13 @@ export default async function ProductDetailPage({ params }: { params: Promise<{ 
     .order("created_at", { ascending: false });
 
   // 4. Get User Session
-  const { data: { user } } = await supabase.auth.getUser();
+  let user = null;
+  try {
+    const { data } = await supabase.auth.getUser();
+    user = data?.user || null;
+  } catch {
+    user = null;
+  }
 
   // 5. Check Wishlist status
   let isInWishlist = false;

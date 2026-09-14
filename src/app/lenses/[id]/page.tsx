@@ -129,48 +129,18 @@ export default async function LensDetailPage({ params }: { params: Promise<{ id:
       </section>
 
       {/* What is it */}
-      <section className="py-16 bg-[#F8F9FC] border-b border-[#ECECEC]">
-        <div className="container mx-auto px-6 lg:px-12">
-          <div className="grid grid-cols-1 lg:grid-cols-3 gap-10">
-            {/* Definition */}
-            <div className="lg:col-span-2 space-y-4">
-              <div className="flex items-center gap-2 mb-4">
-                <div className="w-7 h-7 bg-[#03173D] rounded-lg flex items-center justify-center">
-                  <Info size={14} className="text-white" />
-                </div>
-                <span className="text-[10px] font-bold uppercase tracking-[0.3em] text-[#004AAD]">What is it?</span>
+      <section className="py-14 bg-[#F8F9FC] border-b border-[#ECECEC]">
+        <div className="container mx-auto px-6 lg:px-12 max-w-4xl">
+          <div className="space-y-4">
+            <div className="flex items-center gap-2 mb-2">
+              <div className="w-7 h-7 bg-[#03173D] rounded-lg flex items-center justify-center">
+                <Info size={14} className="text-white" />
               </div>
-              <p className="text-[#333333] text-base leading-relaxed">
-                {editorial.what_it_is}
-              </p>
+              <span className="text-[10px] font-bold uppercase tracking-[0.3em] text-[#004AAD]">What is it?</span>
             </div>
-
-            {/* Price callout */}
-            <div className="bg-white border border-[#ECECEC] rounded-2xl p-7 space-y-4 shadow-sm self-start">
-              <p className="text-[10px] font-bold uppercase tracking-widest text-[#004AAD]">Pricing</p>
-              <p className="text-3xl font-bold text-[#111111]">₹{startingPrice.toLocaleString()}</p>
-              <p className="text-sm text-[#888888]">Per lens, starting price. Final price depends on prescription complexity.</p>
-              <div className="space-y-2 pt-2 border-t border-[#F0F0F0]">
-                <div className="flex items-center gap-2">
-                  <CheckCircle2 size={13} className="text-[#004AAD] shrink-0" />
-                  <span className="text-xs text-[#555555]">ISO-9001 Certified Lab</span>
-                </div>
-                <div className="flex items-center gap-2">
-                  <CheckCircle2 size={13} className="text-[#004AAD] shrink-0" />
-                  <span className="text-xs text-[#555555]">12-Month Warranty</span>
-                </div>
-                <div className="flex items-center gap-2">
-                  <CheckCircle2 size={13} className="text-[#004AAD] shrink-0" />
-                  <span className="text-xs text-[#555555]">3–5 Day Processing</span>
-                </div>
-              </div>
-              <Link
-                href={`/replace-lenses?lensId=${lens.id}`}
-                className="w-full inline-flex items-center justify-center gap-2 bg-[#03173D] text-white rounded-xl px-5 py-3.5 text-sm font-semibold hover:bg-[#004AAD] transition-all mt-2"
-              >
-                Get These Lenses <ArrowRight size={14} />
-              </Link>
-            </div>
+            <p className="text-[#333333] text-base md:text-lg leading-relaxed">
+              {editorial.what_it_is}
+            </p>
           </div>
         </div>
       </section>
@@ -309,10 +279,10 @@ export default async function LensDetailPage({ params }: { params: Promise<{ id:
         <div className="container mx-auto px-6 lg:px-12">
           <div className="grid grid-cols-1 md:grid-cols-3 gap-10">
             <div className="space-y-2">
-              <p className="text-[10px] font-bold uppercase tracking-[0.3em] text-[#00AEEF]">Certification</p>
-              <h4 className="text-base font-bold text-white">ISO-9001 Certified Lab</h4>
+              <p className="text-[10px] font-bold uppercase tracking-[0.3em] text-[#00AEEF]">Optics Standard</p>
+              <h4 className="text-base font-bold text-white">Precision Lab Surfacing</h4>
               <p className="text-sm text-white/55 leading-relaxed">
-                All lenses are surfaced and quality-checked to international optical health standards.
+                All lenses are surfaced and verified to rigorous optical alignment and prescription clarity standards.
               </p>
             </div>
             <div className="space-y-2">

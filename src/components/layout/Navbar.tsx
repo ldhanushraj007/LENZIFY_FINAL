@@ -71,15 +71,30 @@ export default function Navbar() {
     const supabase = createClient();
 
     const syncCart = async () => {
-      const cartData = await getCart();
-      const mappedItems = (cartData || []).map((item: any) => ({
-        id: item.product_id,
-        name: item.products.name,
-        price: item.price || item.products.price,
-        image: item.products.product_images?.[0]?.image_url,
-        quantity: item.quantity,
-      }));
-      setItems(mappedItems as any);
+      try {
+        const cartData = await getCart();
+        if (!Array.isArray(cartData)) return;
+        const mappedItems = cartData.map((item: any) => ({
+          id: `${item.product_id}-${item.selected_color || ""}-${item.selected_size || ""}-${item.lens_id || ""}`,
+          database_id: item.id,
+          product_id: item.product_id,
+          name: item.products?.name || "Eyewear",
+          brand: item.products?.brand || "LENZIFY",
+          price: item.price || item.products?.discount_price || item.products?.offer_price || item.products?.price,
+          image: item.products?.primary_image || item.products?.product_images?.[0]?.image_url || "/placeholder.jpg",
+          category: "Eyewear",
+          quantity: item.quantity,
+          stock: item.products?.stock ?? 99,
+          lens_name: item.lens_config?.type?.name || item.lens_config?.lens_name || item.lenses?.name,
+          lens_config: item.lens_config,
+          prescription: item.prescription_json,
+          selected_color: item.selected_color,
+          selected_size: item.selected_size,
+        }));
+        setItems(mappedItems as any);
+      } catch (err) {
+        console.error("Navbar cart sync error:", err);
+      }
     };
 
     syncCart();

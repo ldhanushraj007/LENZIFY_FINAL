@@ -56,6 +56,13 @@ export async function createReplacementOrder(orderData: any) {
       prescription_type: orderData.prescription_type,
       prescription_data: orderData.prescription_data,
       prescription_url: orderData.prescription_url,
+      prescription_file_url: orderData.prescription_url,
+      add_ons: orderData.add_ons || {
+        selected_index: orderData.selected_index || null,
+        index_label: orderData.index_label || null,
+        index_price: orderData.index_price || 0,
+        selected_package: orderData.selected_package || null
+      },
       pickup_address: orderData.pickup_address,
       delivery_address: orderData.is_delivery_different ? orderData.delivery_address : orderData.pickup_address,
       is_delivery_different: orderData.is_delivery_different,
@@ -79,6 +86,22 @@ export async function createReplacementOrder(orderData: any) {
   if (error) {
     console.error("CRITICAL: Replacement order transmission failed.", error);
     return { error: `Transmission failed: ${error.message}. Please verify network.` };
+  }
+
+  // Send confirmation email asynchronously (never blocking order response)
+  try {
+    const customerEmail = user.email || orderData.pickup_address?.email;
+    const customerName = orderData.pickup_address?.name || user.user_metadata?.name || "Valued Customer";
+    if (customerEmail) {
+      const { sendEmail, getReplacementOrderConfirmationHtml } = await import("@/lib/mail");
+      await sendEmail({
+        to: customerEmail,
+        subject: `Order Confirmed: Lens Replacement #${data.id.slice(0, 8).toUpperCase()}`,
+        html: getReplacementOrderConfirmationHtml(data, customerName),
+      });
+    }
+  } catch (mailErr) {
+    console.error("Failed to dispatch replacement order confirmation email:", mailErr);
   }
 
   revalidatePath("/profile/orders");

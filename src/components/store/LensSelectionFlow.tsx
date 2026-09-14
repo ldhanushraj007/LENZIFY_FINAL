@@ -6,6 +6,8 @@ import { X, CheckCircle2, ChevronRight, ArrowLeft, Info, HelpCircle, Upload, Che
 import { cn } from "@/lib/utils";
 import { createClient } from "@/lib/supabase/client";
 
+import { getIndexOptions, getRecommendedIndexValue, IndexOption } from "@/lib/lens-index-pricing";
+
 interface LensSelectionFlowProps {
   product: any;
   availableLenses: any[];
@@ -61,37 +63,31 @@ export default function LensSelectionFlow({ product, availableLenses, onClose, o
     return [
       {
         tier: "silver",
-        name: "Progressive Silver",
-        displayName: "Silver",
-        price: silver?.price ?? 1799,
-        field_of_view: silver?.field_of_view || "Narrow",
-        fovLabel: "Narrow Corridor",
-        ratings: silver?.performance_ratings || { distance: 7, intermediate: 5, reading: 6, constant: 6 },
-        description: silver?.description || "Excellent all-purpose progressive design with fast adaptation.",
-        lens: silver || { id: "progressive-silver", name: "Progressive Silver", price: 1799 },
+        displayName: "Silver Tier",
+        fov: "Narrow Field of View",
+        ratings: { distance: 7, intermediate: 5, reading: 6, adaptation: 6 },
+        lens: silver,
+        price: silver?.price || 1799,
+        badge: "Standard"
       },
       {
         tier: "gold",
-        name: "Progressive Gold",
-        displayName: "Gold",
-        price: gold?.price ?? 2799,
-        field_of_view: gold?.field_of_view || "Wide",
-        fovLabel: "Wide Corridor",
-        ratings: gold?.performance_ratings || { distance: 8, intermediate: 6, reading: 7, constant: 6 },
-        description: gold?.description || "Recommended for presbyopes choosing their first progressive design.",
-        lens: gold || { id: "progressive-gold", name: "Progressive Gold", price: 2799 },
+        displayName: "Gold Tier",
+        fov: "Wide Field of View",
+        ratings: { distance: 8, intermediate: 6, reading: 7, adaptation: 8 },
+        lens: gold,
+        price: gold?.price || 2799,
+        badge: "Most Popular"
       },
       {
         tier: "platinum",
-        name: "Progressive Platinum",
-        displayName: "Platinum",
-        price: platinum?.price ?? 4299,
-        field_of_view: platinum?.field_of_view || "Widest",
-        fovLabel: "Widest Panoramic View",
-        ratings: platinum?.performance_ratings || { distance: 9, intermediate: 8, reading: 8, constant: 8 },
-        description: platinum?.description || "Ultra-premium everyday lens with maximum visual field clarity.",
-        lens: platinum || { id: "progressive-platinum", name: "Progressive Platinum", price: 4299 },
-      },
+        displayName: "Platinum Tier",
+        fov: "Widest Field of View",
+        ratings: { distance: 9, intermediate: 8, reading: 8, adaptation: 9 },
+        lens: platinum,
+        price: platinum?.price || 4299,
+        badge: "Ultra-Premium"
+      }
     ];
   }, [availableLenses]);
 
@@ -99,26 +95,31 @@ export default function LensSelectionFlow({ product, availableLenses, onClose, o
   const lensMaterials = useMemo(() => availableLenses.filter(l => l.category === "material"), [availableLenses]);
   const lensTints = useMemo(() => availableLenses.filter(l => l.category === "tint"), [availableLenses]);
 
-  // Refractive Index Options (Fix 3: 1.50, 1.56, 1.60, 1.67)
-  const indexOptions = useMemo(() => [
-    { id: "1.50", name: "1.50 — Standard", indexValue: "1.50", label: "Standard", desc: "Traditional thickness. Best for low power up to ±2.00 SPH.", price: 0 },
-    { id: "1.56", name: "1.56 — Mid-index", indexValue: "1.56", label: "Mid-index", desc: "15% thinner & lighter than standard lenses.", price: 0 },
-    { id: "1.60", name: "1.60 — High index", indexValue: "1.60", label: "High index", desc: "Slim profile, up to 25% thinner for moderate powers.", price: 0 },
-    { id: "1.67", name: "1.67 — Ultra-thin", indexValue: "1.67", label: "Ultra-thin", desc: "Maximum thinness and clarity for high prescriptions.", price: 0 },
-  ], []);
+  const isRimless = (product?.frame_type || "").toLowerCase() === "rimless";
 
-  // Compute recommended index based on prescription SPH (Fix 3)
-  const getRecommendedIndex = () => {
+  // Maximum SPH from manual prescription
+  const maxSph = useMemo(() => {
     const od_sph = parseFloat(prescription.od_sph);
     const os_sph = parseFloat(prescription.os_sph);
     const hasOd = !isNaN(od_sph);
     const hasOs = !isNaN(os_sph);
     if (!hasOd && !hasOs) return null;
+    return Math.max(hasOd ? Math.abs(od_sph) : 0, hasOs ? Math.abs(os_sph) : 0);
+  }, [prescription.od_sph, prescription.os_sph]);
 
-    const maxSph = Math.max(hasOd ? Math.abs(od_sph) : 0, hasOs ? Math.abs(os_sph) : 0);
-    if (maxSph > 3.00) return "1.67";
-    if (maxSph >= 2.25) return "1.60";
-    return "1.56"; // SPH <= 2.00 recommends 1.50 or 1.56 (recommending 1.56 mid-index)
+  // Dynamic Refractive Index Options based on Lens Type, Tier, Frame Type, and Power
+  const indexOptions = useMemo(() => {
+    return getIndexOptions({
+      lensType: selectedType?.name,
+      tier: selectedTier?.tier,
+      frameType: product?.frame_type,
+      sphMax: maxSph
+    });
+  }, [selectedType, selectedTier, product?.frame_type, maxSph]);
+
+  // Compute recommended index based on prescription SPH (and rimless check)
+  const getRecommendedIndex = () => {
+    return getRecommendedIndexValue(maxSph, isRimless);
   };
 
   const handleFileUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -258,11 +259,14 @@ export default function LensSelectionFlow({ product, availableLenses, onClose, o
       
       // Auto-set recommended refractive index if not manually set yet
       const rec = getRecommendedIndex();
-      if (rec && !selectedThickness) {
-        const matchingOpt = indexOptions.find(o => o.indexValue === rec);
-        if (matchingOpt) setSelectedThickness(matchingOpt);
+      if (isRimless) {
+        setSelectedThickness(indexOptions[0]);
+        setSelectedMaterial({ name: "Polycarbonate", price: 0 });
+      } else if (rec && (!selectedThickness || !indexOptions.some(o => o.indexValue === selectedThickness.indexValue))) {
+        const matchingOpt = indexOptions.find(o => o.indexValue === rec && o.available) || indexOptions.find(o => o.available) || indexOptions[0];
+        setSelectedThickness(matchingOpt);
       } else if (!selectedThickness) {
-        setSelectedThickness(indexOptions[0]); // default to 1.50
+        setSelectedThickness(indexOptions[0]);
       }
 
       setError(null);
@@ -297,6 +301,10 @@ export default function LensSelectionFlow({ product, availableLenses, onClose, o
           ],
           material: selectedMaterial,
           thickness: selectedThickness,
+          selected_index: selectedThickness?.indexValue || "1.56",
+          index_label: selectedThickness?.name || "1.56 Standard",
+          index_price: selectedThickness?.price || 0,
+          frame_type: product?.frame_type || "full_rim",
           tint: selectedTint,
           power_range_extra: calculatePowerRangeExtra()
         },
@@ -759,6 +767,32 @@ export default function LensSelectionFlow({ product, availableLenses, onClose, o
                                 )}
                               </div>
                             </div>
+
+                            <div className="flex flex-col sm:flex-row items-center gap-4">
+                               <div className="w-full sm:flex-1 space-y-2">
+                                  <label className="text-[10px] font-black uppercase tracking-widest text-brand-navy">Pupillary Distance (PD) (Optional)</label>
+                                  <input 
+                                    value={prescription.pd}
+                                    onChange={(e) => setPrescription({...prescription, pd: e.target.value})}
+                                    className="w-full bg-brand-background border border-brand-navy/10 p-4 text-[11px] font-bold outline-none focus:border-secondary transition-all rounded-xl" 
+                                    placeholder="62"
+                                  />
+                                </div>
+                               <div className="w-full sm:flex-1 p-4 bg-secondary/5 rounded-xl border border-secondary/10 flex items-center gap-4">
+                                  <HelpCircle size={20} className="text-secondary shrink-0" />
+                                  <p className="text-[9px] uppercase font-bold tracking-widest text-secondary leading-relaxed">Optional. Recommended for precision optical centering alignment.</p>
+                                </div>
+                            </div>
+
+                            {calculatePowerRangeExtra() > 0 && (
+                               <div className="p-4 bg-secondary/10 border border-secondary/20 flex items-center justify-between text-brand-navy rounded-xl">
+                                  <div>
+                                     <p className="text-[10px] font-black uppercase tracking-widest text-brand-navy">High Power Prescription Adjustment</p>
+                                     <p className="text-[9px] text-brand-text-muted mt-0.5">Applied automatically based on power range matrix.</p>
+                                  </div>
+                                  <span className="text-xs font-black text-secondary">+₹{calculatePowerRangeExtra().toLocaleString()}</span>
+                                </div>
+                            )}
                          </div>
                       </div>
                    </motion.div>
@@ -767,8 +801,26 @@ export default function LensSelectionFlow({ product, availableLenses, onClose, o
                 {/* STEP 4: REFRACTIVE INDEX (THICKNESS) — FIX 2 & FIX 3 */}
                 {step === "MATERIAL" && (
                    <motion.div key="st-mat" initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} className="space-y-8">
-                      {/* Fix 3: Recommendation Banner or Prompt */}
-                      {getRecommendedIndex() ? (
+                      {/* Rimless Frame Notice */}
+                      {isRimless ? (
+                        <div className="bg-blue-50 border-2 border-[#004AAD]/30 rounded-2xl p-5 flex flex-col sm:flex-row items-center justify-between gap-3 shadow-sm">
+                          <div>
+                            <span className="text-[9px] font-black uppercase tracking-[0.3em] text-[#004AAD] block mb-1">
+                              Rimless Frame Requirement
+                            </span>
+                            <p className="text-[11px] font-black uppercase tracking-widest text-[#03173D] flex items-center gap-2">
+                              <span className="w-2.5 h-2.5 rounded-full bg-[#004AAD]" />
+                              Polycarbonate 1.59 Required: <span className="text-[#004AAD] font-black">Impact-Resistant Calibrated</span>
+                            </p>
+                            <p className="text-[9px] text-slate-500 mt-1">
+                              Rimless frames require polycarbonate material to prevent stress cracking around drill holes.
+                            </p>
+                          </div>
+                          <span className="text-[9px] font-black uppercase tracking-wider bg-[#004AAD] text-white px-3.5 py-1.5 rounded-full shadow">
+                            Rimless Locked
+                          </span>
+                        </div>
+                      ) : getRecommendedIndex() ? (
                         <div className="bg-secondary/15 border-2 border-secondary rounded-2xl p-5 flex flex-col sm:flex-row items-center justify-between gap-3 shadow-sm">
                           <div>
                             <span className="text-[9px] font-black uppercase tracking-[0.3em] text-brand-navy block mb-1">
@@ -786,10 +838,10 @@ export default function LensSelectionFlow({ product, availableLenses, onClose, o
                       ) : (
                         <div className="bg-slate-50 border border-slate-200 rounded-2xl p-5 text-center space-y-1">
                           <p className="text-[11px] font-black uppercase tracking-widest text-brand-navy">
-                            Enter your prescription to get index recommendation
+                            Select your preferred refractive index & thickness
                           </p>
                           <p className="text-[9px] text-brand-text-muted">
-                            You can also manually select your preferred thickness below.
+                            Higher index numbers provide thinner, flatter profiles for stronger prescriptions.
                           </p>
                         </div>
                       )}
@@ -808,14 +860,19 @@ export default function LensSelectionFlow({ product, availableLenses, onClose, o
                          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
                             {indexOptions.map(opt => {
                                const isRecommended = getRecommendedIndex() === opt.indexValue;
-                               const isSelected = selectedThickness?.indexValue === opt.indexValue || selectedThickness?.name?.includes(opt.indexValue);
+                               const isSelected = selectedThickness?.indexValue === opt.indexValue;
+                               const isAvailable = opt.available;
 
                                return (
                                  <button 
                                    key={opt.id}
-                                   onClick={() => setSelectedThickness(opt)}
+                                   disabled={!isAvailable}
+                                   onClick={() => {
+                                     if (isAvailable) setSelectedThickness(opt);
+                                   }}
                                    className={cn(
                                      "p-6 border text-left transition-all rounded-2xl relative flex flex-col justify-between space-y-4",
+                                     !isAvailable && "opacity-40 cursor-not-allowed grayscale",
                                      isSelected 
                                        ? "bg-brand-navy text-white border-secondary shadow-xl ring-2 ring-secondary/20" 
                                        : isRecommended 
@@ -831,24 +888,34 @@ export default function LensSelectionFlow({ product, availableLenses, onClose, o
                                           )}>
                                              {opt.name}
                                           </span>
-                                          {isRecommended && (
+                                          {isRecommended && isAvailable && (
                                             <span className="text-[8px] font-black uppercase tracking-wider bg-secondary text-brand-navy px-2 py-0.5 rounded-full">
                                               ★ Recommended
                                             </span>
                                           )}
+                                          {!isAvailable && (
+                                            <span className="text-[8px] font-bold uppercase tracking-wider bg-red-100 text-red-700 px-2 py-0.5 rounded">
+                                              N/A
+                                            </span>
+                                          )}
                                        </div>
                                        <p className={cn("text-[10px] leading-relaxed mt-1", isSelected ? "text-white/70" : "text-brand-text-muted")}>
-                                          {opt.desc}
+                                          {opt.unavailableReason || opt.desc}
                                        </p>
                                     </div>
 
                                     <div className="flex justify-between items-center pt-3 border-t border-brand-navy/5">
                                        <span className={cn("text-[9px] font-bold uppercase tracking-wider", isSelected ? "text-secondary" : "text-brand-text-muted")}>
-                                          {opt.label}
+                                          {opt.material}
                                        </span>
-                                       {isSelected && (
-                                         <CheckCircle2 size={16} className="text-secondary" />
-                                       )}
+                                       <div className="flex items-center gap-2">
+                                          <span className={cn("text-[11px] font-black", isSelected ? "text-secondary" : "text-brand-navy")}>
+                                            {opt.price > 0 ? `+₹${opt.price.toLocaleString('en-IN')}` : "Included"}
+                                          </span>
+                                          {isSelected && (
+                                            <CheckCircle2 size={16} className="text-secondary" />
+                                          )}
+                                       </div>
                                     </div>
                                  </button>
                                );
@@ -858,25 +925,27 @@ export default function LensSelectionFlow({ product, availableLenses, onClose, o
                    </motion.div>
                 )}
 
-                {/* STEP 5: FINAL SUMMARY */}
+                {/* STEP 5: FINAL CONFIRMATION & CALIBRATION REVIEW */}
                 {step === "SUMMARY" && (
-                   <motion.div key="st-sum" initial={{ opacity: 0, x: 20 }} animate={{ opacity: 1, x: 0 }} className="space-y-10">
-                      <div className="flex flex-col items-center justify-center py-8 text-center border-b border-brand-navy/5">
-                         <div className="w-20 h-20 bg-brand-navy rounded-full flex items-center justify-center text-secondary mb-6 shadow-2xl relative">
-                            <CheckCircle2 size={40} />
-                            <motion.div initial={{ scale: 0.8 }} animate={{ scale: 1.2 }} className="absolute inset-0 border border-secondary rounded-full animate-ping opacity-20" />
+                   <motion.div key="st-sum" initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} className="space-y-8">
+                      <div className="p-8 bg-brand-background border border-brand-navy/10 rounded-2xl flex flex-col sm:flex-row items-center justify-between gap-6">
+                         <div>
+                            <span className="text-[9px] font-black uppercase tracking-[0.4em] text-secondary block mb-1">Configuration Lock</span>
+                            <h3 className="text-2xl font-serif italic text-brand-navy">Review & Calibrate</h3>
                          </div>
-                         <h2 className="text-4xl font-serif italic text-brand-navy tracking-tight uppercase">Calibration <span className="text-secondary">Ready</span></h2>
-                         <p className="text-[10px] font-bold uppercase tracking-[0.4em] text-brand-text-muted mt-2 italic">Architecture verified and finalized.</p>
+                         <div className="text-center sm:text-right">
+                            <p className="text-[10px] font-bold uppercase tracking-widest text-brand-navy opacity-40">Integrated Lens Add-on</p>
+                            <p className="text-3xl font-serif italic text-secondary font-black">₹{calculateTotalLensPrice().toLocaleString()}</p>
+                         </div>
                       </div>
 
                       <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
-                         <div className="space-y-6">
-                            <h4 className="text-[11px] font-black uppercase tracking-widest text-brand-navy opacity-40 italic">Optic Specifications</h4>
-                            <div className="space-y-3">
+                         <div className="space-y-4">
+                            <h4 className="text-[11px] font-black uppercase tracking-widest text-brand-navy opacity-40 italic">Optical Architecture</h4>
+                            <div className="space-y-2">
                                <div className="flex justify-between p-4 bg-brand-background border-l-4 border-secondary rounded-r-xl">
-                                  <span className="text-[10px] uppercase font-bold tracking-widest text-brand-navy">Lens Type</span>
-                                  <span className="text-[10px] font-black uppercase tracking-widest text-secondary">
+                                  <span className="text-[10px] uppercase font-bold tracking-widest text-brand-navy">Lens Category</span>
+                                  <span className="text-[10px] font-black uppercase tracking-widest text-brand-navy">
                                     {selectedType?.name} {selectedTier && `(${selectedTier.displayName})`}
                                   </span>
                                </div>
@@ -892,16 +961,18 @@ export default function LensSelectionFlow({ product, availableLenses, onClose, o
                                     <span className="text-[10px] font-black uppercase tracking-widest text-secondary">+₹{calculatePowerRangeExtra().toLocaleString()}</span>
                                  </div>
                                )}
+                               {selectedThickness && (
+                                 <div className="flex justify-between p-4 bg-brand-background border-l-4 border-secondary rounded-r-xl">
+                                    <span className="text-[10px] uppercase font-bold tracking-widest text-brand-navy">Refractive Index</span>
+                                    <span className="text-[10px] font-black uppercase tracking-widest text-brand-navy">
+                                      {selectedThickness.name} {selectedThickness.price > 0 ? `(+₹{selectedThickness.price.toLocaleString('en-IN')})` : "(Included)"}
+                                    </span>
+                                 </div>
+                               )}
                                {selectedMaterial && (
                                  <div className="flex justify-between p-4 bg-brand-background border-l-4 border-secondary/40 rounded-r-xl">
                                     <span className="text-[10px] uppercase font-bold tracking-widest text-brand-navy">Material</span>
                                     <span className="text-[10px] font-black uppercase tracking-widest">{selectedMaterial.name}</span>
-                                 </div>
-                               )}
-                               {selectedThickness && (
-                                 <div className="flex justify-between p-4 bg-brand-background border-l-4 border-secondary/40 rounded-r-xl">
-                                    <span className="text-[10px] uppercase font-bold tracking-widest text-brand-navy">Refractive Index</span>
-                                    <span className="text-[10px] font-black uppercase tracking-widest">{selectedThickness.name}</span>
                                  </div>
                                )}
                             </div>

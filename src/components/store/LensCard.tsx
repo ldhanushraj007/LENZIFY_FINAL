@@ -3,10 +3,6 @@
 import { motion } from "framer-motion";
 import { Layers, ShieldCheck, Sparkles, ChevronRight, Eye } from "lucide-react";
 import Link from "next/link";
-import { toast } from "react-hot-toast";
-import { useCartStore } from "@/store/cartStore";
-import { useRouter } from "next/navigation";
-import { useAuth } from "@/components/providers/AuthProvider";
 
 interface LensCardProps {
   lens: {
@@ -21,39 +17,6 @@ interface LensCardProps {
 }
 
 export default function LensCard({ lens }: LensCardProps) {
-  const addItem = useCartStore((state) => state.addItem);
-  const router = useRouter();
-  const { user } = useAuth();
-
-  const handleQuickAdd = (e: React.MouseEvent) => {
-    e.preventDefault();
-    e.stopPropagation();
-
-    if (!user) {
-      router.push(`/auth/login?redirect=${encodeURIComponent(window.location.pathname)}`);
-      return;
-    }
-
-    addItem({
-      id: lens.id,
-      name: lens.name,
-      price: lens.price,
-      image: "",
-      quantity: 1,
-      metadata: { type: "lens", category: lens.category, sub_category: lens.sub_category },
-    } as any);
-
-    toast.success(`Added: ${lens.name}`, {
-      style: {
-        background: "#ffffff",
-        color: "#111111",
-        border: "1px solid #E8EAF2",
-        borderRadius: "12px",
-        fontSize: "12px",
-        fontWeight: "600",
-      },
-    });
-  };
 
   return (
     <motion.div
@@ -112,20 +75,12 @@ export default function LensCard({ lens }: LensCardProps) {
           </p>
         </div>
 
-        <div className="flex gap-2">
-          <Link
-            href={`/lenses/${lens.id}`}
-            className="flex-1 border border-[#E8EAF2] text-[#111111] text-xs font-semibold py-2.5 rounded-full text-center hover:border-[#004AAD] hover:text-[#004AAD] transition-all"
-          >
-            Learn More
-          </Link>
-          <button
-            onClick={handleQuickAdd}
-            className="flex-1 bg-[#03173D] text-white text-xs font-semibold py-2.5 rounded-full hover:bg-[#004AAD] transition-all flex items-center justify-center gap-1.5"
-          >
-            Select <ChevronRight size={12} />
-          </button>
-        </div>
+        <Link
+          href={`/lenses/${lens.id}`}
+          className="w-full bg-[#03173D] text-white text-xs font-semibold py-3 rounded-full hover:bg-[#004AAD] transition-all flex items-center justify-center gap-1.5 shadow-sm"
+        >
+          View Options & Pricing <ChevronRight size={14} />
+        </Link>
       </div>
     </motion.div>
   );

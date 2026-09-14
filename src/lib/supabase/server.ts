@@ -18,7 +18,7 @@ export const resilientFetch: typeof fetch = async (input, init) => {
     } catch (err: any) {
       lastError = err;
       if (attempt < 2) {
-        await new Promise((resolve) => setTimeout(resolve, 150 * (attempt + 1)));
+        await new Promise((resolve) => setTimeout(resolve, 250 * Math.pow(2, attempt)));
       }
     }
   }

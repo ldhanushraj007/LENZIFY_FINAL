@@ -351,10 +351,22 @@ export default function ProductDetailsClient({
           {/* ── Right column ── */}
           <div className="space-y-8">
 
-            {/* Brand */}
-            <p className="text-sm font-semibold text-[#004AAD] uppercase tracking-widest">
-              {product.brand || "Lenzify"}
-            </p>
+            {/* Brand & Frame Type */}
+            <div className="flex items-center gap-3 flex-wrap">
+              <p className="text-sm font-semibold text-[#004AAD] uppercase tracking-widest">
+                {product.brand || "Lenzify"}
+              </p>
+              {product.frame_type && (
+                <span className={cn(
+                  "px-2.5 py-0.5 rounded-full text-[10px] font-bold uppercase tracking-wider border",
+                  product.frame_type === 'rimless'
+                    ? "bg-purple-50 text-purple-700 border-purple-200"
+                    : "bg-[#03173D]/5 text-[#03173D] border-[#03173D]/10"
+                )}>
+                  {product.frame_type.replace('_', ' ')}
+                </span>
+              )}
+            </div>
 
             {/* Name */}
             <h1 className="text-4xl md:text-5xl font-[var(--font-hero)] italic text-[#111111] leading-tight -mt-4">
