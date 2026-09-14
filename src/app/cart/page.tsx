@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useRef, useState, useMemo } from "react";
+import { useEffect, useRef, useState, useMemo, Suspense } from "react";
 import Image from "next/image";
 import Link from "next/link";
 import { motion, AnimatePresence } from "framer-motion";
@@ -14,7 +14,7 @@ import { toast } from "react-hot-toast";
 
 const supabaseInstance = createClient();
 
-export default function CartPage() {
+function CartPageContent() {
   const { items, setItems, removeItem, updateQuantity } = useCartStore();
   const [loading, setLoading] = useState(true);
   const { user } = useAuth();
@@ -405,5 +405,20 @@ export default function CartPage() {
         </div>
       </main>
     </div>
+  );
+}
+
+export default function CartPage() {
+  return (
+    <Suspense fallback={
+      <div className="min-h-screen flex items-center justify-center bg-[#F8F9FC]">
+        <div className="text-center space-y-4">
+          <div className="w-10 h-10 border-4 border-[#004AAD] border-t-transparent rounded-full animate-spin mx-auto" />
+          <p className="text-xs font-semibold uppercase tracking-widest text-[#666666]">Loading Cart...</p>
+        </div>
+      </div>
+    }>
+      <CartPageContent />
+    </Suspense>
   );
 }
