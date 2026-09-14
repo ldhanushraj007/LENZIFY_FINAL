@@ -687,8 +687,8 @@ export default function CheckoutPage() {
                       {orderProcessing
                         ? "Placing Order..."
                         : paymentMethod === "cod"
-                        ? `Place Order (COD) • ₹${totalAmount.toLocaleString("en-IN")}`
-                        : `Pay Now • ₹${totalAmount.toLocaleString("en-IN")}`}
+                        ? `Place Order (COD) • ₹${total.toLocaleString("en-IN")}`
+                        : `Pay Now • ₹${total.toLocaleString("en-IN")}`}
                       {!orderProcessing && <ArrowRight size={16} />}
                     </button>
                   </div>
