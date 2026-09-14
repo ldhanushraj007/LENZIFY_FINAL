@@ -8,7 +8,7 @@ interface CartItem extends Product {
 
 interface CartStore {
     items: CartItem[];
-    addItem: (product: Product) => void;
+    addItem: (product: Product & { quantity?: number; [key: string]: any }) => void;
     removeItem: (productId: string) => void;
     updateQuantity: (productId: string, delta: number) => void;
     clearCart: () => void;
@@ -22,7 +22,7 @@ export const useCartStore = create<CartStore>()(
         (set, get) => ({
             items: [],
             addItem: (product) => set((state) => {
-                const qtyToAdd = Number(product.quantity) > 0 ? Number(product.quantity) : 1;
+                const qtyToAdd = Number((product as any).quantity) > 0 ? Number((product as any).quantity) : 1;
                 const existingItem = state.items.find(item => item.id === product.id);
                 if (existingItem) {
                     return {

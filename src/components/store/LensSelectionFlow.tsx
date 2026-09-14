@@ -65,28 +65,34 @@ export default function LensSelectionFlow({ product, availableLenses, onClose, o
         tier: "silver",
         displayName: "Silver Tier",
         fov: "Narrow Field of View",
+        fovLabel: "Narrow Field of View",
         ratings: { distance: 7, intermediate: 5, reading: 6, adaptation: 6 },
         lens: silver,
         price: silver?.price || 1799,
-        badge: "Standard"
+        badge: "Standard",
+        description: silver?.description || "Comfortable corridor for balanced daily vision."
       },
       {
         tier: "gold",
         displayName: "Gold Tier",
         fov: "Wide Field of View",
+        fovLabel: "Wide Field of View",
         ratings: { distance: 8, intermediate: 6, reading: 7, adaptation: 8 },
         lens: gold,
         price: gold?.price || 2799,
-        badge: "Most Popular"
+        badge: "Most Popular",
+        description: gold?.description || "Wider corridor with reduced peripheral distortion."
       },
       {
         tier: "platinum",
         displayName: "Platinum Tier",
         fov: "Widest Field of View",
+        fovLabel: "Widest Field of View",
         ratings: { distance: 9, intermediate: 8, reading: 8, adaptation: 9 },
         lens: platinum,
         price: platinum?.price || 4299,
-        badge: "Ultra-Premium"
+        badge: "Ultra-Premium",
+        description: platinum?.description || "Ultra-wide optical corridor with instant adaptation."
       }
     ];
   }, [availableLenses]);
