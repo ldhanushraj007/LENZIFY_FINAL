@@ -41,6 +41,7 @@ export default function CheckoutPage() {
   const { user, loading: authLoading } = useAuth();
   const [loading, setLoading] = useState(true);
   const [orderProcessing, setOrderProcessing] = useState(false);
+  const [activeStep, setActiveStep] = useState(1);
   const [paymentMethod, setPaymentMethod] = useState<"razorpay" | "cod">("razorpay");
 
   const [addressData, setAddressData] = useState({
