@@ -8,7 +8,7 @@ const CATEGORY_CARDS = [
   { name: "Sunglasses", image_url: "/images/categories/sunglasses.png", href: "/products?type=Sunglasses" },
   { name: "Computer Glasses", image_url: "/images/categories/computer_glasses.png", href: "/products?type=Computer Glasses" },
   { name: "Reading Glasses", image_url: "/images/categories/reading_glasses.png", href: "/products?type=Reading Glasses" },
-  { name: "Contact Lenses", image_url: "/images/categories/contact_lenses.png", href: "/products?type=Contact Lenses" },
+  { name: "Contact Lenses", image_url: "/images/categories/contact_lenses.png", href: "/contact-lenses" },
   { name: "Accessories", image_url: "/images/categories/accessories.png", href: "/products?type=Accessories" },
 ];
 

@@ -37,6 +37,29 @@ const parseArray = (val: any): string[] => {
   return [];
 };
 
+const COLOR_HEX_MAP: Record<string, string> = {
+  transparent: "#E0F2FE",
+  clear: "#F1F5F9",
+  white: "#FFFFFF",
+  black: "#111827",
+  blue: "#2563EB",
+  green: "#16A34A",
+  brown: "#78350F",
+  hazel: "#A16207",
+  grey: "#6B7280",
+  gray: "#6B7280",
+  amber: "#D97706",
+  violet: "#7C3AED",
+  purple: "#9333EA",
+  pink: "#EC4899",
+  gold: "#EAB308",
+  silver: "#CBD5E1",
+  gunmetal: "#374151",
+  matteblack: "#18181B",
+  mattblack: "#18181B",
+  shinyblack: "#000000",
+};
+
 export interface ParsedColor {
   name: string;
   hex: string;
@@ -51,9 +74,11 @@ const parseColorItem = (val: any): ParsedColor | null => {
     } catch {
       const trimmed = val.trim();
       if (!trimmed) return null;
+      const normalized = trimmed.toLowerCase().replace(/[^a-z0-9]/g, "");
+      const mappedHex = COLOR_HEX_MAP[normalized];
       return {
         name: trimmed,
-        hex: trimmed.startsWith("#") ? trimmed : "#000000",
+        hex: trimmed.startsWith("#") ? trimmed : (mappedHex || "#000000"),
       };
     }
   }
@@ -63,12 +88,33 @@ const parseColorItem = (val: any): ParsedColor | null => {
     if (!hex && typeof name === "string" && name.startsWith("#")) {
       hex = name;
     }
+    if (!hex && typeof name === "string") {
+      const normalized = name.toLowerCase().replace(/[^a-z0-9]/g, "");
+      hex = COLOR_HEX_MAP[normalized] || "#000000";
+    }
     if (!hex) hex = "#000000";
     if (name) {
       return { name: String(name).trim(), hex: String(hex).trim() };
     }
   }
   return null;
+};
+
+const isContactLensProduct = (p: any): boolean => {
+  const pt = (p.product_type || "").toLowerCase();
+  const cat = (p.category || "").toLowerCase();
+  const hasContactCat = p.product_categories?.some((pc: any) =>
+    (pc.categories?.name || "").toLowerCase().includes("contact")
+  );
+  return (
+    pt === "contact-lens" ||
+    pt === "contact_lens" ||
+    pt.includes("contact") ||
+    cat === "contact-lenses" ||
+    cat === "contact lenses" ||
+    cat.includes("contact") ||
+    Boolean(hasContactCat)
+  );
 };
 
 const parseSizeItem = (val: any): string[] => {
@@ -383,16 +429,44 @@ export default function ProductGrid({ initialCategory, initialGender }: ProductG
       .sort();
   }, [collectionCategories, products]);
 
-  const brands = useMemo(
-    () =>
-      Array.from(new Set(products.map((p) => p.brand).filter(Boolean))).sort(),
-    [products]
-  );
+  const isContactLensPage = useMemo(() => {
+    const typeParam = (searchParams.get("type") || "").toLowerCase();
+    const catParam = (searchParams.get("category") || "").toLowerCase();
+    const hasContactInTypes = selectedTypes.some((t) => {
+      const lower = (t || "").toLowerCase();
+      return (
+        lower.includes("contact") ||
+        lower === "contact-lens" ||
+        lower === "contact_lens"
+      );
+    });
+
+    return (
+      initialCategory === "contact-lenses" ||
+      initialCategory === "contact_lens" ||
+      initialCategory === "contact-lens" ||
+      pathname === "/contact-lenses" ||
+      pathname.startsWith("/contact-lenses") ||
+      typeParam.includes("contact") ||
+      catParam.includes("contact") ||
+      hasContactInTypes
+    );
+  }, [initialCategory, pathname, selectedTypes, searchParams]);
+
+  const brands = useMemo(() => {
+    const source = isContactLensPage
+      ? products.filter(isContactLensProduct)
+      : products;
+    return Array.from(new Set(source.map((p) => p.brand).filter(Boolean))).sort();
+  }, [products, isContactLensPage]);
 
   const colors = useMemo(() => {
     const map = new Map<string, ParsedColor>();
-    products.forEach((p) => {
-      const pColors = p.colors || [];
+    const source = isContactLensPage
+      ? products.filter(isContactLensProduct)
+      : products;
+    source.forEach((p) => {
+      const pColors = parseArray(p.colors);
       pColors.forEach((c: any) => {
         const parsed = parseColorItem(c);
         if (parsed) {
@@ -404,7 +478,7 @@ export default function ProductGrid({ initialCategory, initialGender }: ProductG
       });
     });
     return Array.from(map.values()).sort((a, b) => a.name.localeCompare(b.name));
-  }, [products]);
+  }, [products, isContactLensPage]);
 
   const sizes = useMemo(() => {
     const allSizes = products.flatMap((p) => {
@@ -447,7 +521,11 @@ export default function ProductGrid({ initialCategory, initialGender }: ProductG
   const clearAll = () => {
     setPriceRange({ min: 0, max: 25000 });
     setSelectedGenders([]);
-    setSelectedTypes([]);
+    setSelectedTypes(
+      isContactLensPage
+        ? (searchType ? [searchType] : initialCategory ? [initialCategory] : ["contact-lens"])
+        : []
+    );
     setSelectedBrands([]);
     setSelectedColors([]);
     setSelectedSizes([]);
@@ -498,6 +576,11 @@ export default function ProductGrid({ initialCategory, initialGender }: ProductG
 
     let result = [...products];
 
+    // On contact lens pages or filters, strictly constrain result to contact lens products
+    if (isContactLensPage) {
+      result = result.filter(isContactLensProduct);
+    }
+
     if (routerSearch) {
       result = result.filter(
         (p) =>
@@ -533,13 +616,20 @@ export default function ProductGrid({ initialCategory, initialGender }: ProductG
             return true;
           if (t === "accessories" && selectedLower.includes("accessory"))
             return true;
+          if (
+            (t === "contact-lens" || t === "contact_lens" || t.includes("contact")) &&
+            selectedLower.some((s) => s.includes("contact"))
+          )
+            return true;
           return false;
         });
 
         const matchesCategory = p.product_categories?.some(
           (pc: any) =>
             pc.categories?.type === "product" &&
-            selectedLower.includes(pc.categories.name.toLowerCase())
+            (selectedLower.includes(pc.categories.name.toLowerCase()) ||
+              (selectedLower.some((s) => s.includes("contact")) &&
+                pc.categories.name.toLowerCase().includes("contact")))
         );
 
         return matchesType || matchesCategory;
@@ -570,8 +660,9 @@ export default function ProductGrid({ initialCategory, initialGender }: ProductG
     }
     if (selectedColors.length > 0) {
       result = result.filter((p) => {
-        if (!p.colors || !Array.isArray(p.colors)) return false;
-        const pColorNames = p.colors
+        const rawColors = parseArray(p.colors);
+        if (!rawColors || rawColors.length === 0) return false;
+        const pColorNames = rawColors
           .map((c: any) => parseColorItem(c)?.name.toLowerCase())
           .filter(Boolean);
         return selectedColors.some((selectedName) =>
@@ -654,16 +745,21 @@ export default function ProductGrid({ initialCategory, initialGender }: ProductG
     selectedShapes,
     priceRange,
     viewMode,
+    isContactLensPage,
   ]);
 
   // ---- derived heading ----
   const pageTitle = routerSearch
     ? `Results for "${routerSearch}"`
+    : isContactLensPage
+    ? "Contact Lenses"
     : [...selectedTypes, ...selectedGenders, ...selectedCollections].join(", ") ||
       "Shop Eyewear";
 
   const activeCrumb =
-    [...selectedTypes, ...selectedGenders, ...selectedCollections][0] || "All";
+    (isContactLensPage ? "Contact Lenses" : null) ||
+    [...selectedTypes, ...selectedGenders, ...selectedCollections][0] ||
+    "All";
 
   // ---- grid classes ----
   const gridColClass =
@@ -689,7 +785,7 @@ export default function ProductGrid({ initialCategory, initialGender }: ProductG
         )}
       </div>
 
-      {dynamicGenders.length > 0 && (
+      {!isContactLensPage && dynamicGenders.length > 0 && (
         <FilterSection
           title="Gender"
           activeCount={selectedGenders.length}
@@ -706,7 +802,7 @@ export default function ProductGrid({ initialCategory, initialGender }: ProductG
         </FilterSection>
       )}
 
-      {dynamicTypes.length > 0 && (
+      {!isContactLensPage && dynamicTypes.length > 0 && (
         <FilterSection
           title="Type"
           activeCount={selectedTypes.length}
@@ -723,7 +819,7 @@ export default function ProductGrid({ initialCategory, initialGender }: ProductG
         </FilterSection>
       )}
 
-      {dynamicCollections.length > 0 && (
+      {!isContactLensPage && dynamicCollections.length > 0 && (
         <FilterSection
           title="Collection"
           activeCount={selectedCollections.length}
@@ -752,37 +848,39 @@ export default function ProductGrid({ initialCategory, initialGender }: ProductG
         </FilterSection>
       )}
 
-      {/* Price Slider */}
-      <FilterSection
-        title="Price"
-        activeCount={priceRange.max < 25000 ? 1 : 0}
-        defaultOpen
-      >
-        <div className="space-y-3 pt-1 pb-2">
-          <div className="flex justify-between text-sm">
-            <span className="text-[#666666]">₹0</span>
-            <span className="font-semibold text-[#03173D]">
-              ₹{priceRange.max.toLocaleString()}
-            </span>
+      {/* Price Slider - hidden on contact lens page */}
+      {!isContactLensPage && (
+        <FilterSection
+          title="Price"
+          activeCount={priceRange.max < 25000 ? 1 : 0}
+          defaultOpen
+        >
+          <div className="space-y-3 pt-1 pb-2">
+            <div className="flex justify-between text-sm">
+              <span className="text-[#666666]">₹0</span>
+              <span className="font-semibold text-[#03173D]">
+                ₹{priceRange.max.toLocaleString()}
+              </span>
+            </div>
+            <input
+              type="range"
+              min="0"
+              max="25000"
+              step="500"
+              value={priceRange.max}
+              onChange={(e) =>
+                setPriceRange((prev) => ({
+                  ...prev,
+                  max: Number(e.target.value),
+                }))
+              }
+              className="w-full accent-[#03173D] h-1.5 rounded-full cursor-pointer"
+            />
           </div>
-          <input
-            type="range"
-            min="0"
-            max="25000"
-            step="500"
-            value={priceRange.max}
-            onChange={(e) =>
-              setPriceRange((prev) => ({
-                ...prev,
-                max: Number(e.target.value),
-              }))
-            }
-            className="w-full accent-[#03173D] h-1.5 rounded-full cursor-pointer"
-          />
-        </div>
-      </FilterSection>
+        </FilterSection>
+      )}
 
-      {frameTypes.length > 0 && (
+      {!isContactLensPage && frameTypes.length > 0 && (
         <FilterSection
           title="Frame Type"
           activeCount={selectedFrameTypes.length}
@@ -798,7 +896,7 @@ export default function ProductGrid({ initialCategory, initialGender }: ProductG
         </FilterSection>
       )}
 
-      {materials.length > 0 && (
+      {!isContactLensPage && materials.length > 0 && (
         <FilterSection title="Material" activeCount={selectedMaterials.length}>
           {materials.map((opt) => (
             <CheckboxOption
@@ -811,7 +909,7 @@ export default function ProductGrid({ initialCategory, initialGender }: ProductG
         </FilterSection>
       )}
 
-      {shapes.length > 0 && (
+      {!isContactLensPage && shapes.length > 0 && (
         <FilterSection title="Shape" activeCount={selectedShapes.length}>
           {shapes.map((opt) => (
             <CheckboxOption
@@ -833,7 +931,10 @@ export default function ProductGrid({ initialCategory, initialGender }: ProductG
               const isLight =
                 hexLower === "#ffffff" ||
                 hexLower === "#fafafa" ||
-                colorObj.name.toLowerCase().includes("transparent");
+                hexLower === "#f1f5f9" ||
+                hexLower === "#e0f2fe" ||
+                colorObj.name.toLowerCase().includes("transparent") ||
+                colorObj.name.toLowerCase().includes("clear");
               return (
                 <button
                   key={colorObj.name}
@@ -883,7 +984,7 @@ export default function ProductGrid({ initialCategory, initialGender }: ProductG
         </FilterSection>
       )}
 
-      {sizes.length > 0 && (
+      {!isContactLensPage && sizes.length > 0 && (
         <FilterSection title="Size" activeCount={selectedSizes.length}>
           {sizes.map((opt) => (
             <CheckboxOption
@@ -917,7 +1018,7 @@ export default function ProductGrid({ initialCategory, initialGender }: ProductG
           banner = {
             image: "/images/banners/contact-lenses-banner.jpg",
             tagline: "Ultra-Hydrating Moisture Matrix • Daily, Monthly & Toric Optics with 100% Breathability",
-            badges: ["💧 100% Moisture Lock", "🩺 Doctor Certified", "⚡ 100% Fresh Sterile Stock"],
+            badges: ["💧 100% Moisture Lock", "🩺 Optom Certified Lenses", "⚡ 100% Fresh Sterile Stock"],
           };
         } else if (c.includes("sun") || t.includes("sun")) {
           banner = {

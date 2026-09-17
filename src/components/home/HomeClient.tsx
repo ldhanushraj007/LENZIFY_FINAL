@@ -37,7 +37,7 @@ function TopCategoriesStrip() {
     { name: "Eyeglasses", image: "/images/categories/eyeglasses.png", href: "/products?type=Eyeglasses", bg: "bg-gradient-to-br from-blue-500/10 via-indigo-500/5 to-transparent border-blue-200/50" },
     { name: "Sunglasses", image: "/images/categories/sunglasses.png", href: "/products?type=Sunglasses", bg: "bg-gradient-to-br from-amber-500/10 via-orange-500/5 to-transparent border-amber-200/50" },
     { name: "Computer Glasses", image: "/images/categories/computer_glasses.png", href: "/products?type=Computer Glasses", bg: "bg-gradient-to-br from-cyan-500/10 via-blue-500/5 to-transparent border-cyan-200/50" },
-    { name: "Contact Lenses", image: "/images/categories/contact_lenses.png", href: "/products?type=Contact Lenses", bg: "bg-gradient-to-br from-teal-500/10 via-sky-500/5 to-transparent border-teal-200/50" },
+    { name: "Contact Lenses", image: "/images/categories/contact_lenses.png", href: "/contact-lenses", bg: "bg-gradient-to-br from-teal-500/10 via-sky-500/5 to-transparent border-teal-200/50" },
     { name: "Kids", image: "/images/categories/kids.png", href: "/products?gender=Kids", bg: "bg-gradient-to-br from-purple-500/10 via-pink-500/5 to-transparent border-purple-200/50" },
     { name: "Offers", image: null, href: "/offers", bg: "bg-gradient-to-br from-rose-500/10 via-amber-500/5 to-transparent border-rose-200/50" },
   ];
@@ -88,10 +88,10 @@ function CategoryBannersSection() {
     {
       title: "Contact Lenses",
       badge: "24-Hour Hydration",
-      tagline: "Doctor-Certified Breathable Comfort",
+      tagline: "Optom-Certified Breathable Comfort",
       desc: "Daily, monthly & toric lenses with sterile moisture-lock matrix from Acuvue, Bausch+Lomb & Alcon.",
       image: "/images/banners/contact-lenses-banner.jpg",
-      href: "/products?type=Contact Lenses",
+      href: "/contact-lenses",
       cta: "Shop Contact Lenses",
       highlight: "from-sky-500/30 to-blue-600/30",
     },

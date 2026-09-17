@@ -25,7 +25,7 @@ export default function Footer() {
       links: [
         { name: "Frames", href: "/products?type=Eyeglasses" },
         { name: "Sunglasses", href: "/products?type=Sunglasses" },
-        { name: "Contact Lens", href: "/products?type=Contact Lenses" },
+        { name: "Contact Lens", href: "/contact-lenses" },
         { name: "Smart Glasses", href: "/products?type=Smart Glasses" },
       ],
     },

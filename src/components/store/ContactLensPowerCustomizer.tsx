@@ -147,7 +147,7 @@ export default function ContactLensPowerCustomizer({
             <p className="text-xs text-[#666666]">
               {value
                 ? `OD: ${value.right_eye.sph} SPH | OS: ${value.left_eye.sph} SPH`
-                : "Enter sphere, base curve, diameter & cylinder specs"}
+                : "Enter sphere, cylinder, axis & multifocal specs"}
             </p>
           </div>
         </div>
@@ -276,41 +276,7 @@ export default function ContactLensPowerCustomizer({
                   </select>
                 </div>
 
-                {/* Base Curve (BC) */}
-                <div>
-                  <label className="block text-[10px] font-bold uppercase tracking-wider text-[#666666] mb-1">
-                    Base Curve (BC)
-                  </label>
-                  <select
-                    value={rightEye.bc}
-                    onChange={(e) => handleRightChange("bc", e.target.value)}
-                    className="w-full bg-white border border-[#E8EAF2] rounded-xl px-3 py-2 text-xs font-semibold text-[#111111] focus:border-[#004AAD] outline-none"
-                  >
-                    {BC_OPTIONS.map((opt) => (
-                      <option key={`r-bc-${opt}`} value={opt}>
-                        {opt} mm
-                      </option>
-                    ))}
-                  </select>
-                </div>
 
-                {/* Diameter (DIA) */}
-                <div>
-                  <label className="block text-[10px] font-bold uppercase tracking-wider text-[#666666] mb-1">
-                    Diameter (DIA)
-                  </label>
-                  <select
-                    value={rightEye.dia}
-                    onChange={(e) => handleRightChange("dia", e.target.value)}
-                    className="w-full bg-white border border-[#E8EAF2] rounded-xl px-3 py-2 text-xs font-semibold text-[#111111] focus:border-[#004AAD] outline-none"
-                  >
-                    {DIA_OPTIONS.map((opt) => (
-                      <option key={`r-dia-${opt}`} value={opt}>
-                        {opt} mm
-                      </option>
-                    ))}
-                  </select>
-                </div>
 
                 {/* Add */}
                 <div>
@@ -404,43 +370,7 @@ export default function ContactLensPowerCustomizer({
                   </select>
                 </div>
 
-                {/* Base Curve (BC) */}
-                <div>
-                  <label className="block text-[10px] font-bold uppercase tracking-wider text-[#666666] mb-1">
-                    Base Curve (BC)
-                  </label>
-                  <select
-                    disabled={sameForBoth}
-                    value={sameForBoth ? rightEye.bc : leftEye.bc}
-                    onChange={(e) => handleLeftChange("bc", e.target.value)}
-                    className="w-full bg-white border border-[#E8EAF2] rounded-xl px-3 py-2 text-xs font-semibold text-[#111111] focus:border-[#004AAD] outline-none disabled:bg-gray-100 disabled:cursor-not-allowed"
-                  >
-                    {BC_OPTIONS.map((opt) => (
-                      <option key={`l-bc-${opt}`} value={opt}>
-                        {opt} mm
-                      </option>
-                    ))}
-                  </select>
-                </div>
 
-                {/* Diameter (DIA) */}
-                <div>
-                  <label className="block text-[10px] font-bold uppercase tracking-wider text-[#666666] mb-1">
-                    Diameter (DIA)
-                  </label>
-                  <select
-                    disabled={sameForBoth}
-                    value={sameForBoth ? rightEye.dia : leftEye.dia}
-                    onChange={(e) => handleLeftChange("dia", e.target.value)}
-                    className="w-full bg-white border border-[#E8EAF2] rounded-xl px-3 py-2 text-xs font-semibold text-[#111111] focus:border-[#004AAD] outline-none disabled:bg-gray-100 disabled:cursor-not-allowed"
-                  >
-                    {DIA_OPTIONS.map((opt) => (
-                      <option key={`l-dia-${opt}`} value={opt}>
-                        {opt} mm
-                      </option>
-                    ))}
-                  </select>
-                </div>
 
                 {/* Add */}
                 <div>

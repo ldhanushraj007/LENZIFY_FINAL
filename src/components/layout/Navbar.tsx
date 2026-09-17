@@ -19,7 +19,7 @@ const SHOP_CATEGORIES = [
   { name: "Sunglasses", href: "/products?type=Sunglasses" },
   { name: "Computer Glasses", href: "/products?type=Computer Glasses" },
   { name: "Reading Glasses", href: "/products?type=Reading Glasses" },
-  { name: "Contact Lenses", href: "/products?type=Contact Lenses" },
+  { name: "Contact Lenses", href: "/contact-lenses" },
   { name: "Accessories", href: "/products?type=Accessories" },
 ];
 
@@ -794,7 +794,7 @@ export default function Navbar() {
               {contactLensBrands.map((brand) => (
                 <Link
                   key={brand.slug}
-                  href={`/products?type=Contact+Lenses&brand=${encodeURIComponent(brand.name)}`}
+                  href={`/contact-lenses?brand=${encodeURIComponent(brand.name)}`}
                   className="px-4 py-2.5 hover:bg-[#F8F9FC] text-xs font-semibold text-[#111111] hover:text-[#004AAD] transition-colors rounded-xl flex items-center justify-between group"
                 >
                   <span className="group-hover:translate-x-0.5 transition-transform">{brand.name}</span>
@@ -1032,7 +1032,7 @@ export default function Navbar() {
                     {contactLensBrands.map((brand) => (
                       <Link
                         key={brand.slug}
-                        href={`/products?type=Contact+Lenses&brand=${encodeURIComponent(brand.name)}`}
+                        href={`/contact-lenses?brand=${encodeURIComponent(brand.name)}`}
                         onClick={() => setIsMobileMenuOpen(false)}
                         className="block text-sm font-medium text-[#111111] hover:text-[#004AAD] transition-colors"
                       >

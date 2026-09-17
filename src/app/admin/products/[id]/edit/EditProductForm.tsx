@@ -258,22 +258,20 @@ export default function EditProductForm({
               <textarea name="description" rows={5} required defaultValue={product.description} placeholder="Provide detailed model specifications... Click • Bullet Point to insert formatted items." className="w-full bg-brand-background border border-brand-navy/10 px-6 py-4 text-[11px] font-medium tracking-wider outline-none focus:border-secondary transition-all resize-y" />
            </div>
 
-           {/* Specifications & Pack Configuration (Directly below Tactical Description) */}
-           <div className="space-y-6 pt-6 border-t border-brand-navy/10">
-              <div className="flex items-center justify-between">
-                <div>
-                  <h4 className="text-[10px] font-bold uppercase tracking-[0.2em] text-brand-navy">Specifications & Pack Configuration</h4>
-                  <p className="text-[9px] text-brand-text-muted mt-0.5">Parameters & pack size info (material, water content, base curve, diameter, replacement schedule)</p>
-                </div>
-                {productType === "contact-lens" && (
+           {/* Pack Configuration - only shown for contact lenses */}
+           {(productType === "contact-lens" || productType === "contact_lens" || productType === "lens") && (
+              <div className="space-y-4 pt-6 border-t border-brand-navy/10">
+                <div className="flex items-center justify-between">
+                  <div>
+                    <h4 className="text-[10px] font-bold uppercase tracking-[0.2em] text-brand-navy">Pack Configuration</h4>
+                    <p className="text-[9px] text-brand-text-muted mt-0.5">Pack size info for customer display</p>
+                  </div>
                   <span className="px-2.5 py-1 bg-secondary/10 text-secondary text-[9px] font-bold uppercase tracking-wider rounded">
                     Contact Lens Specs
                   </span>
-                )}
-              </div>
+                </div>
 
-              <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-                <div className="space-y-1.5">
+                <div className="max-w-md space-y-1.5">
                   <label className="text-[9px] font-bold uppercase tracking-widest text-brand-navy">Pack Size *</label>
                   <input
                     name="pack_size"
@@ -283,69 +281,8 @@ export default function EditProductForm({
                   />
                   <p className="text-[8px] text-brand-text-muted">Feeds customer-facing display on product cards & detail pages</p>
                 </div>
-
-                <div className="space-y-1.5">
-                  <label className="text-[9px] font-bold uppercase tracking-widest text-brand-navy">Lens Material</label>
-                  <input
-                    name="lens_material"
-                    defaultValue={initialSpecs.material || product.material || ""}
-                    placeholder="e.g. Silicone Hydrogel (Senofilcon A)"
-                    className="w-full bg-brand-background border border-brand-navy/10 px-4 py-3 text-[11px] font-medium tracking-wider outline-none focus:border-secondary transition-all"
-                  />
-                </div>
-
-                <div className="space-y-1.5">
-                  <label className="text-[9px] font-bold uppercase tracking-widest text-brand-navy">Water Content</label>
-                  <input
-                    name="lens_water_content"
-                    defaultValue={initialSpecs.water_content || ""}
-                    placeholder="e.g. 38% or 55%"
-                    className="w-full bg-brand-background border border-brand-navy/10 px-4 py-3 text-[11px] font-medium tracking-wider outline-none focus:border-secondary transition-all"
-                  />
-                </div>
-
-                <div className="space-y-1.5">
-                  <label className="text-[9px] font-bold uppercase tracking-widest text-brand-navy">Base Curve (BC)</label>
-                  <input
-                    name="lens_base_curve"
-                    defaultValue={initialSpecs.base_curve || ""}
-                    placeholder="e.g. 8.5 mm, 8.8 mm"
-                    className="w-full bg-brand-background border border-brand-navy/10 px-4 py-3 text-[11px] font-medium tracking-wider outline-none focus:border-secondary transition-all"
-                  />
-                </div>
-
-                <div className="space-y-1.5">
-                  <label className="text-[9px] font-bold uppercase tracking-widest text-brand-navy">Diameter (DIA)</label>
-                  <input
-                    name="lens_diameter"
-                    defaultValue={initialSpecs.diameter || ""}
-                    placeholder="e.g. 14.2 mm"
-                    className="w-full bg-brand-background border border-brand-navy/10 px-4 py-3 text-[11px] font-medium tracking-wider outline-none focus:border-secondary transition-all"
-                  />
-                </div>
-
-                <div className="space-y-1.5">
-                  <label className="text-[9px] font-bold uppercase tracking-widest text-brand-navy">Replacement Schedule</label>
-                  <input
-                    name="lens_replacement_schedule"
-                    defaultValue={initialSpecs.replacement_schedule || ""}
-                    placeholder="e.g. Daily / Monthly / Bi-weekly"
-                    className="w-full bg-brand-background border border-brand-navy/10 px-4 py-3 text-[11px] font-medium tracking-wider outline-none focus:border-secondary transition-all"
-                  />
-                </div>
               </div>
-
-              <div className="space-y-1.5">
-                <label className="text-[9px] font-bold uppercase tracking-widest text-brand-navy">Additional Specifications (Notes / Structured free-text)</label>
-                <textarea
-                  name="custom_specifications"
-                  rows={2}
-                  defaultValue={initialSpecs.custom_notes || ""}
-                  placeholder="e.g. Oxygen Transmissibility (Dk/t): 147, UV Blocker: Class 1, Center Thickness: 0.08 mm"
-                  className="w-full bg-brand-background border border-brand-navy/10 px-4 py-3 text-[11px] font-medium tracking-wider outline-none focus:border-secondary transition-all resize-none"
-                />
-              </div>
-           </div>
+           )}
 
            {/* Deployment Sectors moved to sidebar */}
         </section>

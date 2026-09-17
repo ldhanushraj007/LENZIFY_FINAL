@@ -161,7 +161,6 @@ export async function createProduct(formData: FormData) {
         return [];
       }
     })(),
-    pack_size,
     specifications: (() => {
       try {
         const specs = JSON.parse(formData.get("specifications") as string || "{}");
@@ -357,7 +356,6 @@ export async function updateProduct(id: string, _prevState: any, formData: FormD
           return [];
         }
       })(),
-      pack_size,
       specifications: (() => {
         try {
           const specs = JSON.parse(formData.get("specifications") as string || "{}");
