@@ -1,11 +1,20 @@
 "use client";
 
 import { useEffect, useState } from "react";
+import Image from "next/image";
 import ProductCard from "@/components/store/ProductCard";
 import { createClient } from "@/lib/supabase/client";
 import { ChevronDown, Search } from "lucide-react";
 import { motion, AnimatePresence } from "framer-motion";
 import { cn } from "@/lib/utils";
+
+const CATEGORY_IMAGES: Record<string, string> = {
+    "contact-lenses": "/images/banners/contact-lenses-banner.jpg",
+    "spectacles": "/images/banners/eyeglasses-banner.jpg",
+    "sunglasses": "/images/banners/sunglasses-banner.jpg",
+    "lenses": "/images/banners/computer-glasses-banner.jpg",
+    "accessories": "/images/banners/shop-all-banner.jpg",
+};
 
 interface CategoryPageProps {
     category: "spectacles" | "lenses" | "contact-lenses" | "sunglasses" | "accessories";
@@ -64,7 +73,20 @@ export default function CategoryPageTemplate({ category, title, description }: C
     return (
         <div className="bg-white min-h-screen pb-32">
             {/* Category Hero */}
-            <section className="relative bg-gradient-to-br from-[#03173D] via-[#004AAD] to-[#009DFF] pt-40 pb-20 overflow-hidden">
+            <section className="relative bg-[#03173D] pt-40 pb-20 overflow-hidden">
+                {/* Photographic Hero Background with Overlays */}
+                <div className="absolute inset-0 z-0 overflow-hidden">
+                    <Image
+                        src={CATEGORY_IMAGES[category] || "/images/banners/shop-all-banner.jpg"}
+                        alt={title}
+                        fill
+                        priority
+                        className="object-cover object-center scale-105 brightness-[0.85]"
+                    />
+                    <div className="absolute inset-0 bg-gradient-to-r from-[#03173D]/95 via-[#03173D]/80 to-[#03173D]/40" />
+                    <div className="absolute inset-0 bg-gradient-to-t from-[#03173D] via-transparent to-black/30" />
+                </div>
+
                 {/* Floating white blur shapes */}
                 <div className="absolute top-10 right-10 w-96 h-96 rounded-full bg-white/5 blur-3xl pointer-events-none" />
                 <div className="absolute bottom-0 left-1/4 w-64 h-64 rounded-full bg-white/5 blur-3xl pointer-events-none" />

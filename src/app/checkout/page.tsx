@@ -155,9 +155,20 @@ export default function CheckoutPage() {
     }
     setOrderProcessing(true);
 
+    // GST is included in listed prices for contact lenses, only frames/eyewear have GST added separately
+    const isContactLensItem = (item: any) => {
+      const pType = item.product_type || item.products?.product_type;
+      const cat = item.category || item.products?.category || item.products?.categories?.slug;
+      return pType === "contact-lens" || pType === "contact_lens" || cat === "contact-lenses" || cat === "Contact Lenses";
+    };
+
     const subtotal = cartItems.reduce((acc, item) => acc + (item.price * item.quantity), 0);
     const discountedSubtotal = Math.max(0, subtotal - couponDiscount);
-    const tax = discountedSubtotal * 0.18;
+    const taxableSubtotal = cartItems
+      .filter(item => !isContactLensItem(item))
+      .reduce((acc, item) => acc + (item.price * item.quantity), 0);
+    const taxableRatio = subtotal > 0 ? taxableSubtotal / subtotal : 0;
+    const tax = Math.round(discountedSubtotal * taxableRatio * 0.18);
     const totalAmount = discountedSubtotal + tax;
 
     // 1. CASH ON DELIVERY (COD) FLOW
@@ -316,9 +327,19 @@ export default function CheckoutPage() {
     );
   }
 
+  const isContactLensItem = (item: any) => {
+    const pType = item.product_type || item.products?.product_type;
+    const cat = item.category || item.products?.category || item.products?.categories?.slug;
+    return pType === "contact-lens" || pType === "contact_lens" || cat === "contact-lenses" || cat === "Contact Lenses";
+  };
+
   const subtotal = cartItems.reduce((acc: number, i: any) => acc + (i.price * i.quantity), 0);
   const discountedSubtotal = Math.max(0, subtotal - couponDiscount);
-  const tax = discountedSubtotal * 0.18;
+  const taxableSubtotal = cartItems
+    .filter(item => !isContactLensItem(item))
+    .reduce((acc: number, item: any) => acc + (item.price * item.quantity), 0);
+  const taxableRatio = subtotal > 0 ? taxableSubtotal / subtotal : 0;
+  const tax = Math.round(discountedSubtotal * taxableRatio * 0.18);
   const total = discountedSubtotal + tax;
 
   const isFrameOnly = cartItems.length > 0 && cartItems.every(item => !item.lens_id && !item.prescription_json);
@@ -813,10 +834,12 @@ export default function CheckoutPage() {
                     <span>-₹{couponDiscount.toLocaleString()}</span>
                   </div>
                 )}
-                <div className="flex justify-between text-sm text-[#666666]">
-                  <span>GST (18%)</span>
-                  <span>₹{Math.round(tax).toLocaleString()}</span>
-                </div>
+                {tax > 0 ? (
+                  <div className="flex justify-between text-sm text-[#666666]">
+                    <span>GST (18% on frames)</span>
+                    <span>₹{tax.toLocaleString()}</span>
+                  </div>
+                ) : null}
                 <div className="flex justify-between text-sm text-[#004AAD] font-semibold">
                   <span>Shipping</span>
                   <span>Free</span>

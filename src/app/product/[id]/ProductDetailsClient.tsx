@@ -18,6 +18,7 @@ import ReviewForm from "@/components/shop/ReviewForm";
 import { ProductJsonLd } from "@/components/seo/JsonLd";
 import ProductCard from "@/components/store/ProductCard";
 import toast from "react-hot-toast";
+import ContactLensPowerCustomizer, { ContactLensPrescriptionData } from "@/components/store/ContactLensPowerCustomizer";
 
 interface ProductDetailsClientProps {
   product: any;
@@ -44,6 +45,31 @@ export default function ProductDetailsClient({
   const [isInWish, setIsInWish] = useState(isInWishlist);
 
   const [activeTab, setActiveTab] = useState<"description" | "specs" | "reviews">("description");
+
+  const isContactLens = useMemo(() => {
+    return (
+      product.product_type === "contact-lens" ||
+      product.product_type === "contact_lens" ||
+      product.category === "Contact Lenses" ||
+      product.category === "contact-lenses" ||
+      product.categories?.slug === "contact-lenses" ||
+      (Array.isArray(product.categories) && product.categories.some((c: any) => c.slug === "contact-lenses"))
+    );
+  }, [product.product_type, product.category, product.categories]);
+
+  const parsedContactSpecs = useMemo(() => {
+    let s = product.specifications;
+    if (typeof s === "string") {
+      try {
+        s = JSON.parse(s);
+      } catch {
+        s = {};
+      }
+    }
+    return s || {};
+  }, [product.specifications]);
+
+  const [customPower, setCustomPower] = useState<ContactLensPrescriptionData | null>(null);
   const parsedColors = useMemo(() => {
     if (!product.colors) return [];
     return product.colors.map((colorItem: any) => {
@@ -107,7 +133,7 @@ export default function ProductDetailsClient({
   const handleAddToCart = async (lensData?: any, isBuyNow: boolean = false) => {
     const displayPrice = (product.discount_price || product.price) + (lensData?.lens_price || 0);
 
-    const cartItemId = `${product.id}-${selectedColor || ''}-${selectedSize || ''}-${lensData?.lens_id || ''}`;
+    const cartItemId = `${product.id}-${selectedColor || ''}-${selectedSize || ''}-${lensData?.lens_id || ''}-${customPower ? 'rx' : ''}`;
     const cartItem = {
       id: cartItemId,
       product_id: product.id,
@@ -115,14 +141,17 @@ export default function ProductDetailsClient({
       brand: product.brand || "LENZIFY",
       price: displayPrice,
       image: mainImageSrc || "/placeholder.jpg",
-      category: "Eyewear",
+      category: isContactLens ? "Contact Lenses" : "Eyewear",
+      product_type: product.product_type,
       quantity: 1,
       stock: product.stock,
       selected_color: selectedColor,
       selected_size: selectedSize,
-      lens_name: lensData?.lens_config?.type?.name || lensData?.lens_name,
+      lens_name: isContactLens
+        ? (customPower ? "Custom Power Lenses" : "Standard Contact Lens")
+        : (lensData?.lens_config?.type?.name || lensData?.lens_name),
       lens_config: lensData?.lens_config,
-      prescription: lensData?.prescription_json,
+      prescription: customPower || lensData?.prescription_json,
     };
 
     // 1. Always add to local persistent cart
@@ -149,7 +178,7 @@ export default function ProductDetailsClient({
           price: displayPrice,
           lens_id: lensData?.lens_id || null,
           lens_config: lensData?.lens_config || null,
-          prescription_json: lensData?.prescription_json || null
+          prescription_json: customPower || lensData?.prescription_json || null
         });
       }
 
@@ -225,15 +254,29 @@ export default function ProductDetailsClient({
     return d.toLocaleDateString("en-IN", { weekday: "long", month: "long", day: "numeric" });
   }, []);
 
-  // Specs for the Specifications tab
-  const specs = [
-    { label: "Frame Type", value: product.frame_type },
-    { label: "Shape", value: product.shape },
-    { label: "Material", value: product.material },
-    { label: "Gender", value: product.gender },
-    { label: "Color", value: product.color },
-    { label: "Size", value: product.size },
-  ].filter(s => s.value);
+  // Specs for the Specifications tab (Filter out frame specs for contact lenses, display contact lens parameters)
+  const specs = isContactLens
+    ? [
+        { label: "Pack Size", value: product.pack_size || parsedContactSpecs.pack_size },
+        { label: "Material", value: product.material || parsedContactSpecs.material },
+        { label: "Water Content", value: parsedContactSpecs.water_content || parsedContactSpecs.waterContent },
+        { label: "Base Curve (BC)", value: parsedContactSpecs.base_curve || parsedContactSpecs.baseCurve || parsedContactSpecs.bc },
+        { label: "Diameter (DIA)", value: parsedContactSpecs.diameter || parsedContactSpecs.dia },
+        { label: "Replacement Schedule", value: parsedContactSpecs.replacement_schedule || parsedContactSpecs.usage_schedule || parsedContactSpecs.replacement },
+        { label: "Disposability", value: parsedContactSpecs.disposability },
+        { label: "Packaging", value: parsedContactSpecs.packaging },
+        ...Object.entries(parsedContactSpecs)
+          .filter(([k]) => !["pack_size", "material", "water_content", "waterContent", "base_curve", "baseCurve", "bc", "diameter", "dia", "replacement_schedule", "usage_schedule", "replacement", "disposability", "packaging", "usage_type"].includes(k))
+          .map(([k, v]) => ({ label: k.replace(/_/g, " ").replace(/\b\w/g, l => l.toUpperCase()), value: String(v) }))
+      ].filter(s => s.value)
+    : [
+        { label: "Frame Type", value: product.frame_type },
+        { label: "Shape", value: product.shape },
+        { label: "Material", value: product.material },
+        { label: "Gender", value: product.gender },
+        { label: "Color", value: product.color },
+        { label: "Size", value: product.size },
+      ].filter(s => s.value);
 
   return (
     <div className="bg-white text-[#111111] min-h-screen">
@@ -351,12 +394,12 @@ export default function ProductDetailsClient({
           {/* ── Right column ── */}
           <div className="space-y-8">
 
-            {/* Brand & Frame Type */}
+            {/* Brand & Frame Type (Hide frame type for contact lenses) */}
             <div className="flex items-center gap-3 flex-wrap">
               <p className="text-sm font-semibold text-[#004AAD] uppercase tracking-widest">
                 {product.brand || "Lenzify"}
               </p>
-              {product.frame_type && (
+              {!isContactLens && product.frame_type && (
                 <span className={cn(
                   "px-2.5 py-0.5 rounded-full text-[10px] font-bold uppercase tracking-wider border",
                   product.frame_type === 'rimless'
@@ -418,6 +461,14 @@ export default function ProductDetailsClient({
                 </span>
               )}
             </div>
+
+            {/* Pack Size Display (Contact Lenses) */}
+            {isContactLens && (product.pack_size || parsedContactSpecs.pack_size) && (
+              <div className="inline-flex items-center gap-2 px-3.5 py-1.5 rounded-xl bg-[#004AAD]/5 border border-[#004AAD]/15 text-[#004AAD] text-xs font-semibold">
+                <span className="font-bold uppercase tracking-wider text-[10px] text-[#004AAD]/70">Pack Size:</span>
+                <span>{product.pack_size || parsedContactSpecs.pack_size}</span>
+              </div>
+            )}
 
             {/* Divider */}
             <div className="border-t border-[#E8EAF2]" />
@@ -538,6 +589,18 @@ export default function ProductDetailsClient({
                 </>
               ) : (
                 <>
+                  {/* Customize Your Power Section for Contact Lenses */}
+                  {isContactLens && (
+                    <div className="mb-2">
+                      <ContactLensPowerCustomizer
+                        value={customPower}
+                        onChange={setCustomPower}
+                        productDefaultBc={parsedContactSpecs.base_curve || "8.6"}
+                        productDefaultDia={parsedContactSpecs.diameter || "14.2"}
+                      />
+                    </div>
+                  )}
+
                   <button
                     onClick={() => handleAddToCart(undefined, false)}
                     disabled={product.stock <= 0}
@@ -575,14 +638,22 @@ export default function ProductDetailsClient({
               </button>
             </div>
 
-            {/* Trust badges */}
+            {/* Trust badges (Contact lenses omit frame warranty & returns) */}
             <div className="grid grid-cols-4 gap-2 py-2">
-              {[
-                { icon: <Truck size={16} />, label: "Free Shipping" },
-                { icon: <Shield size={16} />, label: "2-Year Warranty" },
-                { icon: <RefreshCw size={16} />, label: "Free Returns" },
-                { icon: <BadgeCheck size={16} />, label: "Authentic" },
-              ].map(({ icon, label }) => (
+              {(isContactLens
+                ? [
+                    { icon: <Truck size={16} />, label: "Free Shipping" },
+                    { icon: <Shield size={16} />, label: "Sterile & Sealed" },
+                    { icon: <RotateCw size={16} />, label: "100% Fresh Batch" },
+                    { icon: <BadgeCheck size={16} />, label: "Authentic" },
+                  ]
+                : [
+                    { icon: <Truck size={16} />, label: "Free Shipping" },
+                    { icon: <Shield size={16} />, label: "2-Year Warranty" },
+                    { icon: <RefreshCw size={16} />, label: "Free Returns" },
+                    { icon: <BadgeCheck size={16} />, label: "Authentic" },
+                  ]
+              ).map(({ icon, label }) => (
                 <div key={label} className="flex flex-col items-center gap-1.5 text-center">
                   <span className="text-[#004AAD]">{icon}</span>
                   <span className="text-[10px] text-[#666666] leading-tight">{label}</span>
@@ -632,11 +703,48 @@ export default function ProductDetailsClient({
                   animate={{ opacity: 1, y: 0 }}
                   exit={{ opacity: 0, y: -8 }}
                   transition={{ duration: 0.2 }}
-                  className="prose max-w-none text-[#666666] leading-relaxed"
+                  className="prose max-w-none text-[#666666] leading-relaxed space-y-2"
                 >
-                  <p>
-                    {product.description || "No description available for this product."}
-                  </p>
+                  {(() => {
+                    const text = product.description || "No description available for this product.";
+                    const lines = text.split("\n");
+                    const elements: React.ReactNode[] = [];
+                    let currentBullets: string[] = [];
+
+                    lines.forEach((line: string, idx: number) => {
+                      const trimmed = line.trim();
+                      if (trimmed.startsWith("•") || trimmed.startsWith("- ") || trimmed.startsWith("* ")) {
+                        const cleanText = trimmed.replace(/^[•\-\*]\s*/, "");
+                        currentBullets.push(cleanText);
+                      } else {
+                        if (currentBullets.length > 0) {
+                          elements.push(
+                            <ul key={`ul-${idx}`} className="list-disc pl-5 my-2 space-y-1 text-[#555555]">
+                              {currentBullets.map((b, bIdx) => (
+                                <li key={`b-${bIdx}`}>{b}</li>
+                              ))}
+                            </ul>
+                          );
+                          currentBullets = [];
+                        }
+                        if (trimmed) {
+                          elements.push(<p key={`p-${idx}`}>{trimmed}</p>);
+                        }
+                      }
+                    });
+
+                    if (currentBullets.length > 0) {
+                      elements.push(
+                        <ul key="ul-end" className="list-disc pl-5 my-2 space-y-1 text-[#555555]">
+                          {currentBullets.map((b, bIdx) => (
+                            <li key={`b-${bIdx}`}>{b}</li>
+                          ))}
+                        </ul>
+                      );
+                    }
+
+                    return elements.length > 0 ? elements : <p>{text}</p>;
+                  })()}
                 </motion.div>
               )}
 

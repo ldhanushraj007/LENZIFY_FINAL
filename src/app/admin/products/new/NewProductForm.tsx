@@ -162,8 +162,136 @@ export default function NewProductForm({ categories, lenses }: { categories: any
            </div>
 
            <div className="space-y-2 group">
-              <label className="text-[9px] font-bold uppercase tracking-widest text-brand-text-muted transition-colors group-focus-within:text-secondary italic">Tactical Brief (Description)</label>
-              <textarea name="description" rows={4} required placeholder="Provide detailed model specifications..." className="w-full bg-brand-background border border-brand-navy/10 px-6 py-4 text-[11px] font-medium tracking-wider outline-none focus:border-secondary transition-all resize-none" suppressHydrationWarning />
+              <div className="flex items-center justify-between">
+                <label className="text-[9px] font-bold uppercase tracking-widest text-brand-text-muted transition-colors group-focus-within:text-secondary italic">Tactical Brief (Description)</label>
+                <div className="flex items-center gap-1.5">
+                  <button
+                    type="button"
+                    onClick={() => {
+                      const ta = document.querySelector('textarea[name="description"]') as HTMLTextAreaElement;
+                      if (ta) {
+                        const start = ta.selectionStart;
+                        const end = ta.selectionEnd;
+                        const val = ta.value;
+                        const insert = (start === 0 || val[start - 1] === '\n') ? "• " : "\n• ";
+                        ta.value = val.substring(0, start) + insert + val.substring(end);
+                        ta.focus();
+                        ta.selectionStart = ta.selectionEnd = start + insert.length;
+                      }
+                    }}
+                    className="px-2.5 py-1 bg-brand-background border border-brand-navy/10 hover:border-secondary text-[9px] font-bold uppercase tracking-wider text-brand-navy rounded transition-all flex items-center gap-1 cursor-pointer"
+                  >
+                    <span>• Bullet Point</span>
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      const ta = document.querySelector('textarea[name="description"]') as HTMLTextAreaElement;
+                      if (ta) {
+                        const start = ta.selectionStart;
+                        const end = ta.selectionEnd;
+                        const selected = ta.value.substring(start, end) || "bold text";
+                        const insert = `**${selected}**`;
+                        ta.value = ta.value.substring(0, start) + insert + ta.value.substring(end);
+                        ta.focus();
+                      }
+                    }}
+                    className="px-2 py-1 bg-brand-background border border-brand-navy/10 hover:border-secondary text-[9px] font-bold uppercase tracking-wider text-brand-navy rounded transition-all cursor-pointer"
+                  >
+                    B
+                  </button>
+                </div>
+              </div>
+              <textarea name="description" rows={5} required placeholder="Provide detailed model specifications... Click • Bullet Point to insert formatted items." className="w-full bg-brand-background border border-brand-navy/10 px-6 py-4 text-[11px] font-medium tracking-wider outline-none focus:border-secondary transition-all resize-y" suppressHydrationWarning />
+           </div>
+
+           {/* Specifications & Pack Configuration (Directly below Tactical Description) */}
+           <div className="space-y-6 pt-6 border-t border-brand-navy/10">
+              <div className="flex items-center justify-between">
+                <div>
+                  <h4 className="text-[10px] font-bold uppercase tracking-[0.2em] text-brand-navy">Specifications & Pack Configuration</h4>
+                  <p className="text-[9px] text-brand-text-muted mt-0.5">Parameters & pack size info (material, water content, base curve, diameter, replacement schedule)</p>
+                </div>
+                {productType === "contact-lens" && (
+                  <span className="px-2.5 py-1 bg-secondary/10 text-secondary text-[9px] font-bold uppercase tracking-wider rounded">
+                    Contact Lens Specs
+                  </span>
+                )}
+              </div>
+
+              <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+                <div className="space-y-1.5">
+                  <label className="text-[9px] font-bold uppercase tracking-widest text-brand-navy">Pack Size *</label>
+                  <input
+                    name="pack_size"
+                    placeholder="e.g. 6 lenses per pack or 30 lenses / box"
+                    className="w-full bg-brand-background border border-brand-navy/10 px-4 py-3 text-[11px] font-medium tracking-wider outline-none focus:border-secondary transition-all"
+                    suppressHydrationWarning
+                  />
+                  <p className="text-[8px] text-brand-text-muted">Feeds customer-facing display on product cards & detail pages</p>
+                </div>
+
+                <div className="space-y-1.5">
+                  <label className="text-[9px] font-bold uppercase tracking-widest text-brand-navy">Lens Material</label>
+                  <input
+                    name="lens_material"
+                    placeholder="e.g. Silicone Hydrogel (Senofilcon A)"
+                    className="w-full bg-brand-background border border-brand-navy/10 px-4 py-3 text-[11px] font-medium tracking-wider outline-none focus:border-secondary transition-all"
+                    suppressHydrationWarning
+                  />
+                </div>
+
+                <div className="space-y-1.5">
+                  <label className="text-[9px] font-bold uppercase tracking-widest text-brand-navy">Water Content</label>
+                  <input
+                    name="lens_water_content"
+                    placeholder="e.g. 38% or 55%"
+                    className="w-full bg-brand-background border border-brand-navy/10 px-4 py-3 text-[11px] font-medium tracking-wider outline-none focus:border-secondary transition-all"
+                    suppressHydrationWarning
+                  />
+                </div>
+
+                <div className="space-y-1.5">
+                  <label className="text-[9px] font-bold uppercase tracking-widest text-brand-navy">Base Curve (BC)</label>
+                  <input
+                    name="lens_base_curve"
+                    placeholder="e.g. 8.5 mm, 8.8 mm"
+                    className="w-full bg-brand-background border border-brand-navy/10 px-4 py-3 text-[11px] font-medium tracking-wider outline-none focus:border-secondary transition-all"
+                    suppressHydrationWarning
+                  />
+                </div>
+
+                <div className="space-y-1.5">
+                  <label className="text-[9px] font-bold uppercase tracking-widest text-brand-navy">Diameter (DIA)</label>
+                  <input
+                    name="lens_diameter"
+                    placeholder="e.g. 14.2 mm"
+                    className="w-full bg-brand-background border border-brand-navy/10 px-4 py-3 text-[11px] font-medium tracking-wider outline-none focus:border-secondary transition-all"
+                    suppressHydrationWarning
+                  />
+                </div>
+
+                <div className="space-y-1.5">
+                  <label className="text-[9px] font-bold uppercase tracking-widest text-brand-navy">Replacement Schedule</label>
+                  <input
+                    name="lens_replacement_schedule"
+                    placeholder="e.g. Daily / Monthly / Bi-weekly"
+                    className="w-full bg-brand-background border border-brand-navy/10 px-4 py-3 text-[11px] font-medium tracking-wider outline-none focus:border-secondary transition-all"
+                    suppressHydrationWarning
+                  />
+                </div>
+              </div>
+
+              <div className="space-y-1.5">
+                <label className="text-[9px] font-bold uppercase tracking-widest text-brand-navy">Additional Specifications (Notes / Structured free-text)</label>
+                <textarea
+                  name="custom_specifications"
+                  rows={2}
+                  placeholder="e.g. Oxygen Transmissibility (Dk/t): 147, UV Blocker: Class 1, Center Thickness: 0.08 mm"
+                  className="w-full bg-brand-background border border-brand-navy/10 px-4 py-3 text-[11px] font-medium tracking-wider outline-none focus:border-secondary transition-all resize-none"
+                  suppressHydrationWarning
+                />
+              </div>
            </div>
 
            {/* Deployment Sectors moved to sidebar */}
@@ -192,8 +320,8 @@ export default function NewProductForm({ categories, lenses }: { categories: any
            </div>
         </section>
 
-        {/* Optical Matrix (Specifications) */}
-        {productType !== "accessory" && (
+        {/* Optical Matrix (Specifications) - only shown for frames */}
+        {productType !== "accessory" && productType !== "contact-lens" && (
            <section className="bg-white border border-brand-navy/5 p-8 lg:p-12 space-y-10 shadow-sm relative overflow-hidden">
               <div className="flex items-center gap-4 mb-2">
                  <Maximize2 size={16} className="text-secondary" />

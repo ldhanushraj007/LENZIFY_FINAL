@@ -34,12 +34,12 @@ interface HomeClientProps {
 // ─── Top Categories Strip ─────────────────────────────────────────────────────
 function TopCategoriesStrip() {
   const cats = [
-    { name: "Eyeglasses", image: "/images/categories/eyeglasses.png", href: "/products?type=Eyeglasses" },
-    { name: "Sunglasses", image: "/images/categories/sunglasses.png", href: "/products?type=Sunglasses" },
-    { name: "Computer Glasses", image: "/images/categories/computer_glasses.png", href: "/products?type=Computer Glasses" },
-    { name: "Contact Lenses", image: "/images/categories/contact_lenses.png", href: "/products?type=Contact Lenses" },
-    { name: "Kids", image: "/images/categories/kids.png", href: "/products?gender=Kids" },
-    { name: "Offers", image: null, href: "/offers" },
+    { name: "Eyeglasses", image: "/images/categories/eyeglasses.png", href: "/products?type=Eyeglasses", bg: "bg-gradient-to-br from-blue-500/10 via-indigo-500/5 to-transparent border-blue-200/50" },
+    { name: "Sunglasses", image: "/images/categories/sunglasses.png", href: "/products?type=Sunglasses", bg: "bg-gradient-to-br from-amber-500/10 via-orange-500/5 to-transparent border-amber-200/50" },
+    { name: "Computer Glasses", image: "/images/categories/computer_glasses.png", href: "/products?type=Computer Glasses", bg: "bg-gradient-to-br from-cyan-500/10 via-blue-500/5 to-transparent border-cyan-200/50" },
+    { name: "Contact Lenses", image: "/images/categories/contact_lenses.png", href: "/products?type=Contact Lenses", bg: "bg-gradient-to-br from-teal-500/10 via-sky-500/5 to-transparent border-teal-200/50" },
+    { name: "Kids", image: "/images/categories/kids.png", href: "/products?gender=Kids", bg: "bg-gradient-to-br from-purple-500/10 via-pink-500/5 to-transparent border-purple-200/50" },
+    { name: "Offers", image: null, href: "/offers", bg: "bg-gradient-to-br from-rose-500/10 via-amber-500/5 to-transparent border-rose-200/50" },
   ];
 
   return (
@@ -56,7 +56,7 @@ function TopCategoriesStrip() {
               className="flex-1 min-w-[100px]"
             >
               <Link href={cat.href} className="flex flex-col items-center gap-3 group">
-                <div className="relative w-full aspect-square rounded-2xl bg-[#F8F9FC] overflow-hidden border border-[#E8EAF2] group-hover:border-[#004AAD] group-hover:shadow-[0_8px_24px_rgba(0,74,173,0.12)] transition-all duration-300">
+                <div className={`relative w-full aspect-square rounded-2xl ${cat.bg} overflow-hidden border group-hover:border-[#004AAD] group-hover:shadow-[0_8px_24px_rgba(0,74,173,0.12)] transition-all duration-300 shadow-sm`}>
                   {cat.image ? (
                     <Image
                       src={cat.image}
@@ -73,6 +73,187 @@ function TopCategoriesStrip() {
                 <span className="text-[10px] md:text-xs font-bold uppercase tracking-wider text-[#666666] group-hover:text-[#004AAD] transition-colors text-center leading-tight">
                   {cat.name}
                 </span>
+              </Link>
+            </motion.div>
+          ))}
+        </div>
+      </div>
+    </section>
+  );
+}
+
+// ─── Category Banners Showcase (Hero Photography) ─────────────────────────────
+function CategoryBannersSection() {
+  const categoryBanners = [
+    {
+      title: "Contact Lenses",
+      badge: "24-Hour Hydration",
+      tagline: "Doctor-Certified Breathable Comfort",
+      desc: "Daily, monthly & toric lenses with sterile moisture-lock matrix from Acuvue, Bausch+Lomb & Alcon.",
+      image: "/images/banners/contact-lenses-banner.jpg",
+      href: "/products?type=Contact Lenses",
+      cta: "Shop Contact Lenses",
+      highlight: "from-sky-500/30 to-blue-600/30",
+    },
+    {
+      title: "Eyeglasses & Frames",
+      badge: "Signature Craft",
+      tagline: "Lightweight Titanium & Italian Acetate",
+      desc: "Precision ophthalmic designs engineered for exceptional all-day durability and style.",
+      image: "/images/banners/eyeglasses-banner.jpg",
+      href: "/products?type=Eyeglasses",
+      cta: "Explore Eyeglasses",
+      highlight: "from-amber-500/20 to-indigo-600/30",
+    },
+    {
+      title: "Sunglasses",
+      badge: "Polarized UV400",
+      tagline: "Glacier Glare Cut & Style",
+      desc: "Maximum sun protection meets timeless silhouettes, gradient tints and polarized clarity.",
+      image: "/images/banners/sunglasses-banner.jpg",
+      href: "/products?type=Sunglasses",
+      cta: "Discover Sunglasses",
+      highlight: "from-orange-500/25 to-rose-600/25",
+    },
+    {
+      title: "Computer & Screen Glasses",
+      badge: "Anti-Blue Defense",
+      tagline: "Zero Glare Screen Protection",
+      desc: "Filter 95% of digital blue light to relieve eye strain, headaches, and insomnia.",
+      image: "/images/banners/computer-glasses-banner.jpg",
+      href: "/products?type=Computer Glasses",
+      cta: "Shop Blue Light",
+      highlight: "from-cyan-500/25 to-blue-600/25",
+    },
+  ];
+
+  return (
+    <section className="py-12 md:py-20 px-4 sm:px-6 bg-[#F8F9FC] border-b border-[#E8EAF2]">
+      <div className="max-w-7xl mx-auto lg:px-6">
+        <motion.div
+          initial={{ opacity: 0, y: 20 }}
+          whileInView={{ opacity: 1, y: 0 }}
+          viewport={{ once: true }}
+          className="text-center mb-10 md:mb-14"
+        >
+          <span className="text-xs font-semibold uppercase tracking-widest mb-3 block text-[#004AAD]">
+            Shop By Department
+          </span>
+          <h2 className="font-serif italic text-3xl md:text-4xl lg:text-5xl text-[#111111]">
+            Curated Vision Categories
+          </h2>
+          <p className="text-[#666666] text-sm mt-3 font-medium max-w-xl mx-auto">
+            From sterile medical-grade contact lenses to handcrafted Italian frames, explore our optical universe.
+          </p>
+        </motion.div>
+
+        {/* Primary 2-column feature banners */}
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-6 mb-6">
+          {categoryBanners.slice(0, 2).map((banner, i) => (
+            <motion.div
+              key={banner.title}
+              initial={{ opacity: 0, y: 24 }}
+              whileInView={{ opacity: 1, y: 0 }}
+              viewport={{ once: true }}
+              transition={{ duration: 0.6, delay: i * 0.1 }}
+            >
+              <Link
+                href={banner.href}
+                className="group relative block aspect-[16/10] rounded-3xl overflow-hidden shadow-[0_12px_36px_rgba(3,23,61,0.08)] hover:shadow-[0_24px_54px_rgba(3,23,61,0.18)] transition-all duration-500 hover:-translate-y-1.5"
+              >
+                {/* Image */}
+                <Image
+                  src={banner.image}
+                  alt={banner.title}
+                  fill
+                  className="object-cover transition-transform duration-700 group-hover:scale-105"
+                />
+                {/* Overlays */}
+                <div className="absolute inset-0 bg-gradient-to-t from-[#03173D]/95 via-[#03173D]/60 to-transparent transition-opacity" />
+                <div className={`absolute inset-0 bg-gradient-to-br ${banner.highlight} opacity-40 group-hover:opacity-60 transition-opacity`} />
+
+                {/* Content */}
+                <div className="absolute inset-0 p-6 md:p-10 flex flex-col justify-between">
+                  <div>
+                    <span className="inline-flex items-center text-[10px] md:text-xs font-bold uppercase tracking-widest bg-white/20 backdrop-blur-md border border-white/30 text-white px-3.5 py-1 rounded-full shadow-sm">
+                      {banner.badge}
+                    </span>
+                  </div>
+
+                  <div className="space-y-2">
+                    <p className="text-white/80 text-xs md:text-sm font-medium tracking-wide uppercase">
+                      {banner.tagline}
+                    </p>
+                    <h3 className="text-2xl md:text-4xl font-serif italic text-white leading-tight">
+                      {banner.title}
+                    </h3>
+                    <p className="text-white/80 text-xs md:text-sm line-clamp-2 max-w-md">
+                      {banner.desc}
+                    </p>
+                    <div className="pt-2">
+                      <span className="inline-flex items-center gap-2 text-xs md:text-sm font-semibold text-white bg-white/20 backdrop-blur-md border border-white/30 group-hover:bg-white group-hover:text-[#03173D] px-5 py-2.5 rounded-full transition-all duration-300">
+                        {banner.cta}
+                        <ChevronRight className="w-4 h-4 transition-transform group-hover:translate-x-1" />
+                      </span>
+                    </div>
+                  </div>
+                </div>
+              </Link>
+            </motion.div>
+          ))}
+        </div>
+
+        {/* Secondary 2-column banners */}
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+          {categoryBanners.slice(2, 4).map((banner, i) => (
+            <motion.div
+              key={banner.title}
+              initial={{ opacity: 0, y: 24 }}
+              whileInView={{ opacity: 1, y: 0 }}
+              viewport={{ once: true }}
+              transition={{ duration: 0.6, delay: 0.2 + i * 0.1 }}
+            >
+              <Link
+                href={banner.href}
+                className="group relative block aspect-[16/9] rounded-3xl overflow-hidden shadow-[0_12px_36px_rgba(3,23,61,0.08)] hover:shadow-[0_24px_54px_rgba(3,23,61,0.18)] transition-all duration-500 hover:-translate-y-1.5"
+              >
+                {/* Image */}
+                <Image
+                  src={banner.image}
+                  alt={banner.title}
+                  fill
+                  className="object-cover transition-transform duration-700 group-hover:scale-105"
+                />
+                {/* Overlays */}
+                <div className="absolute inset-0 bg-gradient-to-t from-[#03173D]/95 via-[#03173D]/60 to-transparent transition-opacity" />
+                <div className={`absolute inset-0 bg-gradient-to-br ${banner.highlight} opacity-40 group-hover:opacity-60 transition-opacity`} />
+
+                {/* Content */}
+                <div className="absolute inset-0 p-6 md:p-8 flex flex-col justify-between">
+                  <div>
+                    <span className="inline-flex items-center text-[10px] md:text-xs font-bold uppercase tracking-widest bg-white/20 backdrop-blur-md border border-white/30 text-white px-3.5 py-1 rounded-full shadow-sm">
+                      {banner.badge}
+                    </span>
+                  </div>
+
+                  <div className="space-y-1.5">
+                    <p className="text-white/80 text-xs font-medium tracking-wide uppercase">
+                      {banner.tagline}
+                    </p>
+                    <h3 className="text-xl md:text-3xl font-serif italic text-white leading-tight">
+                      {banner.title}
+                    </h3>
+                    <p className="text-white/80 text-xs md:text-sm line-clamp-2 max-w-md">
+                      {banner.desc}
+                    </p>
+                    <div className="pt-2">
+                      <span className="inline-flex items-center gap-2 text-xs font-semibold text-white bg-white/20 backdrop-blur-md border border-white/30 group-hover:bg-white group-hover:text-[#03173D] px-4 py-2 rounded-full transition-all duration-300">
+                        {banner.cta}
+                        <ChevronRight className="w-4 h-4 transition-transform group-hover:translate-x-1" />
+                      </span>
+                    </div>
+                  </div>
+                </div>
               </Link>
             </motion.div>
           ))}
@@ -837,7 +1018,10 @@ export default function HomeClient({ initialSections, initialProducts, stats, te
       {/* 2. Quick Category Strip — white */}
       <TopCategoriesStrip />
 
-      {/* 3. Featured Collections — white, large cards */}
+      {/* 3. High-Impact Category Banners (Contact Lenses, Eyeglasses, Sunglasses, Screen) */}
+      <CategoryBannersSection />
+
+      {/* 4. Featured Collections — white, large cards */}
       <CollectionShowcase items={collectionsSection?.content?.items} />
 
       {/* 4. Featured Products — white */}

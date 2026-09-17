@@ -62,6 +62,14 @@ export async function createProduct(formData: FormData) {
 
   const collection = formData.getAll("collection");
   const usage_type = formData.getAll("usage_type");
+
+  const pack_size = (formData.get("pack_size") as string)?.trim() || null;
+  const lens_material = (formData.get("lens_material") as string)?.trim() || "";
+  const lens_water_content = (formData.get("lens_water_content") as string)?.trim() || "";
+  const lens_base_curve = (formData.get("lens_base_curve") as string)?.trim() || "";
+  const lens_diameter = (formData.get("lens_diameter") as string)?.trim() || "";
+  const lens_replacement_schedule = (formData.get("lens_replacement_schedule") as string)?.trim() || "";
+  const custom_specifications = (formData.get("custom_specifications") as string)?.trim() || "";
   
   const colorsRaw = formData.get("colors") as string;
   const sizesRaw = formData.get("sizes") as string;
@@ -153,13 +161,33 @@ export async function createProduct(formData: FormData) {
         return [];
       }
     })(),
+    pack_size,
     specifications: (() => {
       try {
         const specs = JSON.parse(formData.get("specifications") as string || "{}");
-        return { ...specs, usage_type };
+        return {
+          ...specs,
+          usage_type,
+          ...(lens_material ? { material: lens_material } : {}),
+          ...(lens_water_content ? { water_content: lens_water_content } : {}),
+          ...(lens_base_curve ? { base_curve: lens_base_curve } : {}),
+          ...(lens_diameter ? { diameter: lens_diameter } : {}),
+          ...(lens_replacement_schedule ? { replacement_schedule: lens_replacement_schedule } : {}),
+          ...(custom_specifications ? { custom_notes: custom_specifications } : {}),
+          ...(pack_size ? { pack_size } : {}),
+        };
       } catch (e) {
         console.error("Error parsing specifications:", e);
-        return { usage_type };
+        return {
+          usage_type,
+          ...(lens_material ? { material: lens_material } : {}),
+          ...(lens_water_content ? { water_content: lens_water_content } : {}),
+          ...(lens_base_curve ? { base_curve: lens_base_curve } : {}),
+          ...(lens_diameter ? { diameter: lens_diameter } : {}),
+          ...(lens_replacement_schedule ? { replacement_schedule: lens_replacement_schedule } : {}),
+          ...(custom_specifications ? { custom_notes: custom_specifications } : {}),
+          ...(pack_size ? { pack_size } : {}),
+        };
       }
     })(),
     tags: (formData.get("tags") as string || "").split(",").map(t => t.trim()).filter(Boolean),
@@ -254,6 +282,14 @@ export async function updateProduct(id: string, _prevState: any, formData: FormD
 
     const collection = formData.getAll("collection");
     const usage_type = formData.getAll("usage_type");
+
+    const pack_size = (formData.get("pack_size") as string)?.trim() || null;
+    const lens_material = (formData.get("lens_material") as string)?.trim() || "";
+    const lens_water_content = (formData.get("lens_water_content") as string)?.trim() || "";
+    const lens_base_curve = (formData.get("lens_base_curve") as string)?.trim() || "";
+    const lens_diameter = (formData.get("lens_diameter") as string)?.trim() || "";
+    const lens_replacement_schedule = (formData.get("lens_replacement_schedule") as string)?.trim() || "";
+    const custom_specifications = (formData.get("custom_specifications") as string)?.trim() || "";
     
     const colorsRaw = formData.get("colors") as string;
     const sizesRaw = formData.get("sizes") as string;
@@ -321,13 +357,33 @@ export async function updateProduct(id: string, _prevState: any, formData: FormD
           return [];
         }
       })(),
+      pack_size,
       specifications: (() => {
         try {
           const specs = JSON.parse(formData.get("specifications") as string || "{}");
-          return { ...specs, usage_type };
+          return {
+            ...specs,
+            usage_type,
+            ...(lens_material ? { material: lens_material } : {}),
+            ...(lens_water_content ? { water_content: lens_water_content } : {}),
+            ...(lens_base_curve ? { base_curve: lens_base_curve } : {}),
+            ...(lens_diameter ? { diameter: lens_diameter } : {}),
+            ...(lens_replacement_schedule ? { replacement_schedule: lens_replacement_schedule } : {}),
+            ...(custom_specifications ? { custom_notes: custom_specifications } : {}),
+            ...(pack_size ? { pack_size } : {}),
+          };
         } catch (e) {
           console.error("Error parsing specifications:", e);
-          return { usage_type };
+          return {
+            usage_type,
+            ...(lens_material ? { material: lens_material } : {}),
+            ...(lens_water_content ? { water_content: lens_water_content } : {}),
+            ...(lens_base_curve ? { base_curve: lens_base_curve } : {}),
+            ...(lens_diameter ? { diameter: lens_diameter } : {}),
+            ...(lens_replacement_schedule ? { replacement_schedule: lens_replacement_schedule } : {}),
+            ...(custom_specifications ? { custom_notes: custom_specifications } : {}),
+            ...(pack_size ? { pack_size } : {}),
+          };
         }
       })(),
       tags: (formData.get("tags") as string || "").split(",").map(t => t.trim()).filter(Boolean),

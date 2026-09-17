@@ -106,8 +106,17 @@ function CartPageContent() {
     };
   }, [user]);
 
+  const isContactLensItem = (item: any) => {
+    const pType = item.product_type || item.products?.product_type;
+    const cat = item.category || item.products?.category || item.products?.categories?.slug;
+    return pType === "contact-lens" || pType === "contact_lens" || cat === "contact-lenses" || cat === "Contact Lenses";
+  };
+
   const subtotal = items.reduce((acc, item) => acc + (item.price * item.quantity), 0);
-  const tax = subtotal * 0.18;
+  const taxableSubtotal = items
+    .filter(item => !isContactLensItem(item))
+    .reduce((acc, item) => acc + (item.price * item.quantity), 0);
+  const tax = Math.round(taxableSubtotal * 0.18);
   const total = subtotal + tax;
 
   const handleRemove = async (dbId: number, productId: string) => {
@@ -356,10 +365,12 @@ function CartPageContent() {
                     <span className="text-[#666666] text-sm">Shipping</span>
                     <span className="text-emerald-600 font-semibold text-sm">Free</span>
                   </div>
-                  <div className="flex justify-between items-center">
-                    <span className="text-[#666666] text-sm">GST (18%)</span>
-                    <span className="text-[#111111] font-semibold">₹{tax.toLocaleString()}</span>
-                  </div>
+                  {tax > 0 && (
+                    <div className="flex justify-between items-center">
+                      <span className="text-[#666666] text-sm">GST (18% on frames)</span>
+                      <span className="text-[#111111] font-semibold">₹{tax.toLocaleString()}</span>
+                    </div>
+                  )}
 
                   {/* Free shipping progress */}
                   <div className="pt-2 space-y-2">

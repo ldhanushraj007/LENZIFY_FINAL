@@ -343,6 +343,55 @@ export default async function OrderDetailPage({ params, searchParams }: { params
                         <p className="text-xs text-[#333333]">{item.quantity}</p>
                       </div>
                     </div>
+
+                    {/* Contact Lens Clinical Prescription Matrix */}
+                    {item.prescription_json?.right_eye && (
+                      <div className="mt-4 pt-3 border-t border-[#ECEFF5] bg-[#F8F9FC] p-3.5 rounded-xl border border-[#ECEFF5]">
+                        <div className="flex items-center justify-between mb-2">
+                          <p className="text-[10px] uppercase font-bold tracking-widest text-[#004AAD] flex items-center gap-1">
+                            Contact Lens Prescription Matrix
+                          </p>
+                          <span className="text-[9px] font-bold text-emerald-700 bg-emerald-100 px-2 py-0.5 rounded-md">
+                            Custom Prescription
+                          </span>
+                        </div>
+                        <div className="overflow-x-auto">
+                          <table className="w-full text-left text-xs bg-white rounded-lg border border-[#E8EAF2] overflow-hidden">
+                            <thead className="bg-[#F4F6F8] text-[9px] uppercase font-bold text-[#666666] border-b border-[#E8EAF2]">
+                              <tr>
+                                <th className="px-2.5 py-1.5">Eye</th>
+                                <th className="px-2.5 py-1.5">SPH</th>
+                                <th className="px-2.5 py-1.5">CYL</th>
+                                <th className="px-2.5 py-1.5">Axis</th>
+                                <th className="px-2.5 py-1.5">BC</th>
+                                <th className="px-2.5 py-1.5">DIA</th>
+                                <th className="px-2.5 py-1.5">Add</th>
+                              </tr>
+                            </thead>
+                            <tbody className="divide-y divide-[#E8EAF2] font-mono text-[11px] font-semibold text-[#111111]">
+                              <tr>
+                                <td className="px-2.5 py-1.5 font-sans font-bold text-[#004AAD]">Right (OD)</td>
+                                <td className="px-2.5 py-1.5">{item.prescription_json.right_eye.sph || "—"}</td>
+                                <td className="px-2.5 py-1.5">{item.prescription_json.right_eye.cyl || "—"}</td>
+                                <td className="px-2.5 py-1.5">{item.prescription_json.right_eye.axis || "—"}</td>
+                                <td className="px-2.5 py-1.5">{item.prescription_json.right_eye.bc ? `${item.prescription_json.right_eye.bc} mm` : "—"}</td>
+                                <td className="px-2.5 py-1.5">{item.prescription_json.right_eye.dia ? `${item.prescription_json.right_eye.dia} mm` : "—"}</td>
+                                <td className="px-2.5 py-1.5">{item.prescription_json.right_eye.add || "—"}</td>
+                              </tr>
+                              <tr>
+                                <td className="px-2.5 py-1.5 font-sans font-bold text-[#004AAD]">Left (OS)</td>
+                                <td className="px-2.5 py-1.5">{item.prescription_json.left_eye?.sph || "—"}</td>
+                                <td className="px-2.5 py-1.5">{item.prescription_json.left_eye?.cyl || "—"}</td>
+                                <td className="px-2.5 py-1.5">{item.prescription_json.left_eye?.axis || "—"}</td>
+                                <td className="px-2.5 py-1.5">{item.prescription_json.left_eye?.bc ? `${item.prescription_json.left_eye.bc} mm` : "—"}</td>
+                                <td className="px-2.5 py-1.5">{item.prescription_json.left_eye?.dia ? `${item.prescription_json.left_eye.dia} mm` : "—"}</td>
+                                <td className="px-2.5 py-1.5">{item.prescription_json.left_eye?.add || "—"}</td>
+                              </tr>
+                            </tbody>
+                          </table>
+                        </div>
+                      </div>
+                    )}
                   </div>
                 </div>
               ))}

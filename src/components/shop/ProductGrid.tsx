@@ -7,6 +7,7 @@ import { createClient } from "@/lib/supabase/client";
 import ProductCard from "@/components/store/ProductCard";
 import LensCard from "@/components/store/LensCard";
 import Link from "next/link";
+import Image from "next/image";
 import {
   Check,
   ChevronDown,
@@ -900,35 +901,130 @@ export default function ProductGrid({ initialCategory, initialGender }: ProductG
   return (
     <div className="bg-white min-h-screen">
       {/* ------------------------------------------------------------------ */}
-      {/* Page Header                                                          */}
+      {/* Dynamic Hero Category Banner with Rich Photography                  */}
       {/* ------------------------------------------------------------------ */}
-      <div className="bg-white pt-20 md:pt-28 pb-6 md:pb-8 px-4 sm:px-6 lg:px-12 border-b border-[#ECECEC]">
-        {/* Breadcrumb */}
-        <nav className="flex items-center gap-2 text-xs text-[#666666] mb-4">
-          <Link href="/" className="hover:text-[#004AAD] transition-colors">
-            Home
-          </Link>
-          <span>/</span>
-          <Link
-            href="/products"
-            className="hover:text-[#004AAD] transition-colors"
-          >
-            Shop
-          </Link>
-          <span>/</span>
-          <span className="text-[#111111] font-medium">{activeCrumb}</span>
-        </nav>
+      {(() => {
+        const c = (activeCrumb || "").toLowerCase();
+        const t = (pageTitle || "").toLowerCase();
 
-        <h1
-          className="text-2xl md:text-4xl font-[var(--font-hero)] italic text-[#111111] mb-2"
-          style={{ fontFamily: "var(--font-hero, serif)" }}
-        >
-          {pageTitle}
-        </h1>
-        <p className="text-sm text-[#666666]">
-          {loading ? "Loading..." : `${filteredProducts.length} results`}
-        </p>
-      </div>
+        let banner = {
+          image: "/images/banners/shop-all-banner.jpg",
+          tagline: "Discover India's Premier Curated Eyewear & Contact Lens Boutique",
+          badges: ["🏆 10,000+ Happy Eyes", "🚚 Free Fast Shipping Above ₹999", "⭐ 2-Year Frame Warranty"],
+        };
+
+        if (c.includes("contact") || t.includes("contact")) {
+          banner = {
+            image: "/images/banners/contact-lenses-banner.jpg",
+            tagline: "Ultra-Hydrating Moisture Matrix • Daily, Monthly & Toric Optics with 100% Breathability",
+            badges: ["💧 100% Moisture Lock", "🩺 Doctor Certified", "⚡ 100% Fresh Sterile Stock"],
+          };
+        } else if (c.includes("sun") || t.includes("sun")) {
+          banner = {
+            image: "/images/banners/sunglasses-banner.jpg",
+            tagline: "UV400 Polarized Precision Optics • High-Fashion Silhouettes & Tinted Glass",
+            badges: ["☀️ 100% UV Protection", "🕶️ Polarized Glare-Cut", "💎 Italian Inspired Design"],
+          };
+        } else if (c.includes("computer") || t.includes("computer") || c.includes("blue") || t.includes("blue")) {
+          banner = {
+            image: "/images/banners/computer-glasses-banner.jpg",
+            tagline: "Blue-Light Filtration Shield • Digital Eye Strain Relief & Screen Defense",
+            badges: ["💻 95% Blue Light Cut", "👁️ Zero Glare Multi-Coat", "😴 Enhanced Sleep Quality"],
+          };
+        } else if (c.includes("read") || t.includes("read")) {
+          banner = {
+            image: "/images/editorial/hero_woman_reading.png",
+            tagline: "Crystal-Clear Near-Vision Optics • Ergonomic Lightweight Reading Comfort",
+            badges: ["📖 Precision Magnification", "🪶 Featherlight Frame", "👓 Scratch Resistant"],
+          };
+        } else if (c.includes("kid") || t.includes("kid")) {
+          banner = {
+            image: "/images/categories/kids.png",
+            tagline: "Drop-Safe, Bendable & Fun Eyewear Specially Engineered For Children",
+            badges: ["🎈 Bendable & Flexible", "🛡️ Impact Resistant", "🎨 Kid-Friendly Hues"],
+          };
+        } else if (c.includes("eye") || t.includes("eye") || c.includes("frame") || t.includes("spectacle")) {
+          banner = {
+            image: "/images/banners/eyeglasses-banner.jpg",
+            tagline: "Handcrafted Luxury Titanium & Acetate • Tailored Clinical Vision Correction",
+            badges: ["✨ Premium Handcrafted", "🛡️ Anti-Glare Multi-Coating", "👁️ Doctor Verified Fit"],
+          };
+        }
+
+        return (
+          <div className="relative overflow-hidden bg-[#03173D] text-white pt-24 md:pt-32 pb-10 md:pb-14 px-4 sm:px-6 lg:px-12 border-b border-white/10 shadow-inner">
+            {/* Background Image with Cinematic Overlay */}
+            <div className="absolute inset-0 z-0 overflow-hidden">
+              <Image
+                src={banner.image}
+                alt={pageTitle}
+                fill
+                priority
+                className="object-cover object-center scale-105 transition-transform duration-1000 ease-out brightness-[0.95]"
+              />
+              {/* Luxury dark gradient overlays for crystal-clear text readability */}
+              <div className="absolute inset-0 bg-gradient-to-r from-[#03173D]/95 via-[#03173D]/80 to-[#03173D]/40" />
+              <div className="absolute inset-0 bg-gradient-to-t from-[#03173D] via-transparent to-black/40" />
+            </div>
+
+            {/* Banner Content */}
+            <div className="relative z-10 max-w-7xl mx-auto flex flex-col md:flex-row md:items-end justify-between gap-6">
+              <div className="space-y-3 max-w-2xl">
+                {/* Breadcrumb Frosted Glass Pill */}
+                <nav className="inline-flex items-center gap-2 text-xs text-white/90 bg-white/10 backdrop-blur-md border border-white/20 px-4 py-1.5 rounded-full shadow-sm">
+                  <Link href="/" className="hover:text-white transition-colors">
+                    Home
+                  </Link>
+                  <span className="text-white/40">/</span>
+                  <Link
+                    href="/products"
+                    className="hover:text-white transition-colors"
+                  >
+                    Shop
+                  </Link>
+                  <span className="text-white/40">/</span>
+                  <span className="text-white font-semibold">{activeCrumb}</span>
+                </nav>
+
+                {/* Main Heading */}
+                <h1
+                  className="text-3xl md:text-5xl lg:text-6xl font-[var(--font-hero)] italic text-white tracking-tight leading-tight drop-shadow-md"
+                  style={{ fontFamily: "var(--font-hero, serif)" }}
+                >
+                  {pageTitle}
+                </h1>
+
+                {/* Tagline / Subtitle */}
+                <p className="text-sm md:text-base text-white/90 font-medium leading-relaxed drop-shadow-sm">
+                  {banner.tagline}
+                </p>
+
+                {/* Badges */}
+                <div className="flex flex-wrap gap-2 pt-1">
+                  {banner.badges.map((badge, idx) => (
+                    <span
+                      key={idx}
+                      className="inline-flex items-center text-[11px] font-semibold tracking-wide bg-white/15 backdrop-blur-md border border-white/25 text-white px-3.5 py-1 rounded-full shadow-sm"
+                    >
+                      {badge}
+                    </span>
+                  ))}
+                </div>
+              </div>
+
+              {/* Results Counter Pill */}
+              <div className="shrink-0">
+                <div className="inline-flex items-center gap-2.5 bg-white/15 backdrop-blur-md border border-white/25 rounded-2xl px-5 py-3 shadow-lg">
+                  <span className="w-2.5 h-2.5 rounded-full bg-emerald-400 animate-pulse shadow-[0_0_8px_rgba(52,211,153,0.8)]" />
+                  <span className="text-sm font-semibold text-white tracking-wide">
+                    {loading ? "Loading styles..." : `${filteredProducts.length} Results Available`}
+                  </span>
+                </div>
+              </div>
+            </div>
+          </div>
+        );
+      })()}
 
       {/* ------------------------------------------------------------------ */}
       {/* Sticky Toolbar                                                        */}

@@ -55,6 +55,7 @@ export default function Navbar() {
   const [mounted, setMounted] = useState(false);
   const { user } = useAuth();
   const [brands, setBrands] = useState<{ name: string; slug: string }[]>([]);
+  const [contactLensBrands, setContactLensBrands] = useState<{ name: string; slug: string }[]>([]);
   const [lenses, setLenses] = useState<{ name: string; id: string }[]>([]);
   const [coatings, setCoatings] = useState<{ name: string; id: string }[]>([]);
 
@@ -238,7 +239,49 @@ export default function Navbar() {
       setCoatings([]);
     };
 
+    const fetchContactLensBrands = async () => {
+      try {
+        const { data } = await supabase
+          .from("products")
+          .select("brand")
+          .or("product_type.eq.contact-lens,product_type.eq.contact_lens")
+          .not("brand", "is", null);
+
+        const uniqueBrands: string[] = Array.from(
+          new Set(
+            (data || [])
+              .map((p: any) => (p.brand ? String(p.brand).trim() : ""))
+              .filter((b: string) => Boolean(b))
+          )
+        );
+
+        if (uniqueBrands.length > 0) {
+          setContactLensBrands(
+            uniqueBrands.map((b: string) => ({
+              name: b,
+              slug: b.toLowerCase().replace(/[^a-z0-9]+/g, "-"),
+            }))
+          );
+        } else {
+          setContactLensBrands([
+            { name: "Acuvue", slug: "acuvue" },
+            { name: "Bausch + Lomb", slug: "bausch-lomb" },
+            { name: "Alcon", slug: "alcon" },
+            { name: "CooperVision", slug: "coopervision" },
+          ]);
+        }
+      } catch {
+        setContactLensBrands([
+          { name: "Acuvue", slug: "acuvue" },
+          { name: "Bausch + Lomb", slug: "bausch-lomb" },
+          { name: "Alcon", slug: "alcon" },
+          { name: "CooperVision", slug: "coopervision" },
+        ]);
+      }
+    };
+
     fetchBrands();
+    fetchContactLensBrands();
     fetchLenses();
     fetchCoatings();
   }, [supabase]);
@@ -386,7 +429,7 @@ export default function Navbar() {
               onClick={() => toggleMenu("shop")}
               className={cn(
                 "font-medium transition-all duration-300 py-1 flex items-center gap-1",
-                activeMenu === "shop" || pathname.startsWith("/products")
+                activeMenu === "shop" || (pathname.startsWith("/products") && !pathname.includes("Contact"))
                   ? isWhiteMode
                     ? "text-[#004AAD] border-b border-[#004AAD]"
                     : "text-white border-b border-white"
@@ -395,6 +438,25 @@ export default function Navbar() {
               suppressHydrationWarning
             >
               Shop
+              <span className="material-symbols-outlined text-sm">expand_more</span>
+            </button>
+          </div>
+
+          {/* Contact Lenses */}
+          <div className="relative">
+            <button
+              onClick={() => toggleMenu("contact-lenses")}
+              className={cn(
+                "font-medium transition-all duration-300 py-1 flex items-center gap-1",
+                activeMenu === "contact-lenses" || pathname.startsWith("/contact-lenses")
+                  ? isWhiteMode
+                    ? "text-[#004AAD] border-b border-[#004AAD]"
+                    : "text-white border-b border-white"
+                  : linkColor
+              )}
+              suppressHydrationWarning
+            >
+              Contact Lenses
               <span className="material-symbols-outlined text-sm">expand_more</span>
             </button>
           </div>
@@ -712,6 +774,45 @@ export default function Navbar() {
           </motion.div>
         )}
 
+        {/* Contact Lenses Dropdown */}
+        {activeMenu === "contact-lenses" && (
+          <motion.div
+            initial={{ opacity: 0, y: 10 }}
+            animate={{ opacity: 1, y: 0 }}
+            exit={{ opacity: 0, y: 10 }}
+            className="absolute top-full left-[calc(50%-220px)] bg-white border border-[#E8EAF2] shadow-2xl p-4 flex flex-col gap-2 z-50 rounded-2xl hidden lg:flex min-w-[320px] mt-4"
+          >
+            <div className="flex items-center justify-between border-b border-[#E8EAF2] pb-2 px-2">
+              <h3 className="text-[10px] font-black uppercase tracking-[0.2em] text-[#666666]">
+                Featured Lens Brands
+              </h3>
+              <span className="text-[9px] font-bold text-[#004AAD] bg-[#004AAD]/10 px-2 py-0.5 rounded">
+                100% Authentic
+              </span>
+            </div>
+            <div className="flex flex-col gap-1 py-1">
+              {contactLensBrands.map((brand) => (
+                <Link
+                  key={brand.slug}
+                  href={`/products?type=Contact+Lenses&brand=${encodeURIComponent(brand.name)}`}
+                  className="px-4 py-2.5 hover:bg-[#F8F9FC] text-xs font-semibold text-[#111111] hover:text-[#004AAD] transition-colors rounded-xl flex items-center justify-between group"
+                >
+                  <span className="group-hover:translate-x-0.5 transition-transform">{brand.name}</span>
+                  <span className="text-[10px] text-[#004AAD] opacity-0 group-hover:opacity-100 transition-opacity">View Brand →</span>
+                </Link>
+              ))}
+            </div>
+            <div className="border-t border-[#E8EAF2] pt-2">
+              <Link
+                href="/contact-lenses"
+                className="w-full py-2.5 px-4 bg-[#03173D] hover:bg-[#004AAD] text-white text-xs font-bold rounded-xl text-center block transition-colors"
+              >
+                View All Contact Lenses →
+              </Link>
+            </div>
+          </motion.div>
+        )}
+
         {/* Small Dropdowns */}
         {(activeMenu === "lenses" ||
           activeMenu === "offers") && (
@@ -909,6 +1010,35 @@ export default function Navbar() {
                         </Link>
                       ))}
                     </div>
+                  </div>
+                </div>
+
+                {/* Contact Lenses Mobile Section */}
+                <div>
+                  <h3 className="text-xs font-black uppercase tracking-[0.2em] text-[#999999] mb-4 border-b border-[#E8EAF2] pb-2">
+                    Contact Lenses
+                  </h3>
+                  <div className="space-y-3 pl-2">
+                    <Link
+                      href="/contact-lenses"
+                      onClick={() => setIsMobileMenuOpen(false)}
+                      className="block text-sm font-bold text-[#004AAD] transition-colors"
+                    >
+                      All Contact Lenses →
+                    </Link>
+                    <p className="text-[10px] font-bold text-[#999999] uppercase pt-1">
+                      By Brand
+                    </p>
+                    {contactLensBrands.map((brand) => (
+                      <Link
+                        key={brand.slug}
+                        href={`/products?type=Contact+Lenses&brand=${encodeURIComponent(brand.name)}`}
+                        onClick={() => setIsMobileMenuOpen(false)}
+                        className="block text-sm font-medium text-[#111111] hover:text-[#004AAD] transition-colors"
+                      >
+                        {brand.name}
+                      </Link>
+                    ))}
                   </div>
                 </div>
 

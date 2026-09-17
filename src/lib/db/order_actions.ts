@@ -129,13 +129,35 @@ export async function placeOrder(data: {
       const { error: prescError } = await adminSupabase.from("prescriptions").insert({
           user_id: user.id,
           order_id: order.id,
-          left_eye: data.prescription.left_eye,
-          right_eye: data.prescription.right_eye,
+          left_eye: typeof data.prescription.left_eye === "object" ? JSON.stringify(data.prescription.left_eye) : data.prescription.left_eye,
+          right_eye: typeof data.prescription.right_eye === "object" ? JSON.stringify(data.prescription.right_eye) : data.prescription.right_eye,
           pd: parseFloat(data.prescription.pd) || 0,
           file_url: data.prescription.file_url
       });
       if (prescError) {
           console.error("Prescription Error:", prescError);
+      }
+  } else {
+      // Check if any cart item has contact lens prescription details
+      const clItem = data.items.find((i: any) => i.prescription_json?.is_contact_lens || i.prescription_json?.right_eye);
+      if (clItem) {
+          const rx = clItem.prescription_json;
+          const rightEye = rx.right_eye || {};
+          const leftEye = rx.left_eye || {};
+          const rightStr = `SPH: ${rightEye.sph || '0.00'} | CYL: ${rightEye.cyl || '0.00'} | AXIS: ${rightEye.axis || 'None'} | BC: ${rightEye.bc || '8.6'} | DIA: ${rightEye.dia || '14.2'}${rightEye.add && rightEye.add !== 'None' ? ` | ADD: ${rightEye.add}` : ''}`;
+          const leftStr = `SPH: ${leftEye.sph || '0.00'} | CYL: ${leftEye.cyl || '0.00'} | AXIS: ${leftEye.axis || 'None'} | BC: ${leftEye.bc || '8.6'} | DIA: ${leftEye.dia || '14.2'}${leftEye.add && leftEye.add !== 'None' ? ` | ADD: ${leftEye.add}` : ''}`;
+
+          try {
+            await adminSupabase.from("prescriptions").insert({
+                user_id: user.id,
+                order_id: order.id,
+                right_eye: rightStr,
+                left_eye: leftStr,
+                pd: 0
+            });
+          } catch (err: any) {
+            console.error("Contact Lens Prescription Save Error:", err);
+          }
       }
   }
   

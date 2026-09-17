@@ -27,6 +27,9 @@ interface ProductCardProps {
     colors?: any[];
     stock?: number;
     availability?: string;
+    pack_size?: string;
+    specifications?: any;
+    product_type?: string;
   };
 }
 
@@ -205,9 +208,16 @@ export default function ProductCard({ product }: ProductCardProps) {
 
         {/* Info Area */}
         <div className="px-4 pb-4 pt-1 space-y-1">
-          <p className="text-xs font-semibold text-[#004AAD] uppercase tracking-wider">
-            {product.brand || "Lenzify"}
-          </p>
+          <div className="flex items-center justify-between gap-1">
+            <p className="text-xs font-semibold text-[#004AAD] uppercase tracking-wider truncate">
+              {product.brand || "Lenzify"}
+            </p>
+            {product.pack_size && (
+              <span className="text-[10px] font-bold text-[#004AAD] bg-[#004AAD]/10 px-2 py-0.5 rounded-md flex-shrink-0">
+                {product.pack_size}
+              </span>
+            )}
+          </div>
           <h4 className="text-sm font-medium text-[#111111] leading-snug line-clamp-1 group-hover:text-[#004AAD] transition-colors">
             {product.name}
           </h4>
