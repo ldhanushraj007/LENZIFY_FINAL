@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState, useRef } from "react";
+import { useEffect, useState, useRef, useMemo } from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
 import { motion, AnimatePresence } from "framer-motion";
@@ -8,7 +8,7 @@ import { createClient } from "@/lib/supabase/client";
 import { getCart } from "@/lib/db/customer_actions";
 import { placeOrder } from "@/lib/db/order_actions";
 import { cn } from "@/lib/utils";
-import { validateCheckoutAddress, sanitizeErrorMessage } from "@/lib/validation";
+import { validateCheckoutAddress } from "@/lib/validation";
 import { applyCoupon, incrementCouponUsage } from "@/lib/db/coupon_actions";
 import toast from "react-hot-toast";
 import {
@@ -20,21 +20,35 @@ import {
   Upload,
   ArrowRight,
   ShieldCheck,
-  Eye,
-  Shield,
-  Tag,
-  X,
   Banknote,
+  Copy,
 } from "lucide-react";
 
 import { useAuth } from "@/components/providers/AuthProvider";
 import { useCartStore } from "@/store/cartStore";
+import OrderSummary, { ItemPrescription } from "@/components/checkout/OrderSummary";
 
 const STEPS = [
   { id: 1, label: "Address", icon: MapPin },
   { id: 2, label: "Prescription", icon: FileText },
   { id: 3, label: "Payment", icon: CreditCard },
 ];
+
+const RX_SESSION_KEY = "lenzify_checkout_rx";
+
+function computeCartFingerprint(items: any[]): string {
+  if (!items || items.length === 0) return "";
+  return items
+    .map((i) => {
+      const id = i.database_id || i.id || i.product_id;
+      const lensId = i.lens_id || i.lens_config?.lens_id || "none";
+      const qty = i.quantity || 1;
+      const rx = Boolean(i.prescription_json || i.prescription);
+      return `${id}_${lensId}_${qty}_${rx}`;
+    })
+    .sort()
+    .join("|");
+}
 
 export default function CheckoutPage() {
   const [cartItems, setCartItems] = useState<any[]>([]);
@@ -53,6 +67,7 @@ export default function CheckoutPage() {
     pincode: "",
   });
 
+  // Global / Fallback Prescription state
   const [prescription, setPrescription] = useState<{
     file_url?: string;
     left_eye: string;
@@ -60,39 +75,14 @@ export default function CheckoutPage() {
     pd: string;
   }>({ left_eye: "", right_eye: "", pd: "" });
 
+  // Multi-item prescriptions: cartItemId -> PrescriptionData
+  const [itemPrescriptions, setItemPrescriptions] = useState<Record<string, ItemPrescription>>({});
+  const [prescriptionCompleted, setPrescriptionCompleted] = useState(false);
+  const [applyToAllFrames, setApplyToAllFrames] = useState(true);
+  const [selectedItemTab, setSelectedItemTab] = useState<string>("");
+
   const fileInputRef = useRef<HTMLInputElement>(null);
   const [uploadingPrescription, setUploadingPrescription] = useState(false);
-
-  const handleFileUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
-    const file = e.target.files?.[0];
-    if (!file) return;
-
-    setUploadingPrescription(true);
-    const toastId = toast.loading("Uploading prescription...");
-
-    try {
-      const fileExt = file.name.split(".").pop();
-      const fileName = `prescriptions/${Date.now()}-${Math.random().toString(36).substring(2, 15)}.${fileExt}`;
-
-      const { data, error } = await supabase.storage
-        .from("product-images")
-        .upload(fileName, file);
-
-      if (error) throw error;
-
-      const { data: { publicUrl } } = supabase.storage
-        .from("product-images")
-        .getPublicUrl(fileName);
-
-      setPrescription(prev => ({ ...prev, file_url: publicUrl }));
-      toast.success("Prescription uploaded!", { id: toastId });
-    } catch (err: any) {
-      console.error("Prescription upload error:", err);
-      toast.error(err.message || "Failed to upload prescription.", { id: toastId });
-    } finally {
-      setUploadingPrescription(false);
-    }
-  };
 
   // Coupon state
   const [couponCode, setCouponCode] = useState("");
@@ -101,24 +91,47 @@ export default function CheckoutPage() {
   const [couponId, setCouponId] = useState<number | null>(null);
   const [applyingCoupon, setApplyingCoupon] = useState(false);
 
-  const handleApplyCoupon = async () => {
-    if (!couponCode.trim()) { toast.error("Enter a coupon code."); return; }
-    setApplyingCoupon(true);
-    const subtotal = cartItems.reduce((acc: number, item: any) => acc + (item.price * item.quantity), 0);
-    const result = await applyCoupon(couponCode.trim(), subtotal);
-    setApplyingCoupon(false);
-    if (result.error) {
-      toast.error(result.error);
-    } else if (result.success) {
-      setCouponDiscount(result.discount!);
-      setCouponApplied(result.description!);
-      setCouponId(result.coupon_id ?? null);
-      toast.success(`Coupon applied! ${result.description}`);
-    }
-  };
-
   const supabase = createClient();
   const router = useRouter();
+
+  const isContactLensItem = (item: any) => {
+    const pType = item.product_type || item.products?.product_type;
+    const cat = item.category || item.products?.category || item.products?.categories?.slug;
+    return (
+      pType === "contact-lens" ||
+      pType === "contact_lens" ||
+      cat === "contact-lenses" ||
+      cat === "Contact Lenses"
+    );
+  };
+
+  const isPrescriptionRequiredItem = (item: any) => {
+    if (isContactLensItem(item)) return false;
+    return Boolean(item.lens_id || item.lens_config || item.lens_name);
+  };
+
+  // Prescription-requiring items in this cart
+  const itemsNeedingPrescription = useMemo(
+    () => cartItems.filter(isPrescriptionRequiredItem),
+    [cartItems]
+  );
+
+  const isFrameOnly = cartItems.length > 0 && itemsNeedingPrescription.length === 0;
+
+  // Check if every prescription-requiring item has prescription data
+  const isEveryItemPrescriptionFulfilled = useMemo(() => {
+    if (itemsNeedingPrescription.length === 0) return true;
+    return itemsNeedingPrescription.every((item) => {
+      const key = String(item.database_id || item.id || item.product_id);
+      const rx = itemPrescriptions[key] || item.prescription_json || item.prescription;
+      if (rx && (rx.left_eye || rx.os_sph || rx.file_url)) return true;
+      if (prescription.left_eye || prescription.file_url) return true;
+      return false;
+    });
+  }, [itemsNeedingPrescription, itemPrescriptions, prescription]);
+
+  // Overall prescription completeness condition
+  const isPrescriptionDone = isFrameOnly || (prescriptionCompleted && isEveryItemPrescriptionFulfilled);
 
   useEffect(() => {
     if (!authLoading && !user) {
@@ -134,7 +147,65 @@ export default function CheckoutPage() {
           return;
         }
         setCartItems(cart);
-        setAddressData(prev => ({ ...prev, name: user.user_metadata?.name || "" }));
+        setAddressData((prev) => ({ ...prev, name: user.user_metadata?.name || "" }));
+
+        // Check fingerprint in sessionStorage
+        const currentFingerprint = computeCartFingerprint(cart);
+        const storedSessionRaw = sessionStorage.getItem(RX_SESSION_KEY);
+        let restoredFromSession = false;
+
+        if (storedSessionRaw) {
+          try {
+            const parsed = JSON.parse(storedSessionRaw);
+            if (parsed.fingerprint === currentFingerprint) {
+              if (parsed.itemPrescriptions) {
+                setItemPrescriptions(parsed.itemPrescriptions);
+              }
+              if (parsed.globalPrescription) {
+                setPrescription(parsed.globalPrescription);
+              }
+              if (parsed.prescriptionCompleted) {
+                setPrescriptionCompleted(true);
+                restoredFromSession = true;
+              }
+            } else {
+              // Stale fingerprint from prior cart modification or session
+              sessionStorage.removeItem(RX_SESSION_KEY);
+            }
+          } catch (e) {
+            sessionStorage.removeItem(RX_SESSION_KEY);
+          }
+        }
+
+        // Initialize per-item prescriptions from cart data if not restored
+        if (!restoredFromSession) {
+          const initialMap: Record<string, ItemPrescription> = {};
+          let allPreConfigured = true;
+          cart.forEach((item) => {
+            if (isPrescriptionRequiredItem(item)) {
+              const key = String(item.database_id || item.id || item.product_id);
+              if (item.prescription_json) {
+                initialMap[key] = item.prescription_json;
+              } else if (item.prescription) {
+                initialMap[key] = item.prescription;
+              } else {
+                allPreConfigured = false;
+              }
+            }
+          });
+          setItemPrescriptions(initialMap);
+
+          // If every item with lenses was already configured in product step
+          if (cart.some(isPrescriptionRequiredItem) && allPreConfigured) {
+            setPrescriptionCompleted(true);
+          }
+        }
+
+        const firstRxItem = cart.find(isPrescriptionRequiredItem);
+        if (firstRxItem) {
+          setSelectedItemTab(String(firstRxItem.database_id || firstRxItem.id || firstRxItem.product_id));
+        }
+
         setLoading(false);
       };
       init();
@@ -147,56 +218,217 @@ export default function CheckoutPage() {
     document.body.appendChild(script);
   }, [user, authLoading, router]);
 
+  const handleFileUpload = async (e: React.ChangeEvent<HTMLInputElement>, targetItemKey?: string) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+
+    setUploadingPrescription(true);
+    const toastId = toast.loading("Uploading prescription...");
+
+    try {
+      const fileExt = file.name.split(".").pop();
+      const fileName = `prescriptions/${Date.now()}-${Math.random().toString(36).substring(2, 15)}.${fileExt}`;
+
+      const { error } = await supabase.storage
+        .from("product-images")
+        .upload(fileName, file);
+
+      if (error) throw error;
+
+      const { data: { publicUrl } } = supabase.storage
+        .from("product-images")
+        .getPublicUrl(fileName);
+
+      if (applyToAllFrames || !targetItemKey) {
+        setPrescription((prev) => ({ ...prev, file_url: publicUrl }));
+        // Also update all items needing prescription
+        setItemPrescriptions((prev) => {
+          const next = { ...prev };
+          itemsNeedingPrescription.forEach((item) => {
+            const key = String(item.database_id || item.id || item.product_id);
+            next[key] = { ...(next[key] || {}), file_url: publicUrl };
+          });
+          return next;
+        });
+      } else {
+        setItemPrescriptions((prev) => ({
+          ...prev,
+          [targetItemKey]: { ...(prev[targetItemKey] || {}), file_url: publicUrl },
+        }));
+      }
+
+      toast.success("Prescription uploaded successfully!", { id: toastId });
+    } catch (err: any) {
+      console.error("Prescription upload error:", err);
+      toast.error(err.message || "Failed to upload prescription.", { id: toastId });
+    } finally {
+      setUploadingPrescription(false);
+    }
+  };
+
+  const handleApplyCoupon = async () => {
+    if (!couponCode.trim()) {
+      toast.error("Enter a coupon code.");
+      return;
+    }
+    setApplyingCoupon(true);
+    const subtotal = cartItems.reduce(
+      (acc: number, item: any) =>
+        acc + (item.price || item.products?.offer_price || item.products?.price || 0) * item.quantity,
+      0
+    );
+    const result = await applyCoupon(couponCode.trim(), subtotal);
+    setApplyingCoupon(false);
+    if (result.error) {
+      toast.error(result.error);
+    } else if (result.success) {
+      setCouponDiscount(result.discount!);
+      setCouponApplied(result.description!);
+      setCouponId(result.coupon_id ?? null);
+      toast.success(`Coupon applied! ${result.description}`);
+    }
+  };
+
+  // Navigation handlers ensuring STRICTLY LINEAR FLOW
+  const handleProceedFromAddress = () => {
+    const validationErrors = validateCheckoutAddress(addressData);
+    if (validationErrors.length > 0) {
+      toast.error(validationErrors[0].message);
+      return;
+    }
+    // If prescription is already completed in this checkout session or no items need prescription,
+    // skip Step 2 and proceed directly to Step 3 (Payment)
+    if (isFrameOnly || isPrescriptionDone) {
+      setActiveStep(3);
+    } else {
+      setActiveStep(2);
+    }
+  };
+
+  const handleProceedFromPrescription = () => {
+    // Fulfill all unfulfilled items with current global prescription if applyToAllFrames
+    const updatedMap = { ...itemPrescriptions };
+    itemsNeedingPrescription.forEach((item) => {
+      const key = String(item.database_id || item.id || item.product_id);
+      if (!updatedMap[key] || (!updatedMap[key].left_eye && !updatedMap[key].file_url)) {
+        updatedMap[key] = {
+          left_eye: prescription.left_eye,
+          right_eye: prescription.right_eye,
+          od_sph: prescription.right_eye,
+          os_sph: prescription.left_eye,
+          pd: prescription.pd,
+          file_url: prescription.file_url,
+        };
+      }
+    });
+
+    setItemPrescriptions(updatedMap);
+    setPrescriptionCompleted(true);
+
+    // Save to sessionStorage with current cart fingerprint
+    const fingerprint = computeCartFingerprint(cartItems);
+    sessionStorage.setItem(
+      RX_SESSION_KEY,
+      JSON.stringify({
+        fingerprint,
+        prescriptionCompleted: true,
+        itemPrescriptions: updatedMap,
+        globalPrescription: prescription,
+      })
+    );
+
+    // Strictly advance to Payment step (Step 3)
+    setActiveStep(3);
+  };
+
+  const handleBackFromPrescription = () => {
+    setActiveStep(1);
+  };
+
+  const handleBackFromPayment = () => {
+    // Flow is strictly linear: Once prescription has been completed in this session,
+    // going back from Payment returns to Address (Step 1).
+    setActiveStep(1);
+  };
+
   const handlePayment = async () => {
     const validationErrors = validateCheckoutAddress(addressData);
     if (validationErrors.length > 0) {
-      validationErrors.forEach(err => toast.error(err.message));
+      validationErrors.forEach((err) => toast.error(err.message));
       return;
     }
     setOrderProcessing(true);
 
-    // GST is included in listed prices for contact lenses, only frames/eyewear have GST added separately
-    const isContactLensItem = (item: any) => {
-      const pType = item.product_type || item.products?.product_type;
-      const cat = item.category || item.products?.category || item.products?.categories?.slug;
-      return pType === "contact-lens" || pType === "contact_lens" || cat === "contact-lenses" || cat === "Contact Lenses";
-    };
-
-    const subtotal = cartItems.reduce((acc, item) => acc + (item.price * item.quantity), 0);
+    const subtotal = cartItems.reduce(
+      (acc, item) =>
+        acc + (item.price || item.products?.offer_price || item.products?.price || 0) * item.quantity,
+      0
+    );
     const discountedSubtotal = Math.max(0, subtotal - couponDiscount);
     const taxableSubtotal = cartItems
-      .filter(item => !isContactLensItem(item))
-      .reduce((acc, item) => acc + (item.price * item.quantity), 0);
+      .filter((item) => !isContactLensItem(item))
+      .reduce(
+        (acc, item) =>
+          acc + (item.price || item.products?.offer_price || item.products?.price || 0) * item.quantity,
+        0
+      );
     const taxableRatio = subtotal > 0 ? taxableSubtotal / subtotal : 0;
     const tax = Math.round(discountedSubtotal * taxableRatio * 0.18);
     const totalAmount = discountedSubtotal + tax;
+
+    // Helper to resolve prescription payload per item
+    const getResolvedItemPrescription = (item: any) => {
+      const key = String(item.database_id || item.id || item.product_id);
+      const itemRx = itemPrescriptions[key] || item.prescription_json || item.prescription;
+      if (itemRx) {
+        return {
+          od_sph: itemRx.od_sph || itemRx.right_eye || "0.00",
+          os_sph: itemRx.os_sph || itemRx.left_eye || "0.00",
+          od_cyl: itemRx.od_cyl || "",
+          os_cyl: itemRx.os_cyl || "",
+          od_axis: itemRx.od_axis || "",
+          os_axis: itemRx.os_axis || "",
+          od_add: itemRx.od_add || "",
+          os_add: itemRx.os_add || "",
+          pd: itemRx.pd || prescription.pd || "",
+          file_url: itemRx.file_url || prescription.file_url || null,
+        };
+      }
+      if (prescription.left_eye || prescription.right_eye || prescription.file_url) {
+        return {
+          od_sph: prescription.right_eye || "0.00",
+          os_sph: prescription.left_eye || "0.00",
+          pd: prescription.pd || "",
+          file_url: prescription.file_url || null,
+        };
+      }
+      return null;
+    };
 
     // 1. CASH ON DELIVERY (COD) FLOW
     if (paymentMethod === "cod") {
       try {
         const codId = `COD-${Date.now()}-${Math.random().toString(36).substring(2, 7).toUpperCase()}`;
         const orderRes = await placeOrder({
-          items: cartItems.map(item => ({
+          items: cartItems.map((item) => ({
             id: item.product_id,
             quantity: item.quantity,
-            price: item.price,
+            price: item.price || item.products?.offer_price || item.products?.price || 0,
             lens_id: item.lens_id,
             selected_color: item.selected_color,
             selected_size: item.selected_size,
-            prescription_json: item.prescription_json || (prescription.left_eye ? {
-              od_sph: prescription.right_eye,
-              os_sph: prescription.left_eye,
-              pd: prescription.pd
-            } : null)
+            prescription_json: getResolvedItemPrescription(item),
           })),
           total_price: totalAmount,
           address: addressData,
-          prescription: (prescription.left_eye || prescription.file_url) ? prescription : undefined,
-          payment: { id: codId, method: "cod" }
+          prescription: prescription.left_eye || prescription.file_url ? prescription : undefined,
+          payment: { id: codId, method: "cod" },
         });
 
         if (orderRes.success) {
           if (couponId) await incrementCouponUsage(couponId);
+          // Purge session prescription cache on successful order
+          sessionStorage.removeItem(RX_SESSION_KEY);
           useCartStore.getState().clearCart();
           toast.success("Order placed successfully with Cash on Delivery!");
           router.push(`/orders/success?id=${orderRes.order_id}`);
@@ -218,7 +450,7 @@ export default function CheckoutPage() {
       const res = await fetch("/api/checkout", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ amount: totalAmount })
+        body: JSON.stringify({ amount: totalAmount }),
       });
 
       if (!res.ok) {
@@ -240,11 +472,13 @@ export default function CheckoutPage() {
         prefill: {
           name: addressData.name,
           contact: addressData.phone,
-          email: user?.email
+          email: user?.email,
         },
         theme: { color: "#03173D" },
         modal: {
-          ondismiss: function () { setOrderProcessing(false); }
+          ondismiss: function () {
+            setOrderProcessing(false);
+          },
         },
         handler: async function (response: any) {
           try {
@@ -266,27 +500,25 @@ export default function CheckoutPage() {
             }
 
             const orderRes = await placeOrder({
-              items: cartItems.map(item => ({
+              items: cartItems.map((item) => ({
                 id: item.product_id,
                 quantity: item.quantity,
-                price: item.price,
+                price: item.price || item.products?.offer_price || item.products?.price || 0,
                 lens_id: item.lens_id,
                 selected_color: item.selected_color,
                 selected_size: item.selected_size,
-                prescription_json: item.prescription_json || (prescription.left_eye ? {
-                  od_sph: prescription.right_eye,
-                  os_sph: prescription.left_eye,
-                  pd: prescription.pd
-                } : null)
+                prescription_json: getResolvedItemPrescription(item),
               })),
               total_price: totalAmount,
               address: addressData,
-              prescription: (prescription.left_eye || prescription.file_url) ? prescription : undefined,
-              payment: { id: response.razorpay_payment_id, method: "razorpay" }
+              prescription: prescription.left_eye || prescription.file_url ? prescription : undefined,
+              payment: { id: response.razorpay_payment_id, method: "razorpay" },
             });
 
             if (orderRes.success) {
               if (couponId) await incrementCouponUsage(couponId);
+              // Purge session prescription cache on successful payment
+              sessionStorage.removeItem(RX_SESSION_KEY);
               useCartStore.getState().clearCart();
               router.push(`/orders/success?id=${orderRes.order_id}`);
             } else {
@@ -299,7 +531,7 @@ export default function CheckoutPage() {
             toast.error(`Order processing failed: ${err.message || "Unknown error"}.`);
             setOrderProcessing(false);
           }
-        }
+        },
       };
 
       const rzp = new (window as any).Razorpay(options);
@@ -321,68 +553,66 @@ export default function CheckoutPage() {
       <div className="bg-[#F8F9FC] min-h-screen pt-28 flex items-center justify-center">
         <div className="text-center">
           <div className="w-10 h-10 border-2 border-[#03173D] border-t-transparent rounded-full animate-spin mx-auto mb-4" />
-          <p className="text-[#666666] text-sm">Loading your cart...</p>
+          <p className="text-[#666666] text-sm font-medium">Loading your checkout...</p>
         </div>
       </div>
     );
   }
 
-  const isContactLensItem = (item: any) => {
-    const pType = item.product_type || item.products?.product_type;
-    const cat = item.category || item.products?.category || item.products?.categories?.slug;
-    return pType === "contact-lens" || pType === "contact_lens" || cat === "contact-lenses" || cat === "Contact Lenses";
-  };
-
-  const subtotal = cartItems.reduce((acc: number, i: any) => acc + (i.price * i.quantity), 0);
+  // Calculate totals for payment button label
+  const subtotal = cartItems.reduce(
+    (acc: number, i: any) =>
+      acc + (i.price || i.products?.offer_price || i.products?.price || 0) * i.quantity,
+    0
+  );
   const discountedSubtotal = Math.max(0, subtotal - couponDiscount);
   const taxableSubtotal = cartItems
-    .filter(item => !isContactLensItem(item))
-    .reduce((acc: number, item: any) => acc + (item.price * item.quantity), 0);
+    .filter((item) => !isContactLensItem(item))
+    .reduce(
+      (acc: number, item: any) =>
+        acc + (item.price || item.products?.offer_price || item.products?.price || 0) * item.quantity,
+      0
+    );
   const taxableRatio = subtotal > 0 ? taxableSubtotal / subtotal : 0;
   const tax = Math.round(discountedSubtotal * taxableRatio * 0.18);
-  const total = discountedSubtotal + tax;
+  const grandTotal = discountedSubtotal + tax;
 
-  const isFrameOnly = cartItems.length > 0 && cartItems.every(item => !item.lens_id && !item.prescription_json);
-  const maxStep = isFrameOnly ? 2 : 3; // If frame-only, skip prescription step (step 2 becomes payment)
-
-  const goNext = () => {
-    if (isFrameOnly && activeStep === 1) {
-      setActiveStep(3); // skip prescription
-    } else {
-      setActiveStep(s => Math.min(s + 1, 3));
-    }
-  };
-
-  const goBack = () => {
-    if (isFrameOnly && activeStep === 3) {
-      setActiveStep(1);
-    } else {
-      setActiveStep(s => Math.max(s - 1, 1));
-    }
-  };
-
-  // Determine which steps to show in indicator
+  // Determine steps shown in stepper
   const visibleSteps = isFrameOnly
-    ? [{ id: 1, label: "Address" }, { id: 3, label: "Payment" }]
+    ? [
+        { id: 1, label: "Address", icon: MapPin },
+        { id: 3, label: "Payment", icon: CreditCard },
+      ]
     : STEPS;
 
-  const getStepIndex = (stepId: number) => visibleSteps.findIndex(s => s.id === stepId);
-  const activeVisibleIndex = visibleSteps.findIndex(s => s.id === activeStep);
+  // Active step indices
+  const isAddressCompleted = activeStep > 1;
+  const isPrescriptionStepCompleted = isPrescriptionDone || activeStep > 2;
 
   return (
     <div className="bg-[#F8F9FC] min-h-screen pt-20 md:pt-28 pb-16">
       <div className="max-w-6xl mx-auto px-4 sm:px-6 lg:px-12">
         {/* Page Header */}
         <div className="mb-6 md:mb-8">
-          <p className="text-xs font-semibold uppercase tracking-widest text-[#004AAD] mb-2">Checkout</p>
-          <h1 className="text-2xl md:text-4xl font-[var(--font-hero)] italic text-[#111111]">Complete Your Order</h1>
+          <p className="text-xs font-semibold uppercase tracking-widest text-[#004AAD] mb-1.5">
+            Lenzify Secure Checkout
+          </p>
+          <h1 className="text-2xl md:text-4xl font-[var(--font-hero)] italic text-[#111111]">
+            Complete Your Order
+          </h1>
         </div>
 
         {/* Step Indicator */}
         <div className="mb-8 flex items-center gap-0">
           {visibleSteps.map((step, i) => {
-            const isCompleted = activeVisibleIndex > i;
-            const isCurrent = visibleSteps[i].id === activeStep;
+            const isCompleted =
+              step.id === 1
+                ? isAddressCompleted
+                : step.id === 2
+                ? isPrescriptionStepCompleted
+                : false;
+            const isCurrent = step.id === activeStep;
+
             return (
               <div key={step.id} className="flex items-center flex-1 last:flex-none">
                 <div className="flex items-center gap-2">
@@ -392,16 +622,20 @@ export default function CheckoutPage() {
                       isCompleted
                         ? "border-[#03173D] bg-[#03173D] text-white"
                         : isCurrent
-                        ? "border-[#03173D] bg-white text-[#03173D]"
+                        ? "border-[#03173D] bg-white text-[#03173D] ring-4 ring-[#004AAD]/10"
                         : "border-[#ECECEC] bg-white text-[#666666]"
                     )}
                   >
-                    {isCompleted ? <CheckCircle2 size={14} /> : i + 1}
+                    {isCompleted ? <CheckCircle2 size={15} /> : i + 1}
                   </div>
                   <span
                     className={cn(
                       "text-sm font-semibold hidden sm:block",
-                      isCurrent ? "text-[#03173D]" : isCompleted ? "text-[#111111]" : "text-[#666666]"
+                      isCurrent
+                        ? "text-[#03173D]"
+                        : isCompleted
+                        ? "text-[#111111]"
+                        : "text-[#666666]"
                     )}
                   >
                     {step.label}
@@ -410,7 +644,10 @@ export default function CheckoutPage() {
                 {i < visibleSteps.length - 1 && (
                   <div className="flex-1 mx-3 h-0.5 bg-[#ECECEC] relative overflow-hidden">
                     <div
-                      className={cn("h-full bg-[#03173D] transition-all duration-500", isCompleted ? "w-full" : "w-0")}
+                      className={cn(
+                        "h-full bg-[#03173D] transition-all duration-500",
+                        isCompleted ? "w-full" : "w-0"
+                      )}
                     />
                   </div>
                 )}
@@ -420,20 +657,22 @@ export default function CheckoutPage() {
         </div>
 
         <div className="grid grid-cols-1 lg:grid-cols-12 gap-8 items-start">
-          {/* Left: Steps */}
+          {/* Left: Step Content */}
           <div className="lg:col-span-7 space-y-4">
             <AnimatePresence mode="wait">
               {/* STEP 1: ADDRESS */}
               {activeStep === 1 && (
                 <motion.div
                   key="step1"
-                  initial={{ opacity: 0, x: -20 }}
+                  initial={{ opacity: 0, x: -16 }}
                   animate={{ opacity: 1, x: 0 }}
-                  exit={{ opacity: 0, x: 20 }}
-                  className="bg-white rounded-3xl border border-[#ECECEC] shadow-[0_10px_30px_rgba(0,0,0,0.05)] p-8 space-y-6"
+                  exit={{ opacity: 0, x: 16 }}
+                  className="bg-white rounded-3xl border border-[#ECECEC] shadow-[0_10px_30px_rgba(0,0,0,0.05)] p-6 md:p-8 space-y-6"
                 >
                   <div className="flex items-center gap-3 pb-4 border-b border-[#ECECEC]">
-                    <MapPin size={20} className="text-[#004AAD]" />
+                    <div className="w-9 h-9 rounded-xl bg-[#004AAD]/10 flex items-center justify-center text-[#004AAD]">
+                      <MapPin size={20} />
+                    </div>
                     <div>
                       <h2 className="font-semibold text-[#111111]">Delivery Address</h2>
                       <p className="text-[#666666] text-xs">Where should we deliver your order?</p>
@@ -442,7 +681,9 @@ export default function CheckoutPage() {
 
                   <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                     <div>
-                      <label className="block text-xs font-semibold uppercase tracking-widest text-[#004AAD] mb-1.5">Full Name</label>
+                      <label className="block text-xs font-semibold uppercase tracking-widest text-[#004AAD] mb-1.5">
+                        Full Name *
+                      </label>
                       <input
                         value={addressData.name}
                         onChange={(e) => setAddressData({ ...addressData, name: e.target.value })}
@@ -451,7 +692,9 @@ export default function CheckoutPage() {
                       />
                     </div>
                     <div>
-                      <label className="block text-xs font-semibold uppercase tracking-widest text-[#004AAD] mb-1.5">Phone Number</label>
+                      <label className="block text-xs font-semibold uppercase tracking-widest text-[#004AAD] mb-1.5">
+                        Phone Number *
+                      </label>
                       <input
                         value={addressData.phone}
                         onChange={(e) => setAddressData({ ...addressData, phone: e.target.value })}
@@ -460,16 +703,21 @@ export default function CheckoutPage() {
                       />
                     </div>
                     <div>
-                      <label className="block text-xs font-semibold uppercase tracking-widest text-[#004AAD] mb-1.5">Pincode</label>
+                      <label className="block text-xs font-semibold uppercase tracking-widest text-[#004AAD] mb-1.5">
+                        Pincode *
+                      </label>
                       <input
                         value={addressData.pincode}
                         onChange={(e) => setAddressData({ ...addressData, pincode: e.target.value })}
                         placeholder="6-digit pincode"
+                        maxLength={6}
                         className="bg-[#F8F9FC] border border-[#E8EAF2] rounded-xl px-4 py-3 text-[#111111] focus:border-[#004AAD] focus:ring-2 focus:ring-[#004AAD]/10 outline-none w-full text-sm"
                       />
                     </div>
                     <div>
-                      <label className="block text-xs font-semibold uppercase tracking-widest text-[#004AAD] mb-1.5">City</label>
+                      <label className="block text-xs font-semibold uppercase tracking-widest text-[#004AAD] mb-1.5">
+                        City *
+                      </label>
                       <input
                         value={addressData.city}
                         onChange={(e) => setAddressData({ ...addressData, city: e.target.value })}
@@ -478,7 +726,9 @@ export default function CheckoutPage() {
                       />
                     </div>
                     <div>
-                      <label className="block text-xs font-semibold uppercase tracking-widest text-[#004AAD] mb-1.5">State</label>
+                      <label className="block text-xs font-semibold uppercase tracking-widest text-[#004AAD] mb-1.5">
+                        State *
+                      </label>
                       <input
                         value={addressData.state}
                         onChange={(e) => setAddressData({ ...addressData, state: e.target.value })}
@@ -487,24 +737,30 @@ export default function CheckoutPage() {
                       />
                     </div>
                     <div className="md:col-span-2">
-                      <label className="block text-xs font-semibold uppercase tracking-widest text-[#004AAD] mb-1.5">Address</label>
+                      <label className="block text-xs font-semibold uppercase tracking-widest text-[#004AAD] mb-1.5">
+                        Complete Address *
+                      </label>
                       <textarea
                         value={addressData.address}
                         onChange={(e) => setAddressData({ ...addressData, address: e.target.value })}
                         rows={3}
-                        placeholder="House/flat number, street name, area"
+                        placeholder="House/flat number, street name, area, landmark"
                         className="bg-[#F8F9FC] border border-[#E8EAF2] rounded-xl px-4 py-3 text-[#111111] focus:border-[#004AAD] focus:ring-2 focus:ring-[#004AAD]/10 outline-none w-full text-sm resize-none"
                       />
                     </div>
                   </div>
 
-                  <button
-                    onClick={goNext}
-                    className="flex items-center gap-2 bg-[#03173D] text-white rounded-full px-8 py-3 font-semibold hover:bg-[#004AAD] transition-all"
-                  >
-                    {isFrameOnly ? "Proceed to Payment" : "Proceed to Prescription"}
-                    <ChevronRight size={16} />
-                  </button>
+                  <div className="pt-2">
+                    <button
+                      onClick={handleProceedFromAddress}
+                      className="flex items-center justify-center gap-2 bg-[#03173D] text-white rounded-full px-8 py-3.5 font-semibold hover:bg-[#004AAD] transition-all shadow-md hover:shadow-lg cursor-pointer text-sm"
+                    >
+                      {isFrameOnly || isPrescriptionDone
+                        ? "Proceed to Payment"
+                        : "Proceed to Prescription"}
+                      <ChevronRight size={16} />
+                    </button>
+                  </div>
                 </motion.div>
               )}
 
@@ -512,85 +768,205 @@ export default function CheckoutPage() {
               {activeStep === 2 && (
                 <motion.div
                   key="step2"
-                  initial={{ opacity: 0, x: -20 }}
+                  initial={{ opacity: 0, x: -16 }}
                   animate={{ opacity: 1, x: 0 }}
-                  exit={{ opacity: 0, x: 20 }}
-                  className="bg-white rounded-3xl border border-[#ECECEC] shadow-[0_10px_30px_rgba(0,0,0,0.05)] p-8 space-y-6"
+                  exit={{ opacity: 0, x: 16 }}
+                  className="bg-white rounded-3xl border border-[#ECECEC] shadow-[0_10px_30px_rgba(0,0,0,0.05)] p-6 md:p-8 space-y-6"
                 >
-                  <div className="flex items-center gap-3 pb-4 border-b border-[#ECECEC]">
-                    <FileText size={20} className="text-[#004AAD]" />
-                    <div>
-                      <h2 className="font-semibold text-[#111111]">Prescription Details</h2>
-                      <p className="text-[#666666] text-xs">Optional — enter your vision power for lens grinding.</p>
+                  <div className="flex items-center justify-between pb-4 border-b border-[#ECECEC]">
+                    <div className="flex items-center gap-3">
+                      <div className="w-9 h-9 rounded-xl bg-[#004AAD]/10 flex items-center justify-center text-[#004AAD]">
+                        <FileText size={20} />
+                      </div>
+                      <div>
+                        <h2 className="font-semibold text-[#111111]">Prescription Details</h2>
+                        <p className="text-[#666666] text-xs">
+                          {itemsNeedingPrescription.length > 1
+                            ? `Provide prescription for ${itemsNeedingPrescription.length} prescription frames`
+                            : "Enter your vision power or upload an eye doctor slip"}
+                        </p>
+                      </div>
                     </div>
                   </div>
 
+                  {/* Multi-frame tabs / bulk toggle */}
+                  {itemsNeedingPrescription.length > 1 && (
+                    <div className="bg-[#F8F9FC] border border-[#E8EAF2] rounded-2xl p-4 space-y-3">
+                      <div className="flex items-center justify-between">
+                        <span className="text-xs font-semibold text-[#111111]">
+                          Multiple Frames Requiring Lenses
+                        </span>
+                        <label className="flex items-center gap-2 text-xs font-medium text-[#004AAD] cursor-pointer select-none">
+                          <input
+                            type="checkbox"
+                            checked={applyToAllFrames}
+                            onChange={(e) => setApplyToAllFrames(e.target.checked)}
+                            className="w-4 h-4 rounded text-[#004AAD] focus:ring-[#004AAD]"
+                          />
+                          Use same prescription for all frames
+                        </label>
+                      </div>
+
+                      {!applyToAllFrames && (
+                        <div className="flex flex-wrap gap-2 pt-1">
+                          {itemsNeedingPrescription.map((item, idx) => {
+                            const key = String(item.database_id || item.id || item.product_id);
+                            const isSelected = selectedItemTab === key;
+                            const hasRx = Boolean(
+                              itemPrescriptions[key]?.left_eye ||
+                                itemPrescriptions[key]?.file_url ||
+                                item.prescription_json
+                            );
+
+                            return (
+                              <button
+                                key={key}
+                                type="button"
+                                onClick={() => setSelectedItemTab(key)}
+                                className={cn(
+                                  "px-3 py-1.5 rounded-xl text-xs font-medium border transition-all flex items-center gap-1.5 cursor-pointer",
+                                  isSelected
+                                    ? "bg-[#03173D] text-white border-[#03173D]"
+                                    : "bg-white text-[#444444] border-[#E8EAF2] hover:border-[#CCCCCC]"
+                                )}
+                              >
+                                <span>
+                                  Frame {idx + 1}: {item.products?.name || item.name}
+                                </span>
+                                {hasRx && <CheckCircle2 size={12} className="text-emerald-500" />}
+                              </button>
+                            );
+                          })}
+                        </div>
+                      )}
+                    </div>
+                  )}
+
+                  {/* Manual Power Fields */}
                   <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                     <div>
-                      <label className="block text-xs font-semibold uppercase tracking-widest text-[#004AAD] mb-1.5">Left Eye Power (SPH)</label>
+                      <label className="block text-xs font-semibold uppercase tracking-widest text-[#004AAD] mb-1.5">
+                        Left Eye Power (OS - SPH)
+                      </label>
                       <input
-                        value={prescription.left_eye}
-                        onChange={(e) => setPrescription({ ...prescription, left_eye: e.target.value })}
-                        placeholder="+0.00 / -0.00"
+                        value={
+                          !applyToAllFrames && selectedItemTab && itemPrescriptions[selectedItemTab]?.left_eye !== undefined
+                            ? itemPrescriptions[selectedItemTab].left_eye
+                            : prescription.left_eye
+                        }
+                        onChange={(e) => {
+                          const val = e.target.value;
+                          setPrescription((p) => ({ ...p, left_eye: val }));
+                          if (!applyToAllFrames && selectedItemTab) {
+                            setItemPrescriptions((prev) => ({
+                              ...prev,
+                              [selectedItemTab]: { ...(prev[selectedItemTab] || {}), left_eye: val, os_sph: val },
+                            }));
+                          }
+                        }}
+                        placeholder="-2.50 / +1.75"
                         className="bg-[#F8F9FC] border border-[#E8EAF2] rounded-xl px-4 py-3 text-[#111111] focus:border-[#004AAD] focus:ring-2 focus:ring-[#004AAD]/10 outline-none w-full text-sm"
                       />
                     </div>
+
                     <div>
-                      <label className="block text-xs font-semibold uppercase tracking-widest text-[#004AAD] mb-1.5">Right Eye Power (SPH)</label>
+                      <label className="block text-xs font-semibold uppercase tracking-widest text-[#004AAD] mb-1.5">
+                        Right Eye Power (OD - SPH)
+                      </label>
                       <input
-                        value={prescription.right_eye}
-                        onChange={(e) => setPrescription({ ...prescription, right_eye: e.target.value })}
-                        placeholder="+0.00 / -0.00"
+                        value={
+                          !applyToAllFrames && selectedItemTab && itemPrescriptions[selectedItemTab]?.right_eye !== undefined
+                            ? itemPrescriptions[selectedItemTab].right_eye
+                            : prescription.right_eye
+                        }
+                        onChange={(e) => {
+                          const val = e.target.value;
+                          setPrescription((p) => ({ ...p, right_eye: val }));
+                          if (!applyToAllFrames && selectedItemTab) {
+                            setItemPrescriptions((prev) => ({
+                              ...prev,
+                              [selectedItemTab]: { ...(prev[selectedItemTab] || {}), right_eye: val, od_sph: val },
+                            }));
+                          }
+                        }}
+                        placeholder="-2.50 / +1.75"
                         className="bg-[#F8F9FC] border border-[#E8EAF2] rounded-xl px-4 py-3 text-[#111111] focus:border-[#004AAD] focus:ring-2 focus:ring-[#004AAD]/10 outline-none w-full text-sm"
                       />
                     </div>
+
                     <div className="md:col-span-2">
-                      <label className="block text-xs font-semibold uppercase tracking-widest text-[#004AAD] mb-1.5">Pupillary Distance (PD)</label>
+                      <label className="block text-xs font-semibold uppercase tracking-widest text-[#004AAD] mb-1.5">
+                        Pupillary Distance (PD)
+                      </label>
                       <input
-                        value={prescription.pd}
-                        onChange={(e) => setPrescription({ ...prescription, pd: e.target.value })}
-                        placeholder="e.g. 62mm"
+                        value={
+                          !applyToAllFrames && selectedItemTab && itemPrescriptions[selectedItemTab]?.pd !== undefined
+                            ? itemPrescriptions[selectedItemTab].pd
+                            : prescription.pd
+                        }
+                        onChange={(e) => {
+                          const val = e.target.value;
+                          setPrescription((p) => ({ ...p, pd: val }));
+                          if (!applyToAllFrames && selectedItemTab) {
+                            setItemPrescriptions((prev) => ({
+                              ...prev,
+                              [selectedItemTab]: { ...(prev[selectedItemTab] || {}), pd: val },
+                            }));
+                          }
+                        }}
+                        placeholder="e.g. 62mm (optional)"
                         className="bg-[#F8F9FC] border border-[#E8EAF2] rounded-xl px-4 py-3 text-[#111111] focus:border-[#004AAD] focus:ring-2 focus:ring-[#004AAD]/10 outline-none w-full text-sm"
                       />
                     </div>
                   </div>
 
-                  {/* File upload */}
+                  {/* File upload alternative */}
                   <div
                     onClick={() => fileInputRef.current?.click()}
-                    className="border-2 border-dashed border-[#E8EAF2] rounded-xl p-8 text-center cursor-pointer hover:border-[#004AAD] hover:bg-[#F0F4FF]/30 transition-all"
+                    className="border-2 border-dashed border-[#E8EAF2] rounded-2xl p-6 text-center cursor-pointer hover:border-[#004AAD] hover:bg-[#F0F4FF]/30 transition-all"
                   >
                     <input
                       type="file"
                       ref={fileInputRef}
                       className="hidden"
-                      onChange={handleFileUpload}
+                      onChange={(e) => handleFileUpload(e, !applyToAllFrames ? selectedItemTab : undefined)}
                       accept="image/*,application/pdf"
                       disabled={uploadingPrescription}
                     />
-                    <Upload size={28} className="mx-auto text-[#004AAD]/40 mb-3" />
+                    <Upload size={28} className="mx-auto text-[#004AAD]/50 mb-2" />
                     {uploadingPrescription ? (
-                      <p className="text-sm font-semibold text-[#004AAD] animate-pulse">Uploading...</p>
+                      <p className="text-sm font-semibold text-[#004AAD] animate-pulse">
+                        Uploading prescription file...
+                      </p>
                     ) : prescription.file_url ? (
-                      <p className="text-sm font-semibold text-emerald-600">Prescription uploaded</p>
+                      <div className="space-y-1">
+                        <p className="text-sm font-semibold text-emerald-600 flex items-center justify-center gap-1.5">
+                          <CheckCircle2 size={16} /> Prescription file uploaded
+                        </p>
+                        <p className="text-xs text-[#666666]">Click to upload a replacement file</p>
+                      </div>
                     ) : (
                       <>
-                        <p className="text-sm font-semibold text-[#111111]">Upload Prescription</p>
-                        <p className="text-xs text-[#666666] mt-1">Image or PDF — optional</p>
+                        <p className="text-sm font-semibold text-[#111111]">Upload Doctor Prescription</p>
+                        <p className="text-xs text-[#666666] mt-1">
+                          Take a photo or upload PDF of your clinic slip
+                        </p>
                       </>
                     )}
                   </div>
 
-                  <div className="flex flex-col sm:flex-row gap-3">
+                  <div className="flex flex-col sm:flex-row gap-3 pt-2">
                     <button
-                      onClick={goBack}
-                      className="border border-[#03173D] text-[#03173D] rounded-full px-6 py-3 font-semibold hover:bg-[#03173D] hover:text-white transition-all text-sm"
+                      type="button"
+                      onClick={handleBackFromPrescription}
+                      className="border border-[#03173D] text-[#03173D] rounded-full px-6 py-3.5 font-semibold hover:bg-[#03173D] hover:text-white transition-all text-sm cursor-pointer text-center"
                     >
-                      Back
+                      Back to Address
                     </button>
                     <button
-                      onClick={goNext}
-                      className="flex items-center justify-center gap-2 bg-[#03173D] text-white rounded-full px-8 py-3 font-semibold hover:bg-[#004AAD] transition-all flex-1 sm:flex-none"
+                      type="button"
+                      onClick={handleProceedFromPrescription}
+                      className="flex items-center justify-center gap-2 bg-[#03173D] text-white rounded-full px-8 py-3.5 font-semibold hover:bg-[#004AAD] transition-all flex-1 sm:flex-none shadow-md hover:shadow-lg cursor-pointer text-sm"
                     >
                       Proceed to Payment <ChevronRight size={16} />
                     </button>
@@ -602,17 +978,19 @@ export default function CheckoutPage() {
               {activeStep === 3 && (
                 <motion.div
                   key="step3"
-                  initial={{ opacity: 0, x: -20 }}
+                  initial={{ opacity: 0, x: -16 }}
                   animate={{ opacity: 1, x: 0 }}
-                  exit={{ opacity: 0, x: 20 }}
+                  exit={{ opacity: 0, x: 16 }}
                   className="space-y-4"
                 >
-                  <div className="bg-white rounded-3xl border border-[#ECECEC] shadow-[0_10px_30px_rgba(0,0,0,0.05)] p-8 space-y-6">
+                  <div className="bg-white rounded-3xl border border-[#ECECEC] shadow-[0_10px_30px_rgba(0,0,0,0.05)] p-6 md:p-8 space-y-6">
                     <div className="flex items-center gap-3 pb-4 border-b border-[#ECECEC]">
-                      <CreditCard size={20} className="text-[#004AAD]" />
+                      <div className="w-9 h-9 rounded-xl bg-[#004AAD]/10 flex items-center justify-center text-[#004AAD]">
+                        <CreditCard size={20} />
+                      </div>
                       <div>
                         <h2 className="font-semibold text-[#111111]">Payment Method</h2>
-                        <p className="text-[#666666] text-xs">Choose how you want to pay.</p>
+                        <p className="text-[#666666] text-xs">Choose how you wish to pay.</p>
                       </div>
                     </div>
 
@@ -627,28 +1005,38 @@ export default function CheckoutPage() {
                             : "border-[#ECECEC] bg-white hover:border-[#CCCCCC] hover:bg-[#F8F9FC]"
                         )}
                       >
-                        <div className={cn(
-                          "w-10 h-10 rounded-xl flex items-center justify-center shrink-0 transition-colors",
-                          paymentMethod === "razorpay" ? "bg-[#03173D] text-white" : "bg-[#F4F6F8] text-[#555555]"
-                        )}>
+                        <div
+                          className={cn(
+                            "w-10 h-10 rounded-xl flex items-center justify-center shrink-0 transition-colors",
+                            paymentMethod === "razorpay"
+                              ? "bg-[#03173D] text-white"
+                              : "bg-[#F4F6F8] text-[#555555]"
+                          )}
+                        >
                           <CreditCard size={20} />
                         </div>
                         <div className="flex-1">
                           <div className="flex items-center gap-2">
                             <p className="font-semibold text-[#111111] text-sm">Online Payment</p>
                             <span className="text-[10px] font-bold uppercase tracking-wider bg-emerald-100 text-emerald-800 px-2 py-0.5 rounded">
-                              Recommended
+                              Instant & Secure
                             </span>
                           </div>
-                          <p className="text-[#666666] text-xs mt-0.5">UPI (Google Pay, PhonePe, Paytm), Cards & Net Banking</p>
+                          <p className="text-[#666666] text-xs mt-0.5">
+                            UPI (GPay, PhonePe, Paytm), Credit/Debit Cards & Net Banking
+                          </p>
                         </div>
-                        <div className={cn(
-                          "w-5 h-5 rounded-full flex items-center justify-center shrink-0 border transition-all",
-                          paymentMethod === "razorpay"
-                            ? "bg-[#03173D] border-[#03173D]"
-                            : "border-[#CCCCCC] bg-white"
-                        )}>
-                          {paymentMethod === "razorpay" && <CheckCircle2 size={12} className="text-white" />}
+                        <div
+                          className={cn(
+                            "w-5 h-5 rounded-full flex items-center justify-center shrink-0 border transition-all",
+                            paymentMethod === "razorpay"
+                              ? "bg-[#03173D] border-[#03173D]"
+                              : "border-[#CCCCCC] bg-white"
+                          )}
+                        >
+                          {paymentMethod === "razorpay" && (
+                            <CheckCircle2 size={12} className="text-white" />
+                          )}
                         </div>
                       </div>
 
@@ -662,22 +1050,30 @@ export default function CheckoutPage() {
                             : "border-[#ECECEC] bg-white hover:border-[#CCCCCC] hover:bg-[#F8F9FC]"
                         )}
                       >
-                        <div className={cn(
-                          "w-10 h-10 rounded-xl flex items-center justify-center shrink-0 transition-colors",
-                          paymentMethod === "cod" ? "bg-[#03173D] text-white" : "bg-[#F4F6F8] text-[#555555]"
-                        )}>
+                        <div
+                          className={cn(
+                            "w-10 h-10 rounded-xl flex items-center justify-center shrink-0 transition-colors",
+                            paymentMethod === "cod"
+                              ? "bg-[#03173D] text-white"
+                              : "bg-[#F4F6F8] text-[#555555]"
+                          )}
+                        >
                           <Banknote size={20} />
                         </div>
                         <div className="flex-1">
                           <p className="font-semibold text-[#111111] text-sm">Cash on Delivery (COD)</p>
-                          <p className="text-[#666666] text-xs mt-0.5">Pay in cash or UPI when your package arrives at your doorstep</p>
+                          <p className="text-[#666666] text-xs mt-0.5">
+                            Pay in cash or UPI directly when your package arrives at your doorstep
+                          </p>
                         </div>
-                        <div className={cn(
-                          "w-5 h-5 rounded-full flex items-center justify-center shrink-0 border transition-all",
-                          paymentMethod === "cod"
-                            ? "bg-[#03173D] border-[#03173D]"
-                            : "border-[#CCCCCC] bg-white"
-                        )}>
+                        <div
+                          className={cn(
+                            "w-5 h-5 rounded-full flex items-center justify-center shrink-0 border transition-all",
+                            paymentMethod === "cod"
+                              ? "bg-[#03173D] border-[#03173D]"
+                              : "border-[#CCCCCC] bg-white"
+                          )}
+                        >
                           {paymentMethod === "cod" && <CheckCircle2 size={12} className="text-white" />}
                         </div>
                       </div>
@@ -688,28 +1084,29 @@ export default function CheckoutPage() {
                       <p className="text-[#666666] text-xs leading-relaxed">
                         {paymentMethod === "cod"
                           ? "Cash on Delivery is available across all serviceable pincodes in India. Please keep exact cash or UPI ready upon delivery."
-                          : "Your payment is secured and encrypted via Razorpay. We do not store your card details."}
+                          : "Your payment is secured and encrypted via Razorpay. We never store your payment credentials."}
                       </p>
                     </div>
                   </div>
 
-                  <div className="flex flex-col sm:flex-row gap-3">
+                  <div className="flex flex-col sm:flex-row gap-3 pt-2">
                     <button
-                      onClick={goBack}
-                      className="border border-[#03173D] text-[#03173D] rounded-full px-6 py-3 font-semibold hover:bg-[#03173D] hover:text-white transition-all text-sm"
+                      type="button"
+                      onClick={handleBackFromPayment}
+                      className="border border-[#03173D] text-[#03173D] rounded-full px-6 py-3.5 font-semibold hover:bg-[#03173D] hover:text-white transition-all text-sm cursor-pointer text-center"
                     >
-                      Back
+                      Back to Address
                     </button>
                     <button
                       disabled={orderProcessing}
                       onClick={handlePayment}
-                      className="flex items-center justify-center gap-2 bg-[#03173D] text-white rounded-full px-8 py-3 font-semibold hover:bg-[#004AAD] transition-all flex-1 sm:flex-none disabled:opacity-50 disabled:cursor-not-allowed shadow-md hover:shadow-lg"
+                      className="flex items-center justify-center gap-2 bg-[#03173D] text-white rounded-full px-8 py-3.5 font-semibold hover:bg-[#004AAD] transition-all flex-1 sm:flex-none disabled:opacity-50 disabled:cursor-not-allowed shadow-md hover:shadow-lg cursor-pointer text-sm"
                     >
                       {orderProcessing
                         ? "Placing Order..."
                         : paymentMethod === "cod"
-                        ? `Place Order (COD) • ₹${total.toLocaleString("en-IN")}`
-                        : `Pay Now • ₹${total.toLocaleString("en-IN")}`}
+                        ? `Place Order (COD) • ₹${Math.round(grandTotal).toLocaleString("en-IN")}`
+                        : `Pay Now • ₹${Math.round(grandTotal).toLocaleString("en-IN")}`}
                       {!orderProcessing && <ArrowRight size={16} />}
                     </button>
                   </div>
@@ -718,146 +1115,26 @@ export default function CheckoutPage() {
             </AnimatePresence>
           </div>
 
-          {/* Right: Order Summary (sticky) */}
-          <div className="lg:col-span-5 sticky top-32">
-            <div className="bg-white rounded-3xl border border-[#ECECEC] shadow-[0_10px_30px_rgba(0,0,0,0.05)] p-6 space-y-6">
-              <h2 className="font-semibold text-[#111111] text-base">Order Summary</h2>
-
-              {/* Items */}
-              <div className="space-y-4 max-h-72 overflow-y-auto pr-1">
-                {cartItems.map((item, i) => {
-                  const lensCfg = item.lens_config || {};
-                  const indexName = lensCfg.index_label || lensCfg.thickness?.name || (lensCfg.selected_index ? `Index ${lensCfg.selected_index}` : null);
-                  const lensTypeName = item.lenses?.name || lensCfg.type?.name || item.lens_name;
-                  const tierName = lensCfg.tier ? `(${lensCfg.tier.toUpperCase()})` : "";
-                  const frameType = item.products?.frame_type || lensCfg.frame_type;
-
-                  return (
-                    <div key={i} className="flex gap-3 pb-3 border-b border-[#F0F0F0] last:border-b-0">
-                      <div className="w-16 h-16 bg-[#F8F9FC] border border-[#ECECEC] rounded-xl overflow-hidden flex-shrink-0 flex items-center justify-center">
-                        <img
-                          src={item.products?.product_images?.[0]?.image_url || "/placeholder.jpg"}
-                          className="w-full h-full object-contain"
-                          alt={item.products?.name}
-                        />
-                      </div>
-                      <div className="flex-1 min-w-0">
-                        <p className="font-semibold text-[#111111] text-sm truncate">{item.products?.name}</p>
-                        
-                        {/* Variant details (Frame type, color, size) */}
-                        <div className="flex flex-wrap items-center gap-1.5 mt-0.5">
-                          {frameType && (
-                            <span className="text-[9px] font-bold uppercase bg-[#03173D]/5 text-[#03173D] px-1.5 py-0.5 rounded">
-                              {frameType.replace('_', ' ')}
-                            </span>
-                          )}
-                          {item.selected_color && (
-                            <span className="text-[10px] text-[#666666]">
-                              Color: {item.selected_color}
-                            </span>
-                          )}
-                          {item.selected_size && (
-                            <span className="text-[10px] text-[#666666]">
-                              • Size: {item.selected_size}
-                            </span>
-                          )}
-                        </div>
-
-                        {/* Lens Configuration & Chosen Index */}
-                        {lensTypeName && (
-                          <div className="mt-1 space-y-0.5">
-                            <p className="text-xs font-semibold text-[#004AAD]">
-                              {lensTypeName} {tierName} {lensCfg.package_name ? `• ${lensCfg.package_name}` : ""}
-                            </p>
-                            {indexName && (
-                              <p className="text-[10px] font-medium text-emerald-800 bg-emerald-50 border border-emerald-200/60 px-2 py-0.5 rounded inline-block">
-                                Refractive Index: {indexName}
-                              </p>
-                            )}
-                          </div>
-                        )}
-
-                        <p className="text-[#888888] text-xs mt-1">Qty: {item.quantity}</p>
-                      </div>
-                      <p className="font-bold text-[#111111] text-sm flex-shrink-0">
-                        ₹{(item.price || item.products?.offer_price || 0).toLocaleString()}
-                      </p>
-                    </div>
-                  );
-                })}
-              </div>
-
-              {/* Coupon */}
-              <div className="border-t border-[#ECECEC] pt-4 space-y-3">
-                <p className="text-xs font-semibold uppercase tracking-widest text-[#666666]">Coupon Code</p>
-                <div className="flex gap-2">
-                  <input
-                    value={couponCode}
-                    onChange={(e) => setCouponCode(e.target.value.toUpperCase())}
-                    placeholder="ENTER CODE"
-                    disabled={!!couponApplied}
-                    className="flex-1 bg-[#F8F9FC] border border-[#E8EAF2] rounded-xl px-3 py-2.5 text-[#111111] text-xs font-semibold focus:border-[#004AAD] focus:ring-2 focus:ring-[#004AAD]/10 outline-none disabled:opacity-50"
-                  />
-                  {couponApplied ? (
-                    <button
-                      onClick={() => { setCouponDiscount(0); setCouponApplied(""); setCouponCode(""); }}
-                      className="px-3 py-2.5 bg-red-50 text-red-500 text-xs font-semibold border border-red-200 rounded-xl hover:bg-red-100 transition-all flex items-center gap-1"
-                    >
-                      <X size={12} /> Remove
-                    </button>
-                  ) : (
-                    <button
-                      onClick={handleApplyCoupon}
-                      disabled={applyingCoupon}
-                      className="px-4 py-2.5 bg-[#03173D] text-white text-xs font-semibold rounded-xl hover:bg-[#004AAD] transition-all disabled:opacity-50"
-                    >
-                      {applyingCoupon ? "..." : "Apply"}
-                    </button>
-                  )}
-                </div>
-                {couponApplied && (
-                  <div className="flex items-center gap-1.5 text-emerald-600 text-xs font-semibold">
-                    <Tag size={12} /> {couponApplied} applied
-                  </div>
-                )}
-              </div>
-
-              {/* Price breakdown */}
-              <div className="border-t border-[#ECECEC] pt-4 space-y-3">
-                <div className="flex justify-between text-sm text-[#666666]">
-                  <span>Subtotal</span>
-                  <span>₹{subtotal.toLocaleString()}</span>
-                </div>
-                {couponDiscount > 0 && (
-                  <div className="flex justify-between text-sm text-emerald-600 font-semibold">
-                    <span>Coupon Discount</span>
-                    <span>-₹{couponDiscount.toLocaleString()}</span>
-                  </div>
-                )}
-                {tax > 0 ? (
-                  <div className="flex justify-between text-sm text-[#666666]">
-                    <span>GST (18% on frames)</span>
-                    <span>₹{tax.toLocaleString()}</span>
-                  </div>
-                ) : null}
-                <div className="flex justify-between text-sm text-[#004AAD] font-semibold">
-                  <span>Shipping</span>
-                  <span>Free</span>
-                </div>
-                <div className="border-t border-[#ECECEC] pt-3 flex justify-between items-baseline">
-                  <span className="font-bold text-[#111111]">Total</span>
-                  <span className="text-2xl font-bold text-[#111111]">₹{Math.round(total).toLocaleString()}</span>
-                </div>
-              </div>
-
-              {/* Trust badges */}
-              <div className="flex items-center justify-center gap-6 pt-2 opacity-40">
-                <Shield size={18} className="text-[#111111]" />
-                <Eye size={18} className="text-[#111111]" />
-                <ShieldCheck size={18} className="text-[#111111]" />
-              </div>
-              <p className="text-center text-xs text-[#666666]">Secured & Encrypted Checkout</p>
-            </div>
+          {/* Right: Consolidated Order Summary Component */}
+          <div className="lg:col-span-5 sticky top-28">
+            <OrderSummary
+              items={cartItems}
+              itemPrescriptions={itemPrescriptions}
+              checkoutPrescription={prescription}
+              couponCode={couponCode}
+              onCouponCodeChange={setCouponCode}
+              onApplyCoupon={handleApplyCoupon}
+              onRemoveCoupon={() => {
+                setCouponDiscount(0);
+                setCouponApplied("");
+                setCouponCode("");
+                setCouponId(null);
+              }}
+              couponApplied={couponApplied}
+              couponDiscount={couponDiscount}
+              applyingCoupon={applyingCoupon}
+              showCoupon={true}
+            />
           </div>
         </div>
       </div>

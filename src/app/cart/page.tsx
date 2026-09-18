@@ -11,6 +11,8 @@ import { getCart, removeFromCart, addToCart, updateCartQuantity } from "@/lib/db
 import { useCartStore } from "@/store/cartStore";
 import { useAuth } from "@/components/providers/AuthProvider";
 import { toast } from "react-hot-toast";
+import OrderSummary from "@/components/checkout/OrderSummary";
+import { applyCoupon } from "@/lib/db/coupon_actions";
 
 const supabaseInstance = createClient();
 
@@ -22,6 +24,36 @@ function CartPageContent() {
   const router = useRouter();
   const searchParams = useSearchParams();
   const buyNow = searchParams.get("buyNow");
+
+  // Coupon state
+  const [couponCode, setCouponCode] = useState("");
+  const [couponDiscount, setCouponDiscount] = useState(0);
+  const [couponApplied, setCouponApplied] = useState("");
+  const [couponId, setCouponId] = useState<number | null>(null);
+  const [applyingCoupon, setApplyingCoupon] = useState(false);
+
+  const handleApplyCoupon = async () => {
+    if (!couponCode.trim()) {
+      toast.error("Enter a coupon code.");
+      return;
+    }
+    setApplyingCoupon(true);
+    const subtotal = items.reduce(
+      (acc: number, item: any) =>
+        acc + (item.price || item.products?.offer_price || item.products?.price || 0) * item.quantity,
+      0
+    );
+    const result = await applyCoupon(couponCode.trim(), subtotal);
+    setApplyingCoupon(false);
+    if (result.error) {
+      toast.error(result.error);
+    } else if (result.success) {
+      setCouponDiscount(result.discount!);
+      setCouponApplied(result.description!);
+      setCouponId(result.coupon_id ?? null);
+      toast.success(`Coupon applied! ${result.description}`);
+    }
+  };
 
   const supabase = useMemo(() => supabaseInstance, []);
   const channelRef = useRef<any>(null);
@@ -346,71 +378,48 @@ function CartPageContent() {
             </AnimatePresence>
           </div>
 
-          {/* Order Summary */}
+          {/* Consolidated Order Summary */}
           {items.length > 0 && (
             <div className="lg:col-span-4 sticky top-24">
-              <div className="bg-white rounded-3xl border border-[#ECECEC] shadow-[0_10px_30px_rgba(0,0,0,0.05)] p-8 space-y-6">
-                <header className="border-b border-[#E8EAF2] pb-5">
-                  <h2 className="font-semibold text-[#111111] uppercase tracking-widest text-sm">
-                    Order Summary
-                  </h2>
-                </header>
-
-                <div className="space-y-4">
-                  <div className="flex justify-between items-center">
-                    <span className="text-[#666666] text-sm">Subtotal</span>
-                    <span className="text-[#111111] font-semibold">₹{subtotal.toLocaleString()}</span>
+              <OrderSummary
+                items={items}
+                showCoupon={true}
+                couponCode={couponCode}
+                onCouponCodeChange={setCouponCode}
+                onApplyCoupon={handleApplyCoupon}
+                onRemoveCoupon={() => {
+                  setCouponDiscount(0);
+                  setCouponApplied("");
+                  setCouponCode("");
+                  setCouponId(null);
+                }}
+                couponApplied={couponApplied}
+                couponDiscount={couponDiscount}
+                applyingCoupon={applyingCoupon}
+                showShippingProgress={true}
+                actionButton={
+                  <button
+                    disabled={items.length === 0}
+                    onClick={handleCheckout}
+                    className={cn(
+                      "w-full py-4 bg-[#03173D] text-white font-semibold rounded-full hover:bg-gradient-to-r hover:from-[#03173D] hover:to-[#004AAD] transition-all duration-300 active:scale-[0.98] cursor-pointer shadow-md hover:shadow-lg text-sm",
+                      items.length === 0 && "opacity-30 cursor-not-allowed"
+                    )}
+                  >
+                    Proceed to Checkout
+                  </button>
+                }
+                footerNote={
+                  <div className="text-center pt-1">
+                    <Link
+                      href="/products"
+                      className="text-xs text-[#666666] hover:text-[#004AAD] transition-colors font-medium"
+                    >
+                      Continue shopping
+                    </Link>
                   </div>
-                  <div className="flex justify-between items-center">
-                    <span className="text-[#666666] text-sm">Shipping</span>
-                    <span className="text-emerald-600 font-semibold text-sm">Free</span>
-                  </div>
-                  {tax > 0 && (
-                    <div className="flex justify-between items-center">
-                      <span className="text-[#666666] text-sm">GST (18% on frames)</span>
-                      <span className="text-[#111111] font-semibold">₹{tax.toLocaleString()}</span>
-                    </div>
-                  )}
-
-                  {/* Free shipping progress */}
-                  <div className="pt-2 space-y-2">
-                    <div className="flex justify-between items-center">
-                      <span className="text-[#666666] text-xs">Free shipping progress</span>
-                      <span className="text-xs font-semibold text-[#004AAD]">
-                        {subtotal >= 2000 ? "Unlocked!" : `₹${(2000 - subtotal).toLocaleString()} away`}
-                      </span>
-                    </div>
-                    <div className="h-1.5 bg-[#F8F9FC] border border-[#E8EAF2] rounded-full overflow-hidden">
-                      <div
-                        className="h-full bg-[#004AAD] rounded-full transition-all duration-500"
-                        style={{ width: `${Math.min((subtotal / 2000) * 100, 100)}%` }}
-                      />
-                    </div>
-                  </div>
-
-                  <div className="pt-4 border-t border-[#E8EAF2] flex justify-between items-baseline">
-                    <span className="text-[#666666] text-sm font-medium">Total</span>
-                    <span className="text-3xl font-[var(--font-hero)] italic text-[#111111]">₹{total.toLocaleString()}</span>
-                  </div>
-                </div>
-
-                <button
-                  disabled={items.length === 0}
-                  onClick={handleCheckout}
-                  className={cn(
-                    "w-full py-4 bg-[#03173D] text-white font-semibold rounded-full hover:bg-gradient-to-r hover:from-[#03173D] hover:to-[#004AAD] transition-all duration-300 active:scale-[0.98]",
-                    items.length === 0 && "opacity-30 cursor-not-allowed"
-                  )}
-                >
-                  Proceed to Checkout
-                </button>
-
-                <div className="text-center">
-                  <Link href="/products" className="text-xs text-[#666666] hover:text-[#004AAD] transition-colors font-medium">
-                    Continue shopping
-                  </Link>
-                </div>
-              </div>
+                }
+              />
             </div>
           )}
         </div>
