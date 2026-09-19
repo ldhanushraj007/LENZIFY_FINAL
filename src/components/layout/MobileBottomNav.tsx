@@ -6,11 +6,15 @@ import { Home, Search, ShoppingBag, Heart, User } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { useCartStore } from "@/store/cartStore";
 import { useWishlistStore } from "@/store/wishlistStore";
+import { useAuth } from "@/components/providers/AuthProvider";
 
 export default function MobileBottomNav() {
   const pathname = usePathname();
-  const totalItems = useCartStore((s) => s.items.reduce((a, i) => a + Number(i.quantity || 0), 0));
-  const wishlistCount = useWishlistStore((s) => s.items.length);
+  const { user } = useAuth();
+  const rawTotalItems = useCartStore((s) => s.items.reduce((a, i) => a + Number(i.quantity || 0), 0));
+  const rawWishlistCount = useWishlistStore((s) => s.items.length);
+  const totalItems = user ? rawTotalItems : 0;
+  const wishlistCount = user ? rawWishlistCount : 0;
 
   const isAdmin = pathname?.startsWith("/admin") || pathname === "/secure-admin-login";
   if (isAdmin) return null;
@@ -18,8 +22,8 @@ export default function MobileBottomNav() {
   const tabs = [
     { href: "/", icon: Home, label: "Home" },
     { href: "/products", icon: Search, label: "Shop" },
-    { href: "/cart", icon: ShoppingBag, label: "Cart", badge: totalItems },
-    { href: "/wishlist", icon: Heart, label: "Wishlist", badge: wishlistCount },
+    { href: "/cart", icon: ShoppingBag, label: "Cart", badge: user ? totalItems : undefined },
+    { href: "/wishlist", icon: Heart, label: "Wishlist", badge: user ? wishlistCount : undefined },
     { href: "/dashboard", icon: User, label: "Account" },
   ];
 

@@ -5,6 +5,8 @@ import Image from "next/image";
 import Link from "next/link";
 import { Shield, Eye, ShieldCheck, Tag, X, FileText, CheckCircle2 } from "lucide-react";
 import { cn } from "@/lib/utils";
+import { getGSTRate, calculateCartGST } from "@/lib/gst";
+import { resolveProductImage } from "@/lib/image_utils";
 
 export interface ItemPrescription {
   od_sph?: string;
@@ -68,23 +70,8 @@ export default function OrderSummary({
     );
   };
 
-  const subtotal = items.reduce(
-    (acc, item) => acc + (item.price || item.products?.offer_price || item.products?.price || 0) * item.quantity,
-    0
-  );
-
-  const discountedSubtotal = Math.max(0, subtotal - (couponDiscount || 0));
-
-  const taxableSubtotal = items
-    .filter((item) => !isContactLensItem(item))
-    .reduce(
-      (acc, item) => acc + (item.price || item.products?.offer_price || item.products?.price || 0) * item.quantity,
-      0
-    );
-
-  const taxableRatio = subtotal > 0 ? taxableSubtotal / subtotal : 0;
-  const tax = Math.round(discountedSubtotal * taxableRatio * 0.18);
-  const grandTotal = discountedSubtotal + tax;
+  const gstBreakdown = calculateCartGST(items, couponDiscount);
+  const { subtotal, discountedSubtotal, gst5Total, gst18Total, hasContactLens, grandTotal } = gstBreakdown;
 
   // Resolve prescription for a specific line item
   const getItemPrescription = (item: any): ItemPrescription | null => {
@@ -155,12 +142,35 @@ export default function OrderSummary({
             : [];
           const allCoatings = Array.from(new Set([...coatings, ...features])).filter(Boolean);
 
-          const itemPrice = item.price || item.products?.offer_price || item.products?.price || 0;
-          const itemTotalPrice = itemPrice * item.quantity;
+          const hasLensConfig = Boolean(
+            lensCfg &&
+            (lensCfg.type || lensCfg.package || lensCfg.package_name || lensCfg.selected_index || lensCfg.thickness || item.lens_price || item.lens_name)
+          );
+
+          const totalItemUnitPrice = item.price || item.products?.offer_price || item.products?.price || 0;
+          const itemTotalPrice = totalItemUnitPrice * item.quantity;
+
+          const rawLensPrice = Number(
+            item.lens_price ||
+            lensCfg.total_price ||
+            lensCfg.lens_price ||
+            lensCfg.price ||
+            0
+          );
+          const baseProductPrice = Number(item.products?.offer_price || item.products?.price || item.product?.price || 0);
+          const lensUnitPrice = rawLensPrice > 0
+            ? rawLensPrice
+            : (baseProductPrice > 0 && totalItemUnitPrice > baseProductPrice ? totalItemUnitPrice - baseProductPrice : 0);
+          const frameUnitPrice = Math.max(0, totalItemUnitPrice - lensUnitPrice);
+
+          const rate = getGSTRate(item);
+          const gstRatePct = rate === 'included' ? 0 : rate === 0.18 ? 18 : 5;
+          const gstAmount = rate === 'included' ? 0 : Math.round(itemTotalPrice * (rate as number));
+          const coatingsCount = allCoatings.length > 0 ? allCoatings.length : 4;
+
           const imageUrl =
+            resolveProductImage(item.products || item) ||
             item.image ||
-            item.products?.primary_image ||
-            item.products?.product_images?.[0]?.image_url ||
             "/placeholder.jpg";
           const productName = item.name || item.products?.name || "Eyewear";
           const brandName = item.brand || item.products?.brand || "LENZIFY";
@@ -195,9 +205,11 @@ export default function OrderSummary({
                         {productName}
                       </h4>
                     </div>
-                    <p className="font-bold text-[#111111] text-sm whitespace-nowrap">
-                      ₹{itemTotalPrice.toLocaleString("en-IN")}
-                    </p>
+                    {!hasLensConfig && (
+                      <p className="font-bold text-[#111111] text-sm whitespace-nowrap">
+                        ₹{itemTotalPrice.toLocaleString("en-IN")}
+                      </p>
+                    )}
                   </div>
 
                   {/* Frame Specs (Size, Color, Frame Type) */}
@@ -221,42 +233,38 @@ export default function OrderSummary({
                 </div>
               </div>
 
-              {/* Lens Specification breakdown */}
-              {(lensTypeName || indexName || allCoatings.length > 0) && (
-                <div className="bg-[#F8F9FC] border border-[#E8EAF2] rounded-xl p-2.5 text-xs space-y-1.5 mt-2">
-                  {lensTypeName && (
-                    <div className="flex items-center justify-between gap-2">
-                      <span className="text-[#666666] font-medium text-[11px]">Lens Type</span>
-                      <span className="font-semibold text-[#004AAD] text-right">
-                        {lensTypeName} {tierName} {lensCfg.package_name ? `• ${lensCfg.package_name}` : ""}
-                      </span>
-                    </div>
-                  )}
-
-                  {indexName && (
-                    <div className="flex items-center justify-between gap-2">
-                      <span className="text-[#666666] font-medium text-[11px]">Refractive Index</span>
-                      <span className="font-semibold text-emerald-800 bg-emerald-50 border border-emerald-200/60 px-1.5 py-0.5 rounded text-[10px]">
-                        {indexName}
-                      </span>
-                    </div>
-                  )}
-
-                  {allCoatings.length > 0 && (
-                    <div className="flex items-start justify-between gap-2 pt-1 border-t border-[#ECECEC]/60">
-                      <span className="text-[#666666] font-medium text-[11px] shrink-0">Coatings</span>
-                      <div className="flex flex-wrap gap-1 justify-end">
-                        {allCoatings.map((c, i) => (
-                          <span
-                            key={i}
-                            className="bg-white border border-[#E0E2EC] text-[#222222] text-[10px] px-1.5 py-0.5 rounded font-medium"
-                          >
-                            {c}
-                          </span>
-                        ))}
-                      </div>
-                    </div>
-                  )}
+              {/* Lens & Frame Separate Lines (Change 2 & Change 5) */}
+              {hasLensConfig ? (
+                <div className="bg-[#F8F9FC] border border-[#E8EAF2] rounded-xl p-3 text-xs space-y-1.5 mt-2">
+                  <div className="flex justify-between text-[#555555]">
+                    <span>Frame</span>
+                    <span className="font-medium text-[#111111]">₹{(frameUnitPrice * item.quantity).toLocaleString("en-IN")}</span>
+                  </div>
+                  <div className="flex justify-between text-[#555555]">
+                    <span>{lensTypeName || "Prescription Lens"} · {lensCfg.package_name || lensCfg.package || "Standard"}</span>
+                    <span className="font-medium text-[#111111]">₹{(lensUnitPrice * item.quantity).toLocaleString("en-IN")}</span>
+                  </div>
+                  <div className="flex justify-between text-[#555555]">
+                    <span>Included Coatings ({coatingsCount})</span>
+                    <span className="font-bold text-emerald-600 uppercase text-[11px]">FREE</span>
+                  </div>
+                  <div className="border-t border-[#ECECEC] pt-1.5 flex justify-between font-bold text-[#111111]">
+                    <span>Item Total</span>
+                    <span>₹{itemTotalPrice.toLocaleString("en-IN")}</span>
+                  </div>
+                  <div className="flex justify-between text-[11px] text-[#666666]">
+                    <span>GST (5%):</span>
+                    <span className="font-medium text-[#111111]">₹{gstAmount.toLocaleString("en-IN")}</span>
+                  </div>
+                </div>
+              ) : (
+                <div className="flex justify-between items-center text-xs text-[#666666] pt-1 px-1">
+                  <span>GST:</span>
+                  <span className="font-medium text-[#111111]">
+                    {rate === 'included'
+                      ? "Included in price"
+                      : `GST (${gstRatePct}%): ₹${gstAmount.toLocaleString("en-IN")}`}
+                  </span>
                 </div>
               )}
 
@@ -370,8 +378,8 @@ export default function OrderSummary({
       {/* Price breakdown */}
       <div className="border-t border-[#ECECEC] pt-4 space-y-2.5">
         <div className="flex justify-between text-sm text-[#666666]">
-          <span>Subtotal</span>
-          <span className="font-medium text-[#111111]">₹{subtotal.toLocaleString("en-IN")}</span>
+          <span>Subtotal (excl. GST)</span>
+          <span className="font-medium text-[#111111]">₹{discountedSubtotal.toLocaleString("en-IN")}</span>
         </div>
 
         {couponDiscount > 0 && (
@@ -381,15 +389,29 @@ export default function OrderSummary({
           </div>
         )}
 
-        {tax > 0 ? (
+        {gst5Total > 0 ? (
           <div className="flex justify-between text-sm text-[#666666]">
-            <span>GST (18% on frames)</span>
-            <span className="font-medium text-[#111111]">₹{tax.toLocaleString("en-IN")}</span>
+            <span>GST (5% — Eyeglasses/Lenses)</span>
+            <span className="font-medium text-[#111111]">₹{gst5Total.toLocaleString("en-IN")}</span>
+          </div>
+        ) : null}
+
+        {gst18Total > 0 ? (
+          <div className="flex justify-between text-sm text-[#666666]">
+            <span>GST (18% — Sunglasses)</span>
+            <span className="font-medium text-[#111111]">₹{gst18Total.toLocaleString("en-IN")}</span>
+          </div>
+        ) : null}
+
+        {hasContactLens ? (
+          <div className="flex justify-between text-sm text-emerald-600 font-medium">
+            <span>Contact Lenses</span>
+            <span>GST Included</span>
           </div>
         ) : null}
 
         <div className="flex justify-between text-sm text-[#004AAD] font-semibold">
-          <span>Shipping</span>
+          <span>Delivery</span>
           <span>Free</span>
         </div>
 

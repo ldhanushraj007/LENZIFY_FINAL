@@ -129,5 +129,16 @@ export async function updateSession(request: NextRequest) {
     }
   }
 
+  // 5. CUSTOMER ACCESS: Protect Checkout routes
+  if (pathname.startsWith('/checkout')) {
+    if (!user) {
+      const url = request.nextUrl.clone();
+      url.pathname = '/auth/login';
+      url.searchParams.set('returnUrl', '/checkout');
+      url.searchParams.set('redirect', '/checkout');
+      return NextResponse.redirect(url);
+    }
+  }
+
   return supabaseResponse
 }

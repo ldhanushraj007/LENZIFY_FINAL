@@ -1,4 +1,4 @@
-import { createClient } from "@/lib/supabase/server";
+import { createAdminClient } from "@/lib/supabase/server";
 import { ShoppingCart, Search, Filter, Eye, CheckCircle2, Truck, Calendar } from "lucide-react";
 import Link from "next/link";
 import { cn } from "@/lib/utils";
@@ -32,11 +32,11 @@ export default async function AdminOrdersPage({
   const toDate = params?.to || "";
   const pageSize = 15;
 
-  const supabase = await createClient();
+  const supabase = await createAdminClient();
 
   let dbQuery = supabase
     .from("orders")
-    .select("*, users(name, email)", { count: "exact" })
+    .select("*, users(name, email), addresses(*)", { count: "exact" })
     .order("created_at", { ascending: false });
 
   if (query) dbQuery = dbQuery.or(`id.ilike.%${query}%,tracking_id.ilike.%${query}%`);
@@ -47,6 +47,18 @@ export default async function AdminOrdersPage({
   const from = (page - 1) * pageSize;
   const { data: orders, count } = await dbQuery.range(from, from + pageSize - 1);
   const totalPages = Math.ceil((count || 0) / pageSize);
+
+  // Map user IDs to auth metadata for accurate customer names & emails
+  const userMap = new Map<string, { name: string; email: string }>();
+  try {
+    const { data: usersData } = await supabase.auth.admin.listUsers();
+    for (const u of usersData?.users || []) {
+      userMap.set(u.id, {
+        name: u.user_metadata?.full_name || u.email?.split("@")[0] || "Customer",
+        email: u.email || "",
+      });
+    }
+  } catch {}
 
   const statusOptions = [
     { value: "all",       label: "All Orders" },
@@ -139,8 +151,12 @@ export default async function AdminOrdersPage({
                     {new Date(order.created_at).toLocaleDateString("en-IN", { day: "numeric", month: "short", year: "numeric" })}
                   </td>
                   <td className="px-4 py-4">
-                    <p className="text-sm font-medium text-[#111111]">{(order.users as any)?.name || "Customer"}</p>
-                    <p className="text-[10px] text-[#AAAAAA]">{(order.users as any)?.email}</p>
+                    <p className="text-sm font-medium text-[#111111]">
+                      {(order.addresses as any)?.full_name || userMap.get(order.user_id)?.name || (order.users as any)?.name || "Customer"}
+                    </p>
+                    <p className="text-[10px] text-[#AAAAAA]">
+                      {userMap.get(order.user_id)?.email || (order.users as any)?.email || ""}
+                    </p>
                   </td>
                   <td className="px-4 py-4 text-sm font-semibold text-[#111111]">
                     ₹{Number(order.total_price || 0).toLocaleString("en-IN")}

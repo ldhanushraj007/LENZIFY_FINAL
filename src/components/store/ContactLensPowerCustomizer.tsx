@@ -20,11 +20,68 @@ export interface ContactLensPrescriptionData {
   notes?: string;
 }
 
+export function validateContactLensPower(data: ContactLensPrescriptionData | null): {
+  isValid: boolean;
+  errors: {
+    right_sph?: string;
+    right_axis?: string;
+    left_sph?: string;
+    left_axis?: string;
+  };
+} {
+  if (!data || !data.right_eye || !data.left_eye) {
+    return {
+      isValid: false,
+      errors: {
+        right_sph: "Right eye sphere (SPH) is required",
+        left_sph: "Left eye sphere (SPH) is required",
+      },
+    };
+  }
+
+  const errors: {
+    right_sph?: string;
+    right_axis?: string;
+    left_sph?: string;
+    left_axis?: string;
+  } = {};
+
+  if (!data.right_eye.sph || data.right_eye.sph.trim() === "") {
+    errors.right_sph = "Please select Right Eye (OD) Sphere";
+  }
+
+  if (
+    data.right_eye.cyl &&
+    data.right_eye.cyl !== "0.00 (None)" &&
+    (!data.right_eye.axis || data.right_eye.axis === "None")
+  ) {
+    errors.right_axis = "Axis is required when Cylinder is specified";
+  }
+
+  if (!data.left_eye.sph || data.left_eye.sph.trim() === "") {
+    errors.left_sph = "Please select Left Eye (OS) Sphere";
+  }
+
+  if (
+    data.left_eye.cyl &&
+    data.left_eye.cyl !== "0.00 (None)" &&
+    (!data.left_eye.axis || data.left_eye.axis === "None")
+  ) {
+    errors.left_axis = "Axis is required when Cylinder is specified";
+  }
+
+  return {
+    isValid: Object.keys(errors).length === 0,
+    errors,
+  };
+}
+
 interface ContactLensPowerCustomizerProps {
   value: ContactLensPrescriptionData | null;
   onChange: (prescription: ContactLensPrescriptionData | null) => void;
   productDefaultBc?: string;
   productDefaultDia?: string;
+  required?: boolean;
 }
 
 // Standard options
@@ -65,9 +122,11 @@ export default function ContactLensPowerCustomizer({
   onChange,
   productDefaultBc = "8.6",
   productDefaultDia = "14.2",
+  required = true,
 }: ContactLensPowerCustomizerProps) {
-  const [isOpen, setIsOpen] = useState(!!value);
+  const [isOpen, setIsOpen] = useState(required ? true : !!value);
   const [sameForBoth, setSameForBoth] = useState(false);
+  const [touched, setTouched] = useState(false);
 
   // Form states
   const [rightEye, setRightEye] = useState<ContactLensEyePower>(
@@ -92,27 +151,59 @@ export default function ContactLensPowerCustomizer({
     }
   );
 
-  const handleRightChange = (field: keyof ContactLensEyePower, val: string) => {
-    const updated = { ...rightEye, [field]: val };
-    setRightEye(updated);
-    if (sameForBoth) {
-      setLeftEye(updated);
+  // Compute live validation
+  const validation = validateContactLensPower({
+    is_contact_lens: true,
+    right_eye: rightEye,
+    left_eye: sameForBoth ? rightEye : leftEye,
+  });
+
+  const syncToParent = (rEye: ContactLensEyePower, lEye: ContactLensEyePower, isSame: boolean) => {
+    const finalLeft = isSame ? { ...rEye } : lEye;
+    const currentData: ContactLensPrescriptionData = {
+      is_contact_lens: true,
+      right_eye: rEye,
+      left_eye: finalLeft,
+    };
+    const v = validateContactLensPower(currentData);
+    if (v.isValid) {
+      onChange(currentData);
+    } else {
+      onChange(null);
     }
   };
 
+  const handleRightChange = (field: keyof ContactLensEyePower, val: string) => {
+    setTouched(true);
+    const updated = { ...rightEye, [field]: val };
+    setRightEye(updated);
+    const newLeft = sameForBoth ? updated : leftEye;
+    if (sameForBoth) {
+      setLeftEye(updated);
+    }
+    syncToParent(updated, newLeft, sameForBoth);
+  };
+
   const handleLeftChange = (field: keyof ContactLensEyePower, val: string) => {
-    setLeftEye(prev => ({ ...prev, [field]: val }));
+    setTouched(true);
+    const updated = { ...leftEye, [field]: val };
+    setLeftEye(updated);
+    syncToParent(rightEye, updated, sameForBoth);
   };
 
   const handleToggleSameForBoth = (e: React.ChangeEvent<HTMLInputElement>) => {
     const checked = e.target.checked;
     setSameForBoth(checked);
+    const newLeft = checked ? { ...rightEye } : leftEye;
     if (checked) {
       setLeftEye({ ...rightEye });
     }
+    syncToParent(rightEye, newLeft, checked);
   };
 
   const handleApply = () => {
+    setTouched(true);
+    if (!validation.isValid) return;
     const finalLeft = sameForBoth ? { ...rightEye } : leftEye;
     onChange({
       is_contact_lens: true,
@@ -124,7 +215,8 @@ export default function ContactLensPowerCustomizer({
 
   const handleClear = () => {
     onChange(null);
-    setIsOpen(false);
+    setTouched(false);
+    if (!required) setIsOpen(false);
   };
 
   return (
@@ -230,7 +322,10 @@ export default function ContactLensPowerCustomizer({
                   <select
                     value={rightEye.sph}
                     onChange={(e) => handleRightChange("sph", e.target.value)}
-                    className="w-full bg-white border border-[#E8EAF2] rounded-xl px-3 py-2 text-xs font-semibold text-[#111111] focus:border-[#004AAD] outline-none"
+                    className={cn(
+                      "w-full bg-white border rounded-xl px-3 py-2 text-xs font-semibold text-[#111111] focus:border-[#004AAD] outline-none",
+                      touched && validation.errors.right_sph ? "border-red-500 bg-red-50/40" : "border-[#E8EAF2]"
+                    )}
                   >
                     {SPH_OPTIONS.map((opt) => (
                       <option key={`r-sph-${opt}`} value={opt}>
@@ -238,6 +333,9 @@ export default function ContactLensPowerCustomizer({
                       </option>
                     ))}
                   </select>
+                  {touched && validation.errors.right_sph && (
+                    <p className="text-[9px] font-semibold text-red-600 mt-1">{validation.errors.right_sph}</p>
+                  )}
                 </div>
 
                 {/* CYL */}
@@ -266,7 +364,10 @@ export default function ContactLensPowerCustomizer({
                   <select
                     value={rightEye.axis}
                     onChange={(e) => handleRightChange("axis", e.target.value)}
-                    className="w-full bg-white border border-[#E8EAF2] rounded-xl px-3 py-2 text-xs font-semibold text-[#111111] focus:border-[#004AAD] outline-none"
+                    className={cn(
+                      "w-full bg-white border rounded-xl px-3 py-2 text-xs font-semibold text-[#111111] focus:border-[#004AAD] outline-none",
+                      touched && validation.errors.right_axis ? "border-red-500 bg-red-50/40" : "border-[#E8EAF2]"
+                    )}
                   >
                     {AXIS_OPTIONS.map((opt) => (
                       <option key={`r-axis-${opt}`} value={opt}>
@@ -274,6 +375,9 @@ export default function ContactLensPowerCustomizer({
                       </option>
                     ))}
                   </select>
+                  {touched && validation.errors.right_axis && (
+                    <p className="text-[9px] font-semibold text-red-600 mt-1">{validation.errors.right_axis}</p>
+                  )}
                 </div>
 
 
@@ -322,7 +426,10 @@ export default function ContactLensPowerCustomizer({
                     disabled={sameForBoth}
                     value={sameForBoth ? rightEye.sph : leftEye.sph}
                     onChange={(e) => handleLeftChange("sph", e.target.value)}
-                    className="w-full bg-white border border-[#E8EAF2] rounded-xl px-3 py-2 text-xs font-semibold text-[#111111] focus:border-[#004AAD] outline-none disabled:bg-gray-100 disabled:cursor-not-allowed"
+                    className={cn(
+                      "w-full bg-white border rounded-xl px-3 py-2 text-xs font-semibold text-[#111111] focus:border-[#004AAD] outline-none disabled:bg-gray-100 disabled:cursor-not-allowed",
+                      !sameForBoth && touched && validation.errors.left_sph ? "border-red-500 bg-red-50/40" : "border-[#E8EAF2]"
+                    )}
                   >
                     {SPH_OPTIONS.map((opt) => (
                       <option key={`l-sph-${opt}`} value={opt}>
@@ -330,6 +437,9 @@ export default function ContactLensPowerCustomizer({
                       </option>
                     ))}
                   </select>
+                  {!sameForBoth && touched && validation.errors.left_sph && (
+                    <p className="text-[9px] font-semibold text-red-600 mt-1">{validation.errors.left_sph}</p>
+                  )}
                 </div>
 
                 {/* CYL */}
@@ -360,7 +470,10 @@ export default function ContactLensPowerCustomizer({
                     disabled={sameForBoth}
                     value={sameForBoth ? rightEye.axis : leftEye.axis}
                     onChange={(e) => handleLeftChange("axis", e.target.value)}
-                    className="w-full bg-white border border-[#E8EAF2] rounded-xl px-3 py-2 text-xs font-semibold text-[#111111] focus:border-[#004AAD] outline-none disabled:bg-gray-100 disabled:cursor-not-allowed"
+                    className={cn(
+                      "w-full bg-white border rounded-xl px-3 py-2 text-xs font-semibold text-[#111111] focus:border-[#004AAD] outline-none disabled:bg-gray-100 disabled:cursor-not-allowed",
+                      !sameForBoth && touched && validation.errors.left_axis ? "border-red-500 bg-red-50/40" : "border-[#E8EAF2]"
+                    )}
                   >
                     {AXIS_OPTIONS.map((opt) => (
                       <option key={`l-axis-${opt}`} value={opt}>
@@ -368,6 +481,9 @@ export default function ContactLensPowerCustomizer({
                       </option>
                     ))}
                   </select>
+                  {!sameForBoth && touched && validation.errors.left_axis && (
+                    <p className="text-[9px] font-semibold text-red-600 mt-1">{validation.errors.left_axis}</p>
+                  )}
                 </div>
 
 

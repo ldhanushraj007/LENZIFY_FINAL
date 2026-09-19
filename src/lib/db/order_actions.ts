@@ -58,17 +58,28 @@ export async function placeOrder(data: {
   // 3. Create Order Items
   const orderItems = data.items.map(item => ({
     order_id: order.id,
-    product_id: item.id,
+    product_id: item.product_id || item.id,
     quantity: item.quantity,
     price: item.price,
-    lens_id: item.lens_id,
-    prescription_json: item.prescription_json,
+    lens_id: item.lens_id || null,
+    prescription_json: item.prescription_json || null,
     selected_color: item.selected_color || null,
-    selected_size: item.selected_size || null
+    selected_size: item.selected_size || null,
+    gst_rate: item.gst_rate !== undefined ? item.gst_rate : 0.05,
+    gst_amount: item.gst_amount !== undefined ? item.gst_amount : 0
   }));
 
-  const { error: itemsError } = await adminSupabase.from("order_items").insert(orderItems);
-  if (itemsError) return { error: "Item batch insert failure: " + itemsError.message };
+  let { error: itemsError } = await adminSupabase.from("order_items").insert(orderItems);
+  if (itemsError && (itemsError.message?.includes("gst_rate") || itemsError.message?.includes("gst_amount"))) {
+    // Graceful fallback if database migration SQL has not been executed yet
+    const fallbackItems = orderItems.map(({ gst_rate, gst_amount, ...rest }) => rest);
+    const retryResult = await adminSupabase.from("order_items").insert(fallbackItems);
+    itemsError = retryResult.error;
+  }
+  if (itemsError) {
+    console.error("[ORDER] Order items insert failure:", itemsError);
+    return { error: "Item batch insert failure: " + itemsError.message };
+  }
 
   // Admin-facing notification: new order placed
   try {
@@ -87,7 +98,7 @@ export async function placeOrder(data: {
   for (const item of data.items) {
     const { data: decremented, error: stockErr } = await adminSupabase.rpc(
       "decrement_inventory_safe",
-      { p_id: item.id, p_qty: item.quantity }
+      { p_id: item.product_id || item.id, p_qty: item.quantity }
     );
     if (stockErr || decremented === false) {
       if (!paymentAlreadyReceived) {
@@ -97,68 +108,68 @@ export async function placeOrder(data: {
       }
       // Payment already taken — keep the order, flag it for admin review
       console.error(`[ORDER] Stock issue for product ${item.id} on paid order ${order.id}. Manual review needed.`);
-    } else {
-      // Admin-facing notification: low stock crossed (avoid spamming — only fire once per dip)
-      try {
-        const { data: prod } = await adminSupabase.from("products").select("name, stock").eq("id", item.id).single();
-        if (prod && prod.stock <= 5) {
-          const { data: existingAlert } = await adminSupabase
-            .from("notifications")
-            .select("id")
-            .is("user_id", null)
-            .eq("type", "Low Stock")
-            .eq("read", false)
-            .contains("metadata", { product_id: item.id })
-            .limit(1);
-          if (!existingAlert || existingAlert.length === 0) {
-            await adminSupabase.from("notifications").insert({
-              user_id: null,
-              title: "Low Stock",
-              message: `${prod.name} is running low (${prod.stock} left).`,
-              type: "Low Stock",
-              metadata: { product_id: item.id },
-            });
-          }
-        }
-      } catch {}
     }
   }
 
-  // 4. Handle Prescription
-  if (data.prescription) {
+  // 4. Comprehensive Prescription & Upload Image Persistence
+  try {
+    let fileUrl = data.prescription?.file_url || null;
+    let rightEyeStr = data.prescription?.right_eye ? (typeof data.prescription.right_eye === "object" ? JSON.stringify(data.prescription.right_eye) : String(data.prescription.right_eye)) : null;
+    let leftEyeStr = data.prescription?.left_eye ? (typeof data.prescription.left_eye === "object" ? JSON.stringify(data.prescription.left_eye) : String(data.prescription.left_eye)) : null;
+    let pdVal = parseFloat(data.prescription?.pd) || 0;
+
+    // Scan items for any uploaded prescription file or optical specs
+    for (const item of data.items) {
+      const rx = item.prescription_json;
+      if (!rx) continue;
+
+      if (!fileUrl && rx.file_url) {
+        fileUrl = rx.file_url;
+      }
+
+      if (!rightEyeStr && (rx.od_sph || rx.right_eye)) {
+        if (rx.right_eye) {
+          const re = rx.right_eye;
+          rightEyeStr = `SPH: ${re.sph || '0.00'} | CYL: ${re.cyl || '0.00'} | AXIS: ${re.axis || 'None'} | BC: ${re.bc || '8.6'} | DIA: ${re.dia || '14.2'}${re.add && re.add !== 'None' ? ` | ADD: ${re.add}` : ''}`;
+        } else if (rx.od_sph) {
+          rightEyeStr = `SPH: ${rx.od_sph || '0.00'}${rx.od_cyl ? ` | CYL: ${rx.od_cyl}` : ''}${rx.od_axis ? ` | AXIS: ${rx.od_axis}` : ''}${rx.od_add ? ` | ADD: ${rx.od_add}` : ''}`;
+        }
+      }
+
+      if (!leftEyeStr && (rx.os_sph || rx.left_eye)) {
+        if (rx.left_eye) {
+          const le = rx.left_eye;
+          leftEyeStr = `SPH: ${le.sph || '0.00'} | CYL: ${le.cyl || '0.00'} | AXIS: ${le.axis || 'None'} | BC: ${le.bc || '8.6'} | DIA: ${le.dia || '14.2'}${le.add && le.add !== 'None' ? ` | ADD: ${le.add}` : ''}`;
+        } else if (rx.os_sph) {
+          leftEyeStr = `SPH: ${rx.os_sph || '0.00'}${rx.os_cyl ? ` | CYL: ${rx.os_cyl}` : ''}${rx.os_axis ? ` | AXIS: ${rx.os_axis}` : ''}${rx.os_add ? ` | ADD: ${rx.os_add}` : ''}`;
+        }
+      }
+
+      if (!rightEyeStr && rx.reading_power) {
+        rightEyeStr = `Reading Power: ${rx.reading_power}`;
+        leftEyeStr = `Reading Power: ${rx.reading_power}`;
+      }
+
+      if (!pdVal && rx.pd) {
+        pdVal = parseFloat(rx.pd) || 0;
+      }
+    }
+
+    if (rightEyeStr || leftEyeStr || fileUrl || pdVal > 0) {
       const { error: prescError } = await adminSupabase.from("prescriptions").insert({
-          user_id: user.id,
-          order_id: order.id,
-          left_eye: typeof data.prescription.left_eye === "object" ? JSON.stringify(data.prescription.left_eye) : data.prescription.left_eye,
-          right_eye: typeof data.prescription.right_eye === "object" ? JSON.stringify(data.prescription.right_eye) : data.prescription.right_eye,
-          pd: parseFloat(data.prescription.pd) || 0,
-          file_url: data.prescription.file_url
+        user_id: user.id,
+        order_id: order.id,
+        right_eye: rightEyeStr || "Not Specified",
+        left_eye: leftEyeStr || "Not Specified",
+        pd: pdVal,
+        file_url: fileUrl
       });
       if (prescError) {
-          console.error("Prescription Error:", prescError);
+        console.error("[ORDER] Prescription insert error:", prescError.message, prescError.details);
       }
-  } else {
-      // Check if any cart item has contact lens prescription details
-      const clItem = data.items.find((i: any) => i.prescription_json?.is_contact_lens || i.prescription_json?.right_eye);
-      if (clItem) {
-          const rx = clItem.prescription_json;
-          const rightEye = rx.right_eye || {};
-          const leftEye = rx.left_eye || {};
-          const rightStr = `SPH: ${rightEye.sph || '0.00'} | CYL: ${rightEye.cyl || '0.00'} | AXIS: ${rightEye.axis || 'None'} | BC: ${rightEye.bc || '8.6'} | DIA: ${rightEye.dia || '14.2'}${rightEye.add && rightEye.add !== 'None' ? ` | ADD: ${rightEye.add}` : ''}`;
-          const leftStr = `SPH: ${leftEye.sph || '0.00'} | CYL: ${leftEye.cyl || '0.00'} | AXIS: ${leftEye.axis || 'None'} | BC: ${leftEye.bc || '8.6'} | DIA: ${leftEye.dia || '14.2'}${leftEye.add && leftEye.add !== 'None' ? ` | ADD: ${leftEye.add}` : ''}`;
-
-          try {
-            await adminSupabase.from("prescriptions").insert({
-                user_id: user.id,
-                order_id: order.id,
-                right_eye: rightStr,
-                left_eye: leftStr,
-                pd: 0
-            });
-          } catch (err: any) {
-            console.error("Contact Lens Prescription Save Error:", err);
-          }
-      }
+    }
+  } catch (rxErr: any) {
+    console.error("[ORDER] Prescription processing exception:", rxErr?.message);
   }
   
   // 5. Record Payment

@@ -48,17 +48,15 @@ function InfoRow({ label, value }: { label: string; value?: string | null }) {
 export default async function OrderDetailPage({ params, searchParams }: { params: Promise<{ id: string }>; searchParams: Promise<{ saved?: string }> }) {
   const { id } = await params;
   const { saved } = await searchParams;
-  const supabase = await createClient();
   const adminSupabase = await createAdminClient();
 
-  const { data: order, error } = await supabase
+  const { data: order, error } = await adminSupabase
     .from("orders")
     .select(`
       *,
       addresses(*),
       order_items(*, products(name, brand, product_images(*)), lenses(name)),
-      prescriptions(*),
-      order_status_history(id, status, note, updated_by, created_at)
+      prescriptions(*)
     `)
     .eq("id", id)
     .single();
@@ -318,15 +316,34 @@ export default async function OrderDetailPage({ params, searchParams }: { params
                         <p className="text-[10px] text-[#AAAAAA]">Lens</p>
                         <p className="text-xs text-[#333333]">{item.lenses?.name || item.lens_type || "Frame Only"}</p>
                       </div>
-                      <div>
-                        <p className="text-[10px] text-[#AAAAAA]">Power</p>
-                        <p className="text-xs text-[#333333]">
-                          {item.prescription_json
-                            ? `L: ${item.prescription_json.os_sph || "0.00"} | R: ${item.prescription_json.od_sph || "0.00"}`
-                            : `L: ${item.power_left || "PL"} | R: ${item.power_right || "PL"}`}
-                        </p>
-                      </div>
-                       {item.selected_color && (
+                      {item.prescription_json?.reading_power ? (
+                        <div>
+                          <p className="text-[10px] text-[#AAAAAA]">Reading Power</p>
+                          <span className="inline-block text-xs font-bold text-[#004AAD] bg-blue-50 border border-blue-200 px-2 py-0.5 rounded">
+                            {item.prescription_json.reading_power}
+                          </span>
+                        </div>
+                      ) : (
+                        <div>
+                          <p className="text-[10px] text-[#AAAAAA]">Power</p>
+                          <p className="text-xs text-[#333333]">
+                            {item.prescription_json?.os_sph || item.prescription_json?.od_sph
+                              ? `L: ${item.prescription_json.os_sph || "0.00"} | R: ${item.prescription_json.od_sph || "0.00"}`
+                              : `L: ${item.power_left || "PL"} | R: ${item.power_right || "PL"}`}
+                          </p>
+                        </div>
+                      )}
+                      {item.prescription_json?.lens_package && (
+                        <div>
+                          <p className="text-[10px] text-[#AAAAAA]">Lens Package</p>
+                          <p className="text-xs text-[#333333] font-medium capitalize">
+                            {item.prescription_json.lens_package}
+                            {item.prescription_json.lens_tier ? ` (${item.prescription_json.lens_tier})` : ""}
+                            {item.prescription_json.lens_index ? ` · Index ${item.prescription_json.lens_index}` : ""}
+                          </p>
+                        </div>
+                      )}
+                      {item.selected_color && (
                         <div>
                           <p className="text-[10px] text-[#AAAAAA]">Color</p>
                           <p className="text-xs text-[#333333]">{item.selected_color}</p>
@@ -344,16 +361,18 @@ export default async function OrderDetailPage({ params, searchParams }: { params
                       </div>
                     </div>
 
-                    {/* Contact Lens Clinical Prescription Matrix */}
-                    {item.prescription_json?.right_eye && (
+                    {/* Clinical Prescription Matrix (Contact Lens or Eyeglasses) */}
+                    {(item.prescription_json?.right_eye || item.prescription_json?.left_eye) && (
                       <div className="mt-4 pt-3 border-t border-[#ECEFF5] bg-[#F8F9FC] p-3.5 rounded-xl border border-[#ECEFF5]">
                         <div className="flex items-center justify-between mb-2">
                           <p className="text-[10px] uppercase font-bold tracking-widest text-[#004AAD] flex items-center gap-1">
-                            Contact Lens Prescription Matrix
+                            Clinical Prescription Matrix
                           </p>
-                          <span className="text-[9px] font-bold text-emerald-700 bg-emerald-100 px-2 py-0.5 rounded-md">
-                            Custom Prescription
-                          </span>
+                          {item.prescription_json.pd && (
+                            <span className="text-[10px] font-semibold text-[#555555]">
+                              PD: <strong className="text-[#111111]">{item.prescription_json.pd} mm</strong>
+                            </span>
+                          )}
                         </div>
                         <div className="overflow-x-auto">
                           <table className="w-full text-left text-xs bg-white rounded-lg border border-[#E8EAF2] overflow-hidden">
@@ -371,16 +390,16 @@ export default async function OrderDetailPage({ params, searchParams }: { params
                             <tbody className="divide-y divide-[#E8EAF2] font-mono text-[11px] font-semibold text-[#111111]">
                               <tr>
                                 <td className="px-2.5 py-1.5 font-sans font-bold text-[#004AAD]">Right (OD)</td>
-                                <td className="px-2.5 py-1.5">{item.prescription_json.right_eye.sph || "—"}</td>
-                                <td className="px-2.5 py-1.5">{item.prescription_json.right_eye.cyl || "—"}</td>
-                                <td className="px-2.5 py-1.5">{item.prescription_json.right_eye.axis || "—"}</td>
-                                <td className="px-2.5 py-1.5">{item.prescription_json.right_eye.bc ? `${item.prescription_json.right_eye.bc} mm` : "—"}</td>
-                                <td className="px-2.5 py-1.5">{item.prescription_json.right_eye.dia ? `${item.prescription_json.right_eye.dia} mm` : "—"}</td>
-                                <td className="px-2.5 py-1.5">{item.prescription_json.right_eye.add || "—"}</td>
+                                <td className="px-2.5 py-1.5">{item.prescription_json.right_eye?.sph || "0.00"}</td>
+                                <td className="px-2.5 py-1.5">{item.prescription_json.right_eye?.cyl || "—"}</td>
+                                <td className="px-2.5 py-1.5">{item.prescription_json.right_eye?.axis || "—"}</td>
+                                <td className="px-2.5 py-1.5">{item.prescription_json.right_eye?.bc ? `${item.prescription_json.right_eye.bc} mm` : "—"}</td>
+                                <td className="px-2.5 py-1.5">{item.prescription_json.right_eye?.dia ? `${item.prescription_json.right_eye.dia} mm` : "—"}</td>
+                                <td className="px-2.5 py-1.5">{item.prescription_json.right_eye?.add || "—"}</td>
                               </tr>
                               <tr>
                                 <td className="px-2.5 py-1.5 font-sans font-bold text-[#004AAD]">Left (OS)</td>
-                                <td className="px-2.5 py-1.5">{item.prescription_json.left_eye?.sph || "—"}</td>
+                                <td className="px-2.5 py-1.5">{item.prescription_json.left_eye?.sph || "0.00"}</td>
                                 <td className="px-2.5 py-1.5">{item.prescription_json.left_eye?.cyl || "—"}</td>
                                 <td className="px-2.5 py-1.5">{item.prescription_json.left_eye?.axis || "—"}</td>
                                 <td className="px-2.5 py-1.5">{item.prescription_json.left_eye?.bc ? `${item.prescription_json.left_eye.bc} mm` : "—"}</td>
@@ -390,6 +409,29 @@ export default async function OrderDetailPage({ params, searchParams }: { params
                             </tbody>
                           </table>
                         </div>
+                      </div>
+                    )}
+
+                    {/* Item Uploaded Prescription Slip */}
+                    {item.prescription_json?.file_url && (
+                      <div className="mt-3 p-3 bg-blue-50/50 border border-blue-100 rounded-xl flex items-center justify-between gap-3">
+                        <div className="flex items-center gap-3">
+                          <div className="w-12 h-12 rounded-lg bg-white border border-blue-200 overflow-hidden flex-shrink-0">
+                            <img src={item.prescription_json.file_url} alt="Prescription Slip" className="w-full h-full object-cover" />
+                          </div>
+                          <div>
+                            <p className="text-xs font-semibold text-[#111111]">Uploaded Prescription Slip</p>
+                            <p className="text-[10px] text-[#666666]">Attached by customer for this item</p>
+                          </div>
+                        </div>
+                        <a
+                          href={item.prescription_json.file_url}
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          className="px-3 py-1.5 bg-white border border-[#ECEFF5] rounded-lg text-xs font-semibold text-[#004AAD] hover:bg-blue-50 transition-colors flex items-center gap-1.5"
+                        >
+                          <Download size={13} /> View Slip
+                        </a>
                       </div>
                     )}
                   </div>
@@ -402,30 +444,51 @@ export default async function OrderDetailPage({ params, searchParams }: { params
             </div>
           </div>
 
-          {/* Prescription */}
-          {order.prescriptions?.[0] && (
+          {/* Prescriptions on Order */}
+          {order.prescriptions && order.prescriptions.length > 0 && (
             <div className="bg-white border border-[#ECEFF5] rounded-2xl overflow-hidden">
               <div className="flex items-center gap-2.5 px-6 py-4 border-b border-[#ECEFF5]">
                 <FileText size={15} className="text-[#004AAD]" />
-                <h2 className="text-sm font-semibold text-[#111111]">Prescription</h2>
+                <h2 className="text-sm font-semibold text-[#111111]">Prescription Records ({order.prescriptions.length})</h2>
               </div>
-              <div className="p-6 grid grid-cols-1 md:grid-cols-2 gap-6">
-                <div className="space-y-4">
-                  <InfoRow label="Left Eye" value={order.prescriptions[0].left_eye} />
-                  <InfoRow label="Right Eye" value={order.prescriptions[0].right_eye} />
-                  <InfoRow label="PD" value={order.prescriptions[0].pd?.toString()} />
-                  {order.prescriptions[0].file_url && (
-                    <a href={order.prescriptions[0].file_url} target="_blank"
-                      className="inline-flex items-center gap-2 text-sm font-semibold text-[#004AAD] hover:underline">
-                      <Download size={14} /> Download prescription
-                    </a>
-                  )}
-                </div>
-                {order.prescriptions[0].file_url && (
-                  <div className="aspect-[3/4] bg-[#F4F6F8] rounded-xl overflow-hidden border border-[#ECEFF5]">
-                    <img src={order.prescriptions[0].file_url} className="w-full h-full object-cover" alt="Prescription" />
+              <div className="divide-y divide-[#ECEFF5]">
+                {order.prescriptions.map((rx: any, idx: number) => (
+                  <div key={rx.id || idx} className="p-6 grid grid-cols-1 md:grid-cols-2 gap-6">
+                    <div className="space-y-4">
+                      <div className="flex items-center gap-2">
+                        <span className="text-xs font-semibold text-[#555555]">Record #{idx + 1}</span>
+                        {rx.status && (
+                          <span className="text-[10px] font-bold uppercase tracking-wider bg-blue-50 text-[#004AAD] px-2 py-0.5 rounded">
+                            {rx.status}
+                          </span>
+                        )}
+                      </div>
+                      <InfoRow label="Left Eye (OS)" value={rx.left_eye} />
+                      <InfoRow label="Right Eye (OD)" value={rx.right_eye} />
+                      <InfoRow label="Pupillary Distance (PD)" value={rx.pd ? `${rx.pd} mm` : undefined} />
+                      {rx.admin_notes && <InfoRow label="Admin Notes" value={rx.admin_notes} />}
+                      {(rx.file_url || rx.download_url) && (
+                        <a
+                          href={rx.file_url || rx.download_url}
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          className="inline-flex items-center gap-2 text-sm font-semibold text-[#004AAD] hover:underline"
+                        >
+                          <Download size={14} /> Download / Open Prescription
+                        </a>
+                      )}
+                    </div>
+                    {(rx.file_url || rx.download_url) && (
+                      <div className="aspect-[3/4] bg-[#F4F6F8] rounded-xl overflow-hidden border border-[#ECEFF5] flex items-center justify-center">
+                        <img
+                          src={rx.file_url || rx.download_url}
+                          className="w-full h-full object-contain"
+                          alt={`Prescription ${idx + 1}`}
+                        />
+                      </div>
+                    )}
                   </div>
-                )}
+                ))}
               </div>
             </div>
           )}

@@ -1,12 +1,13 @@
 "use client";
 
-import { useState, useMemo, useRef } from "react";
+import { useState, useMemo, useRef, useEffect } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import { X, CheckCircle2, ChevronRight, ArrowLeft, Info, HelpCircle, Upload, Check } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { createClient } from "@/lib/supabase/client";
 
 import { getIndexOptions, getRecommendedIndexValue, IndexOption } from "@/lib/lens-index-pricing";
+import { resolveProductImage } from "@/lib/image_utils";
 
 interface LensSelectionFlowProps {
   product: any;
@@ -21,6 +22,14 @@ type PackageKey = "standard" | "photochromatic" | "photochromatic_bluecut";
 export default function LensSelectionFlow({ product, availableLenses, onClose, onAddToCart }: LensSelectionFlowProps) {
   const [step, setStep] = useState<Step>("TYPE");
   const [error, setError] = useState<string | null>(null);
+
+  useEffect(() => {
+    const originalOverflow = document.body.style.overflow;
+    document.body.style.overflow = "hidden";
+    return () => {
+      document.body.style.overflow = originalOverflow;
+    };
+  }, []);
   
   // Selections state
   const [selectedType, setSelectedType] = useState<any | null>(null);
@@ -336,16 +345,17 @@ export default function LensSelectionFlow({ product, availableLenses, onClose, o
   };
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-brand-navy/60 backdrop-blur-md">
+    <div data-lenis-prevent className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-brand-navy/60 backdrop-blur-md">
       <motion.div 
+        data-lenis-prevent
         initial={{ opacity: 0, scale: 0.95, y: 20 }}
         animate={{ opacity: 1, scale: 1, y: 0 }}
         exit={{ opacity: 0, scale: 0.95, y: 20 }}
-        className="w-full max-w-5xl bg-white shadow-[0_0_100px_rgba(0,0,0,0.3)] flex flex-col md:flex-row overflow-hidden h-[90vh] min-h-[600px]"
+        className="w-full max-w-5xl bg-white shadow-[0_0_100px_rgba(0,0,0,0.3)] flex flex-col md:flex-row overflow-hidden h-[90vh] max-h-[90vh] min-h-[550px] rounded-2xl"
       >
         {/* Left Side: Dynamic configuration info */}
-        <div className="w-full md:w-[32%] bg-brand-background p-8 border-r border-brand-navy/5 flex flex-col justify-between hidden md:flex">
-          <div className="space-y-8 overflow-y-auto pr-1">
+        <div className="w-full md:w-[32%] bg-brand-background p-8 border-r border-brand-navy/5 flex flex-col justify-between hidden md:flex h-full min-h-0 overflow-hidden">
+          <div data-lenis-prevent className="space-y-8 overflow-y-auto pr-1 flex-1 min-h-0 custom-scrollbar">
             <div>
                <p className="text-[9px] font-bold uppercase tracking-[0.4em] text-secondary italic mb-2">Build Manifest</p>
                <h2 className="text-3xl font-serif italic text-brand-navy tracking-tight leading-none uppercase">Lens Calibration<br/><span className="text-secondary">Protocol</span></h2>
@@ -353,7 +363,7 @@ export default function LensSelectionFlow({ product, availableLenses, onClose, o
 
             <div className="space-y-6">
                <div className="aspect-[4/3] bg-white border border-brand-navy/5 p-6 flex items-center justify-center relative group">
-                  <img src={product.primary_image || product.product_images?.[0]?.image_url || "/placeholder.jpg"} alt={product.name} className="object-contain w-full h-full mix-blend-multiply opacity-80 group-hover:opacity-100 transition-opacity" />
+                  <img src={resolveProductImage(product)} alt={product.name} className="object-contain w-full h-full mix-blend-multiply opacity-80 group-hover:opacity-100 transition-opacity" />
                   <div className="absolute top-2 right-2 px-2 py-1 bg-brand-navy text-white text-[7px] font-bold tracking-widest uppercase italic">Archive Entry</div>
                </div>
                
@@ -406,15 +416,15 @@ export default function LensSelectionFlow({ product, availableLenses, onClose, o
             </div>
           </div>
 
-          <div className="border-t-2 border-brand-navy pt-6">
+          <div className="border-t-2 border-brand-navy pt-6 shrink-0">
              <p className="text-[9px] uppercase font-black tracking-[0.5em] text-secondary italic mb-1">Total Calibrated Value</p>
              <div className="text-3xl font-serif italic text-brand-navy">₹{calculateGrandTotal().toLocaleString()}</div>
           </div>
         </div>
 
         {/* Right Side: Step Matrix */}
-        <div className="w-full md:w-[68%] flex flex-col bg-white overflow-hidden h-full">
-          <header className="p-8 border-b border-brand-navy/5 flex justify-between items-center bg-white/80 backdrop-blur-md sticky top-0 z-20">
+        <div data-lenis-prevent className="w-full md:w-[68%] flex flex-col bg-white overflow-hidden h-full max-h-full min-h-0">
+          <header className="p-8 border-b border-brand-navy/5 flex justify-between items-center bg-white/80 backdrop-blur-md sticky top-0 z-20 shrink-0">
             <div className="flex gap-6 items-center">
                {step !== "TYPE" && (
                    <button onClick={handleBack} className="p-3 border border-brand-navy/10 text-brand-navy hover:text-secondary hover:border-secondary transition-all group">
@@ -429,8 +439,12 @@ export default function LensSelectionFlow({ product, availableLenses, onClose, o
             <button onClick={onClose} className="p-3 text-brand-navy/20 hover:text-secondary transition-colors"><X size={20} /></button>
           </header>
 
-          <div className="flex-grow overflow-y-auto custom-scrollbar bg-white min-h-0">
-             <div className="p-8 lg:p-10 space-y-8">
+          <div 
+            data-lenis-prevent
+            className="flex-1 overflow-y-auto overscroll-contain custom-scrollbar bg-white min-h-0"
+            style={{ scrollbarWidth: 'thin', scrollbarColor: '#004AAD #F0F2F8' }}
+          >
+             <div className="p-8 lg:p-10 space-y-8 pb-24">
              <AnimatePresence mode="wait">
                 {/* STEP 1: LENS TYPE & INLINE PROGRESSIVE TIERS */}
                 {step === "TYPE" && (

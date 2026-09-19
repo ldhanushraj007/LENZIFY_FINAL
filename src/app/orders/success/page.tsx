@@ -23,7 +23,7 @@ function SuccessContent() {
     const supabase = createClient();
     supabase
       .from("orders")
-      .select("*, order_items(*, products(name, product_images(image_url)))")
+      .select("*, order_items(*, products(name, brand, product_images(image_url)), lenses(name))")
       .eq("id", orderId)
       .single()
       .then((res: { data: any }) => setOrder(res.data));
@@ -162,7 +162,17 @@ function SuccessContent() {
                         <p className="font-semibold text-[#111111] text-sm truncate">
                           {item.products?.name || "Product"}
                         </p>
-                        <p className="text-[#999999] text-xs">Qty: {item.quantity}</p>
+                        <div className="flex flex-wrap items-center gap-x-2 gap-y-0.5 text-xs text-[#666666] mt-0.5">
+                          <span>Qty: {item.quantity}</span>
+                          {(item.lenses?.name || item.lens_type) && (
+                            <span>· {item.lenses?.name || item.lens_type}</span>
+                          )}
+                          {item.prescription_json?.reading_power && (
+                            <span className="font-semibold text-[#004AAD]">· Power: {item.prescription_json.reading_power}</span>
+                          )}
+                          {item.selected_color && <span>· Color: {item.selected_color}</span>}
+                          {item.selected_size && <span>· Size: {item.selected_size}</span>}
+                        </div>
                       </div>
                       <p className="font-bold text-[#111111] text-sm flex-shrink-0">
                         ₹{(item.price * item.quantity).toLocaleString()}
@@ -216,12 +226,21 @@ function SuccessContent() {
 
             {/* Actions */}
             <div className="flex flex-col sm:flex-row gap-3">
+              {orderId && (
+                <Link
+                  href={`/orders/${orderId}`}
+                  className="flex-1 flex items-center justify-center gap-2 py-3.5 bg-[#004AAD] text-white rounded-full font-semibold text-sm hover:bg-[#003d99] transition-colors"
+                >
+                  <Package size={16} />
+                  Track This Order
+                </Link>
+              )}
               <Link
                 href="/orders"
                 className="flex-1 flex items-center justify-center gap-2 py-3.5 bg-[#03173D] text-white rounded-full font-semibold text-sm hover:bg-[#004AAD] transition-colors"
               >
                 <Package size={16} />
-                View My Orders
+                View All Orders
               </Link>
               <Link
                 href="/products"

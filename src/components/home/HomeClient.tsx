@@ -358,7 +358,7 @@ function ProductRow({
     const fetchProducts = async () => {
       let query = supabase
         .from("products")
-        .select("*")
+        .select("*, product_images(image_url, is_primary)")
         .eq("is_enabled", true)
         .order("created_at", { ascending: false })
         .limit(4);

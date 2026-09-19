@@ -2,10 +2,10 @@
 
 import { useEffect, useState, Suspense } from "react";
 import { useSearchParams } from "next/navigation";
-import { createClient } from "@/lib/supabase/client";
+import { getOffersData } from "./actions";
 import ProductCard from "@/components/store/ProductCard";
 import { motion, AnimatePresence } from "framer-motion";
-import { Copy, Ticket, Percent, ShoppingBag, Tag, Zap } from "lucide-react";
+import { Copy, Ticket, Percent, ShoppingBag, Tag, Zap, Lock } from "lucide-react";
 import { toast } from "react-hot-toast";
 import { cn } from "@/lib/utils";
 import Link from "next/link";
@@ -21,44 +21,19 @@ function OffersContent() {
   const type = searchParams.get("type") || "discounts";
 
   const [items, setItems] = useState<any[]>([]);
+  const [isAuthenticated, setIsAuthenticated] = useState<boolean | null>(null);
   const [loading, setLoading] = useState(true);
-  const supabase = createClient();
 
   useEffect(() => {
     async function fetchData() {
       setLoading(true);
-      if (type === "coupons") {
-        const { data } = await supabase
-          .from("coupons")
-          .select("*")
-          .eq("is_active", true)
-          .gte("expiry_date", new Date().toISOString());
-        setItems(data || []);
-      } else if (type === "discounts") {
-        const { data } = await supabase
-          .from("products")
-          .select("*")
-          .not("discount_price", "is", null)
-          .eq("is_enabled", true);
-        setItems(data || []);
-      } else if (type === "seasonal-sales") {
-        // Defining seasonal sales as products in a 'Sale' category or having a 'Seasonal Sale' tag
-        const { data } = await supabase
-          .from("products")
-          .select(`
-            *,
-            categories (name)
-          `)
-          .eq("is_enabled", true)
-          .or("tags.cs.{Seasonal-Sale},is_featured.eq.true") // Check for tag or featured sale
-          .not("discount_price", "is", null);
-
-        setItems(data || []);
-      }
+      const res = await getOffersData(type);
+      setIsAuthenticated(res.authenticated);
+      setItems(res.items || []);
       setLoading(false);
     }
     fetchData();
-  }, [type, supabase]);
+  }, [type]);
 
   const copyToClipboard = (code: string) => {
     navigator.clipboard.writeText(code);
@@ -114,8 +89,29 @@ function OffersContent() {
           </h2>
         </div>
 
-        {/* Loading */}
-        {loading ? (
+        {/* Loading / Auth Check */}
+        {!loading && isAuthenticated === false ? (
+          <div className="bg-white rounded-3xl border border-[#ECECEC] shadow-[0_10px_30px_rgba(0,0,0,0.05)] p-12 sm:p-16 text-center max-w-lg mx-auto my-8">
+            <div className="w-16 h-16 bg-[#004AAD]/10 rounded-full flex items-center justify-center mx-auto mb-5 border border-[#004AAD]/20">
+              <Lock size={26} className="text-[#004AAD]" />
+            </div>
+            <p className="text-xs font-bold uppercase tracking-widest text-[#004AAD] mb-2">
+              Member Exclusive
+            </p>
+            <h3 className="text-2xl font-[var(--font-hero)] italic text-[#111111] mb-3">
+              Sign In to Unlock Offers
+            </h3>
+            <p className="text-[#666666] text-sm mb-8 leading-relaxed">
+              Coupon codes, special promotional pricing, and seasonal discounts are reserved exclusively for registered Lenzify members.
+            </p>
+            <Link
+              href="/auth/login?redirect=/offers"
+              className="inline-flex items-center justify-center gap-2 bg-[#03173D] text-white rounded-full px-8 py-3.5 font-semibold hover:bg-[#004AAD] transition-all text-sm shadow-md"
+            >
+              Sign In to View Offers
+            </Link>
+          </div>
+        ) : loading ? (
           <div className={cn(
             "grid gap-6",
             type === "coupons" ? "grid-cols-1 md:grid-cols-2 lg:grid-cols-3" : "grid-cols-2 md:grid-cols-3 lg:grid-cols-4"

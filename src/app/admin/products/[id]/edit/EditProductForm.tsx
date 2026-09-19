@@ -178,13 +178,14 @@ export default function EditProductForm({
          {/* Product Type Selector */}
          <section className="bg-white border border-brand-navy/5 p-8 shadow-sm">
             <h3 className="text-[10px] font-bold uppercase tracking-[0.3em] text-brand-navy mb-4">Product Type Designation</h3>
-            <div className="grid grid-cols-3 gap-6">
+            <div className="grid grid-cols-2 sm:grid-cols-4 gap-4">
                {[
                  { id: "frame", label: "Frame" },
+                 { id: "reading-glasses", label: "Reading Glasses" },
                  { id: "contact-lens", label: "Contact Lenses" },
                  { id: "accessory", label: "Accessory" }
                ].map(({ id: type, label }) => (
-                 <label key={type} className={`cursor-pointer border-2 p-6 transition-all ${(productType === type || (type === "contact-lens" && productType === "lens")) ? 'border-secondary bg-secondary/5' : 'border-brand-navy/5 hover:border-brand-navy/20'}`}>
+                 <label key={type} className={`cursor-pointer border-2 p-4 transition-all ${(productType === type || (type === "contact-lens" && productType === "lens")) ? 'border-secondary bg-secondary/5' : 'border-brand-navy/5 hover:border-brand-navy/20'}`}>
                     <input type="radio" name="product_type" value={type} className="hidden" checked={productType === type || (type === "contact-lens" && productType === "lens")} onChange={() => setProductType(type)} />
                     <span className="text-[11px] font-bold uppercase tracking-widest text-brand-navy block text-center">{label}</span>
                  </label>

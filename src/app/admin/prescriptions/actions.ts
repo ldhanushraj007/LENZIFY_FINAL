@@ -1,14 +1,28 @@
 "use server";
 
-import { createClient } from "@/lib/supabase/server";
+import { createAdminClient } from "@/lib/supabase/server";
 import { revalidatePath } from "next/cache";
+
+export async function getAdminPrescriptions() {
+  const supabase = await createAdminClient();
+  const { data, error } = await supabase
+    .from("prescriptions")
+    .select("*, users(name, email)")
+    .order("created_at", { ascending: false });
+
+  if (error) {
+    console.error("Error fetching admin prescriptions:", error);
+    return [];
+  }
+  return data || [];
+}
 
 export async function updatePrescriptionStatus(
   id: string, 
   status: 'pending' | 'approved' | 'rejected', 
   adminNotes?: string
 ) {
-  const supabase = await createClient();
+  const supabase = await createAdminClient();
 
   const { error } = await supabase
     .from("prescriptions")
@@ -29,7 +43,7 @@ export async function updatePrescriptionStatus(
 }
 
 export async function updatePrescriptionPower(id: string, leftEye: any, rightEye: any, pd: number) {
-  const supabase = await createClient();
+  const supabase = await createAdminClient();
 
   const { error } = await supabase
     .from("prescriptions")
@@ -51,7 +65,7 @@ export async function updatePrescriptionPower(id: string, leftEye: any, rightEye
 }
 
 export async function deletePrescription(id: string) {
-    const supabase = await createClient();
+    const supabase = await createAdminClient();
     const { error } = await supabase.from("prescriptions").delete().eq("id", id);
   
     if (error) {

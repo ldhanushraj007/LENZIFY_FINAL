@@ -2,8 +2,7 @@
 
 import { useState, useEffect } from "react";
 import { FileText, Search, CheckCircle2, XCircle, Download, Trash2, Hash } from "lucide-react";
-import { createClient } from "@/lib/supabase/client";
-import { updatePrescriptionStatus, deletePrescription } from "./actions";
+import { updatePrescriptionStatus, deletePrescription, getAdminPrescriptions } from "./actions";
 import { cn } from "@/lib/utils";
 import Link from "next/link";
 
@@ -12,18 +11,13 @@ export default function AdminPrescriptionsPage() {
   const [loading, setLoading] = useState(true);
   const [searchQuery, setSearchQuery] = useState("");
 
-  const supabase = createClient();
-
   useEffect(() => {
     fetchPrescriptions();
   }, []);
 
   async function fetchPrescriptions() {
     setLoading(true);
-    const { data } = await supabase
-      .from("prescriptions")
-      .select("*, users(name, email)")
-      .order("created_at", { ascending: false });
+    const data = await getAdminPrescriptions();
     if (data) setPrescriptions(data);
     setLoading(false);
   }

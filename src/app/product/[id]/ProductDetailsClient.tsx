@@ -18,7 +18,9 @@ import ReviewForm from "@/components/shop/ReviewForm";
 import { ProductJsonLd } from "@/components/seo/JsonLd";
 import ProductCard from "@/components/store/ProductCard";
 import toast from "react-hot-toast";
-import ContactLensPowerCustomizer, { ContactLensPrescriptionData } from "@/components/store/ContactLensPowerCustomizer";
+import ContactLensPowerCustomizer, { ContactLensPrescriptionData, validateContactLensPower } from "@/components/store/ContactLensPowerCustomizer";
+import LoginPromptModal from "@/components/auth/LoginPromptModal";
+import { resolveProductImage } from "@/lib/image_utils";
 
 interface ProductDetailsClientProps {
   product: any;
@@ -43,6 +45,8 @@ export default function ProductDetailsClient({
   const addItem = useCartStore((state) => state.addItem);
   const { addItem: addToWishlist, removeItem: removeFromWishlist, isInWishlist: isItemInWishlist } = useWishlistStore();
   const [isInWish, setIsInWish] = useState(isInWishlist);
+  const [showLoginModal, setShowLoginModal] = useState(false);
+  const [loginModalMessage, setLoginModalMessage] = useState("Please log in to add items to your cart");
 
   const [activeTab, setActiveTab] = useState<"description" | "specs" | "reviews">("description");
 
@@ -54,6 +58,17 @@ export default function ProductDetailsClient({
       product.category === "contact-lenses" ||
       product.categories?.slug === "contact-lenses" ||
       (Array.isArray(product.categories) && product.categories.some((c: any) => c.slug === "contact-lenses"))
+    );
+  }, [product.product_type, product.category, product.categories]);
+
+  const isReadingGlasses = useMemo(() => {
+    return (
+      product.product_type === "reading-glasses" ||
+      product.product_type === "reading_glasses" ||
+      product.category === "Reading Glasses" ||
+      product.category === "reading-glasses" ||
+      product.categories?.slug === "reading-glasses" ||
+      (Array.isArray(product.categories) && product.categories.some((c: any) => c.slug === "reading-glasses"))
     );
   }, [product.product_type, product.category, product.categories]);
 
@@ -70,6 +85,7 @@ export default function ProductDetailsClient({
   }, [product.specifications]);
 
   const [customPower, setCustomPower] = useState<ContactLensPrescriptionData | null>(null);
+  const [readingPower, setReadingPower] = useState<string>("");
   const parsedColors = useMemo(() => {
     if (!product.colors) return [];
     return product.colors.map((colorItem: any) => {
@@ -119,21 +135,20 @@ export default function ProductDetailsClient({
   const [viewMode, setViewMode] = useState<"static" | "360">("static");
   const [showLensFlow, setShowLensFlow] = useState(false);
 
-  const getPrimaryImage = () => {
-    const p = product.primary_image;
-    if (p && p !== "/placeholder.jpg" && !p.startsWith("/placeholder")) return p;
-    const primaryImg = product.product_images?.find((img: any) => img.is_primary);
-    const bestImg = primaryImg || product.product_images?.[0];
-    if (bestImg?.image_url && bestImg.image_url !== "/placeholder.jpg") return bestImg.image_url;
-    return "/placeholder.jpg";
-  };
-  const initialPrimaryImage = getPrimaryImage();
+  const initialPrimaryImage = resolveProductImage(product);
   const [mainImageSrc, setMainImageSrc] = useState(initialPrimaryImage);
 
   const handleAddToCart = async (lensData?: any, isBuyNow: boolean = false) => {
+    const activeUser = currentUser || user;
+    if (!activeUser) {
+      setLoginModalMessage(isBuyNow ? "Please log in to complete your purchase" : "Please log in to add items to your cart");
+      setShowLoginModal(true);
+      return;
+    }
+
     const displayPrice = (product.discount_price || product.price) + (lensData?.lens_price || 0);
 
-    const cartItemId = `${product.id}-${selectedColor || ''}-${selectedSize || ''}-${lensData?.lens_id || ''}-${customPower ? 'rx' : ''}`;
+    const cartItemId = `${product.id}-${selectedColor || ''}-${selectedSize || ''}-${lensData?.lens_id || ''}-${customPower ? 'rx' : ''}-${readingPower ? `rp-${readingPower}` : ''}`;
     const cartItem = {
       id: cartItemId,
       product_id: product.id,
@@ -141,17 +156,22 @@ export default function ProductDetailsClient({
       brand: product.brand || "LENZIFY",
       price: displayPrice,
       image: mainImageSrc || "/placeholder.jpg",
-      category: isContactLens ? "Contact Lenses" : "Eyewear",
-      product_type: product.product_type,
+      category: isContactLens ? "Contact Lenses" : isReadingGlasses ? "Reading Glasses" : "Eyewear",
+      product_type: product.product_type || (isReadingGlasses ? "reading-glasses" : "frame"),
       quantity: 1,
       stock: product.stock,
       selected_color: selectedColor,
       selected_size: selectedSize,
-      lens_name: isContactLens
+      reading_power: isReadingGlasses ? readingPower : undefined,
+      lens_name: isReadingGlasses
+        ? `Reading Lens (${readingPower})`
+        : isContactLens
         ? (customPower ? "Custom Power Lenses" : "Standard Contact Lens")
         : (lensData?.lens_config?.type?.name || lensData?.lens_name),
       lens_config: lensData?.lens_config,
-      prescription: customPower || lensData?.prescription_json,
+      prescription: isReadingGlasses
+        ? { reading_power: readingPower }
+        : (customPower || lensData?.prescription_json),
     };
 
     // 1. Always add to local persistent cart
@@ -178,7 +198,9 @@ export default function ProductDetailsClient({
           price: displayPrice,
           lens_id: lensData?.lens_id || null,
           lens_config: lensData?.lens_config || null,
-          prescription_json: customPower || lensData?.prescription_json || null
+          prescription_json: isReadingGlasses
+            ? { reading_power: readingPower }
+            : (customPower || lensData?.prescription_json || null)
         });
       }
 
@@ -215,8 +237,10 @@ export default function ProductDetailsClient({
   };
 
   const handleWishlist = async () => {
-    if (!currentUser) {
-      router.push(`/auth/login?redirect=${encodeURIComponent(window.location.pathname)}`);
+    const activeUser = currentUser || user;
+    if (!activeUser) {
+      setLoginModalMessage("Please log in to save items to your wishlist");
+      setShowLoginModal(true);
       return;
     }
     const res = await toggleWishlist(product.id);
@@ -229,6 +253,16 @@ export default function ProductDetailsClient({
             setIsInWish(true);
         }
     }
+  };
+
+  const handleOpenLensFlow = () => {
+    const activeUser = currentUser || user;
+    if (!activeUser) {
+      setLoginModalMessage("Please log in to customize lenses and proceed with your order");
+      setShowLoginModal(true);
+      return;
+    }
+    setShowLensFlow(true);
   };
 
   const primaryImage = product.product_images?.find((img: any) => img.is_primary)?.image_url || product.product_images?.[0]?.image_url;
@@ -326,7 +360,15 @@ export default function ProductDetailsClient({
                     alt={product.name}
                     fill
                     priority
-                    onError={() => setMainImageSrc("/placeholder.jpg")}
+                    unoptimized
+                    onError={() => {
+                      const raw = product.primary_image || product.product_images?.[0]?.image_url;
+                      if (raw && raw !== mainImageSrc && raw !== "/placeholder.jpg") {
+                        setMainImageSrc(raw);
+                      } else {
+                        setMainImageSrc("/placeholder.jpg");
+                      }
+                    }}
                     className="object-contain w-full h-full group-hover:scale-105 transition-transform duration-700"
                   />
 
@@ -366,27 +408,31 @@ export default function ProductDetailsClient({
             {/* Thumbnail strip */}
             {product.product_images && product.product_images.length > 1 && (
               <div className="flex gap-3 overflow-x-auto pb-1">
-                {product.product_images.map((img: any) => (
-                  <button
-                    key={img.id}
-                    onClick={() => { setMainImageSrc(img.image_url); setViewMode("static"); }}
-                    suppressHydrationWarning
-                    className={cn(
-                      "flex-shrink-0 w-20 h-20 rounded-2xl bg-[#F8F9FC] border-2 cursor-pointer overflow-hidden transition-all duration-200",
-                      mainImageSrc === img.image_url
-                        ? "border-[#03173D]"
-                        : "border-transparent hover:border-[#004AAD]/30"
-                    )}
-                  >
-                    <Image
-                      src={img.image_url}
-                      alt="Product thumbnail"
-                      width={80}
-                      height={80}
-                      className="object-contain w-full h-full p-2"
-                    />
-                  </button>
-                ))}
+                {product.product_images.map((img: any) => {
+                  const resolvedThumb = resolveProductImage({ primary_image: img.image_url });
+                  return (
+                    <button
+                      key={img.id}
+                      onClick={() => { setMainImageSrc(resolvedThumb); setViewMode("static"); }}
+                      suppressHydrationWarning
+                      className={cn(
+                        "flex-shrink-0 w-20 h-20 rounded-2xl bg-[#F8F9FC] border-2 cursor-pointer overflow-hidden transition-all duration-200",
+                        mainImageSrc === resolvedThumb
+                          ? "border-[#03173D]"
+                          : "border-transparent hover:border-[#004AAD]/30"
+                      )}
+                    >
+                      <Image
+                        src={resolvedThumb}
+                        alt="Product thumbnail"
+                        width={80}
+                        height={80}
+                        unoptimized
+                        className="object-contain w-full h-full p-2"
+                      />
+                    </button>
+                  );
+                })}
               </div>
             )}
           </div>
@@ -542,7 +588,7 @@ export default function ProductDetailsClient({
             {product.product_type === "frame" && (
               <div className="bg-[#F8F9FC] rounded-2xl p-4 border border-[#ECECEC]">
                 <button
-                  onClick={() => setShowLensFlow(true)}
+                  onClick={handleOpenLensFlow}
                   suppressHydrationWarning
                   className="w-full flex items-center justify-between text-left"
                 >
@@ -567,10 +613,10 @@ export default function ProductDetailsClient({
 
             {/* Action buttons */}
             <div className="space-y-3">
-              {product.product_type === "frame" ? (
+              {product.product_type === "frame" && !isReadingGlasses ? (
                 <>
                   <button
-                    onClick={() => setShowLensFlow(true)}
+                    onClick={handleOpenLensFlow}
                     disabled={product.stock <= 0}
                     suppressHydrationWarning
                     className="w-full bg-[#03173D] text-white rounded-full py-4 font-semibold flex items-center justify-center gap-2 hover:bg-[#004AAD] transition-all disabled:opacity-40 disabled:pointer-events-none"
@@ -597,28 +643,85 @@ export default function ProductDetailsClient({
                         onChange={setCustomPower}
                         productDefaultBc={parsedContactSpecs.base_curve || "8.6"}
                         productDefaultDia={parsedContactSpecs.diameter || "14.2"}
+                        required={true}
                       />
                     </div>
                   )}
 
-                  <button
-                    onClick={() => handleAddToCart(undefined, false)}
-                    disabled={product.stock <= 0}
-                    suppressHydrationWarning
-                    className="w-full bg-[#03173D] text-white rounded-full py-4 font-semibold flex items-center justify-center gap-2 hover:bg-[#004AAD] transition-all disabled:opacity-40 disabled:pointer-events-none"
-                  >
-                    <ShoppingBag size={18} />
-                    {product.stock > 0 ? "Add to Cart" : "Out of Stock"}
-                  </button>
-                  {product.stock > 0 && (
-                    <button
-                      onClick={() => handleAddToCart(undefined, true)}
-                      suppressHydrationWarning
-                      className="w-full border border-[#03173D] text-[#03173D] rounded-full py-4 font-semibold hover:bg-[#03173D] hover:text-white transition-all"
-                    >
-                      Buy Now
-                    </button>
+                  {/* Reading Power Selector for Reading Glasses */}
+                  {isReadingGlasses && (
+                    <div className="mb-4 p-4 bg-[#F8F9FC] border border-[#ECEFF5] rounded-2xl space-y-3">
+                      <div className="flex items-center justify-between">
+                        <div>
+                          <p className="text-xs font-bold uppercase tracking-wider text-[#111111]">
+                            Select Reading Power <span className="text-red-500">*</span>
+                          </p>
+                          <p className="text-[11px] text-[#666666]">Choose magnification strength</p>
+                        </div>
+                        {readingPower && (
+                          <span className="text-xs font-bold text-[#004AAD] bg-blue-50 border border-blue-200 px-2.5 py-0.5 rounded-full">
+                            {readingPower}
+                          </span>
+                        )}
+                      </div>
+                      <div className="grid grid-cols-4 sm:grid-cols-6 gap-2">
+                        {["+1.00", "+1.25", "+1.50", "+1.75", "+2.00", "+2.25", "+2.50", "+2.75", "+3.00", "+3.25", "+3.50"].map((p) => (
+                          <button
+                            key={p}
+                            type="button"
+                            onClick={() => setReadingPower(p)}
+                            className={cn(
+                              "py-2 px-1 text-xs font-bold rounded-xl border transition-all text-center",
+                              readingPower === p
+                                ? "bg-[#004AAD] text-white border-[#004AAD] shadow-sm"
+                                : "bg-white text-[#111111] border-[#ECEFF5] hover:border-[#004AAD]/40"
+                            )}
+                          >
+                            {p}
+                          </button>
+                        ))}
+                      </div>
+                    </div>
                   )}
+
+                  {(() => {
+                    const isClValid = isContactLens ? validateContactLensPower(customPower).isValid : true;
+                    const isRgValid = isReadingGlasses ? !!readingPower : true;
+                    const canPurchase = isClValid && isRgValid;
+                    return (
+                      <>
+                        <button
+                          onClick={() => handleAddToCart(undefined, false)}
+                          disabled={product.stock <= 0 || !canPurchase}
+                          suppressHydrationWarning
+                          className="w-full bg-[#03173D] text-white rounded-full py-4 font-semibold flex items-center justify-center gap-2 hover:bg-[#004AAD] transition-all disabled:opacity-40 disabled:pointer-events-none"
+                        >
+                          <ShoppingBag size={18} />
+                          {product.stock > 0 ? "Add to Cart" : "Out of Stock"}
+                        </button>
+                        {product.stock > 0 && (
+                          <button
+                            onClick={() => handleAddToCart(undefined, true)}
+                            disabled={!canPurchase}
+                            suppressHydrationWarning
+                            className="w-full border border-[#03173D] text-[#03173D] rounded-full py-4 font-semibold hover:bg-[#03173D] hover:text-white transition-all disabled:opacity-40 disabled:pointer-events-none"
+                          >
+                            Buy Now
+                          </button>
+                        )}
+                        {isContactLens && !isClValid && (
+                          <p className="text-[11px] font-semibold text-amber-800 bg-amber-50/90 border border-amber-200/80 px-4 py-2.5 rounded-2xl text-center leading-relaxed">
+                            ⚠️ Power Customization Required: Please configure your left and right eye power above to enable purchasing.
+                          </p>
+                        )}
+                        {isReadingGlasses && !isRgValid && (
+                          <p className="text-[11px] font-semibold text-amber-800 bg-amber-50/90 border border-amber-200/80 px-4 py-2.5 rounded-2xl text-center leading-relaxed">
+                            ⚠️ Reading Power Required: Please select your reading magnification strength above before adding to cart.
+                          </p>
+                        )}
+                      </>
+                    );
+                  })()}
                 </>
               )}
 
@@ -848,6 +951,13 @@ export default function ProductDetailsClient({
           </section>
         )}
       </main>
+
+      <LoginPromptModal
+        isOpen={showLoginModal}
+        onClose={() => setShowLoginModal(false)}
+        title="Sign in to continue"
+        message={loginModalMessage}
+      />
     </div>
   );
 }

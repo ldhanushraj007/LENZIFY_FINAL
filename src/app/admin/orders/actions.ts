@@ -7,7 +7,7 @@ import { updateOrderStatus } from "@/lib/db/order_actions";
 export { updateOrderStatus };
 
 export async function updatePaymentStatus(orderId: string, payment_status: string) {
-  const supabase = await createClient();
+  const supabase = await createAdminClient();
 
   const { error } = await supabase
     .from("orders")
@@ -65,7 +65,7 @@ export async function cancelOrder(orderId: string, reason?: string) {
 }
 
 export async function refundOrder(orderId: string) {
-  const supabase = await createClient();
+  const supabase = await createAdminClient();
   
   // Update both status and payment
   const { error } = await supabase

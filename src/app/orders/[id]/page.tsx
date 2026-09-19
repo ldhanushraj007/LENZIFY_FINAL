@@ -1,7 +1,7 @@
 import { createClient } from "@/lib/supabase/server";
 import {
   Package, Truck, CheckCircle2, ChevronLeft, AlertCircle,
-  MapPin, CreditCard, Clock, RotateCcw, X, Calendar,
+  MapPin, CreditCard, Clock, RotateCcw, X, Calendar, FileText, Download,
 } from "lucide-react";
 import Link from "next/link";
 import { cn } from "@/lib/utils";
@@ -56,8 +56,8 @@ export default async function OrderTrackingPage({ params }: { params: Promise<{ 
       *,
       users(name, email, phone),
       addresses(*),
-      order_items(*, products(name, brand, product_images(*))),
-      order_status_history(id, status, note, updated_by, created_at)
+      order_items(*, products(name, brand, product_images(*)), lenses(name)),
+      prescriptions(*)
     `)
     .eq("id", id)
     .eq("user_id", user.id)
@@ -288,29 +288,159 @@ export default async function OrderTrackingPage({ params }: { params: Promise<{ 
         {!isReplacement && order?.order_items?.length > 0 && (
           <div className="bg-white rounded-3xl border border-[#ECECEC] shadow-[0_4px_20px_rgba(0,0,0,0.05)] p-6 sm:p-8">
             <p className="text-xs font-semibold uppercase tracking-widest text-[#004AAD] mb-6">Items Ordered</p>
-            <div className="space-y-5 divide-y divide-[#F5F5F5]">
+            <div className="space-y-6 divide-y divide-[#F5F5F5]">
               {order.order_items.map((item: any) => (
-                <div key={item.id} className="flex items-center gap-4 pt-5 first:pt-0">
-                  <div className="w-16 h-16 bg-[#F8F9FC] border border-[#ECECEC] rounded-2xl overflow-hidden flex items-center justify-center flex-shrink-0">
-                    <img
-                      src={item.products?.product_images?.[0]?.image_url || "/placeholder.jpg"}
-                      className="w-full h-full object-contain p-1"
-                      alt={item.products?.name}
-                    />
+                <div key={item.id} className="pt-6 first:pt-0 space-y-4">
+                  <div className="flex items-start gap-4">
+                    <div className="w-16 h-16 bg-[#F8F9FC] border border-[#ECECEC] rounded-2xl overflow-hidden flex items-center justify-center flex-shrink-0">
+                      <img
+                        src={item.products?.product_images?.[0]?.image_url || "/placeholder.jpg"}
+                        className="w-full h-full object-contain p-1"
+                        alt={item.products?.name}
+                      />
+                    </div>
+                    <div className="flex-1 min-w-0">
+                      <div className="flex justify-between items-start gap-2">
+                        <div>
+                          <p className="font-semibold text-[#111111] text-sm">{item.products?.name}</p>
+                          <p className="text-[#666666] text-xs mt-0.5">
+                            {item.products?.brand} · Qty: {item.quantity}
+                            {item.selected_color && ` · Color: ${item.selected_color}`}
+                            {item.selected_size && ` · Size: ${item.selected_size}`}
+                          </p>
+                        </div>
+                        <p className="font-semibold text-[#111111] text-sm flex-shrink-0">₹{Number(item.price || 0).toLocaleString("en-IN")}</p>
+                      </div>
+
+                      {/* Lens & Power details */}
+                      <div className="flex flex-wrap items-center gap-2.5 mt-2.5">
+                        <span className="text-[11px] font-medium bg-[#F4F6F8] text-[#444444] px-2.5 py-1 rounded-lg">
+                          Lens: {item.lenses?.name || item.lens_type || "Frame Only"}
+                        </span>
+                        {item.prescription_json?.reading_power ? (
+                          <span className="text-[11px] font-bold bg-blue-50 text-[#004AAD] border border-blue-200 px-2.5 py-1 rounded-lg">
+                            Reading Power: {item.prescription_json.reading_power}
+                          </span>
+                        ) : (
+                          (item.prescription_json?.os_sph || item.prescription_json?.od_sph || item.power_left || item.power_right) && (
+                            <span className="text-[11px] font-medium bg-[#F4F6F8] text-[#444444] px-2.5 py-1 rounded-lg">
+                              Power: {item.prescription_json?.os_sph || item.prescription_json?.od_sph 
+                                ? `L: ${item.prescription_json.os_sph || "0.00"} | R: ${item.prescription_json.od_sph || "0.00"}`
+                                : `L: ${item.power_left || "PL"} | R: ${item.power_right || "PL"}`}
+                            </span>
+                          )
+                        )}
+                        {item.prescription_json?.lens_package && (
+                          <span className="text-[11px] font-medium bg-blue-50/50 text-[#004AAD] px-2.5 py-1 rounded-lg capitalize">
+                            {item.prescription_json.lens_package}
+                            {item.prescription_json.lens_tier ? ` (${item.prescription_json.lens_tier})` : ""}
+                          </span>
+                        )}
+                      </div>
+                    </div>
                   </div>
-                  <div className="flex-1 min-w-0">
-                    <p className="font-semibold text-[#111111] truncate text-sm">{item.products?.name}</p>
-                    <p className="text-[#666666] text-xs mt-0.5">
-                      {item.products?.brand} · Qty: {item.quantity}
-                      {item.selected_color && ` · Color: ${item.selected_color}`}
-                      {item.selected_size && ` · Size: ${item.selected_size}`}
-                    </p>
-                  </div>
-                  <p className="font-semibold text-[#111111] text-sm flex-shrink-0">₹{Number(item.price || 0).toLocaleString("en-IN")}</p>
+
+                  {/* Clinical Prescription Matrix if custom powers attached */}
+                  {(item.prescription_json?.right_eye || item.prescription_json?.left_eye) && (
+                    <div className="bg-[#F8F9FC] border border-[#ECECEC] rounded-2xl p-3.5 space-y-2">
+                      <p className="text-[10px] font-bold uppercase tracking-wider text-[#004AAD]">
+                        Prescription Matrix {item.prescription_json.pd ? `(PD: ${item.prescription_json.pd} mm)` : ""}
+                      </p>
+                      <div className="overflow-x-auto">
+                        <table className="w-full text-left text-xs bg-white rounded-lg border border-[#E8EAF2] overflow-hidden">
+                          <thead className="bg-[#F4F6F8] text-[9px] uppercase font-bold text-[#666666]">
+                            <tr>
+                              <th className="px-2.5 py-1.5">Eye</th>
+                              <th className="px-2.5 py-1.5">SPH</th>
+                              <th className="px-2.5 py-1.5">CYL</th>
+                              <th className="px-2.5 py-1.5">Axis</th>
+                              {item.prescription_json.right_eye?.bc && <th className="px-2.5 py-1.5">BC</th>}
+                              {item.prescription_json.right_eye?.dia && <th className="px-2.5 py-1.5">DIA</th>}
+                              {item.prescription_json.right_eye?.add && <th className="px-2.5 py-1.5">Add</th>}
+                            </tr>
+                          </thead>
+                          <tbody className="font-mono text-[11px] divide-y divide-[#E8EAF2]">
+                            <tr>
+                              <td className="px-2.5 py-1.5 font-sans font-bold text-[#004AAD]">Right (OD)</td>
+                              <td className="px-2.5 py-1.5">{item.prescription_json.right_eye?.sph || "0.00"}</td>
+                              <td className="px-2.5 py-1.5">{item.prescription_json.right_eye?.cyl || "—"}</td>
+                              <td className="px-2.5 py-1.5">{item.prescription_json.right_eye?.axis || "—"}</td>
+                              {item.prescription_json.right_eye?.bc && <td className="px-2.5 py-1.5">{item.prescription_json.right_eye.bc} mm</td>}
+                              {item.prescription_json.right_eye?.dia && <td className="px-2.5 py-1.5">{item.prescription_json.right_eye.dia} mm</td>}
+                              {item.prescription_json.right_eye?.add && <td className="px-2.5 py-1.5">{item.prescription_json.right_eye.add}</td>}
+                            </tr>
+                            <tr>
+                              <td className="px-2.5 py-1.5 font-sans font-bold text-[#004AAD]">Left (OS)</td>
+                              <td className="px-2.5 py-1.5">{item.prescription_json.left_eye?.sph || "0.00"}</td>
+                              <td className="px-2.5 py-1.5">{item.prescription_json.left_eye?.cyl || "—"}</td>
+                              <td className="px-2.5 py-1.5">{item.prescription_json.left_eye?.axis || "—"}</td>
+                              {item.prescription_json.right_eye?.bc && <td className="px-2.5 py-1.5">{item.prescription_json.left_eye?.bc || "—"} mm</td>}
+                              {item.prescription_json.right_eye?.dia && <td className="px-2.5 py-1.5">{item.prescription_json.left_eye?.dia || "—"} mm</td>}
+                              {item.prescription_json.right_eye?.add && <td className="px-2.5 py-1.5">{item.prescription_json.left_eye?.add || "—"}</td>}
+                            </tr>
+                          </tbody>
+                        </table>
+                      </div>
+                    </div>
+                  )}
+
+                  {/* Uploaded Prescription Slip */}
+                  {item.prescription_json?.file_url && (
+                    <div className="p-3 bg-blue-50/50 border border-blue-100 rounded-2xl flex items-center justify-between gap-3">
+                      <div className="flex items-center gap-3">
+                        <div className="w-10 h-10 rounded-xl bg-white border border-blue-200 overflow-hidden flex-shrink-0">
+                          <img src={item.prescription_json.file_url} alt="Prescription" className="w-full h-full object-cover" />
+                        </div>
+                        <div>
+                          <p className="text-xs font-semibold text-[#111111]">Attached Prescription Slip</p>
+                          <p className="text-[10px] text-[#666666]">Provided during configuration</p>
+                        </div>
+                      </div>
+                      <a
+                        href={item.prescription_json.file_url}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="px-3 py-1.5 bg-white border border-[#ECECEC] rounded-lg text-xs font-semibold text-[#004AAD] hover:bg-blue-50 transition-colors flex items-center gap-1.5"
+                      >
+                        <Download size={13} /> View Slip
+                      </a>
+                    </div>
+                  )}
                 </div>
               ))}
             </div>
-            <div className="flex justify-between items-center pt-5 mt-5 border-t border-[#ECECEC]">
+
+            {/* Prescriptions on Order level if any */}
+            {order.prescriptions && order.prescriptions.length > 0 && (
+              <div className="mt-6 pt-6 border-t border-[#ECECEC] space-y-3">
+                <p className="text-xs font-semibold uppercase tracking-widest text-[#004AAD]">Prescription Attachment</p>
+                {order.prescriptions.map((rx: any, idx: number) => (
+                  <div key={rx.id || idx} className="p-3 bg-[#F8F9FC] border border-[#ECECEC] rounded-2xl flex items-center justify-between">
+                    <div className="flex items-center gap-3">
+                      <FileText size={18} className="text-[#004AAD]" />
+                      <div>
+                        <p className="text-xs font-semibold text-[#111111]">Prescription #{idx + 1}</p>
+                        <p className="text-[10px] text-[#666666]">
+                          {rx.left_eye && `L: ${rx.left_eye}`} {rx.right_eye && `| R: ${rx.right_eye}`} {rx.pd && `| PD: ${rx.pd}mm`}
+                        </p>
+                      </div>
+                    </div>
+                    {(rx.file_url || rx.download_url) && (
+                      <a
+                        href={rx.file_url || rx.download_url}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="px-3 py-1.5 bg-white border border-[#ECECEC] rounded-lg text-xs font-semibold text-[#004AAD] hover:bg-blue-50 transition-colors flex items-center gap-1.5"
+                      >
+                        <Download size={13} /> View Prescription
+                      </a>
+                    )}
+                  </div>
+                ))}
+              </div>
+            )}
+
+            <div className="flex justify-between items-center pt-5 mt-6 border-t border-[#ECECEC]">
               <span className="text-sm text-[#666666]">Order Total</span>
               <span className="text-lg font-bold text-[#111111]">₹{Number(displayOrder.total_price || 0).toLocaleString("en-IN")}</span>
             </div>

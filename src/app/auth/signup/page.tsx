@@ -29,7 +29,7 @@ function SignupForm({ fallbackError, initialLoading }: { fallbackError: string |
   const [loading, setLoading] = useState(initialLoading);
   const router = useRouter();
   const searchParams = useSearchParams();
-  const redirectTo = searchParams.get("redirect") || "/";
+  const redirectTo = searchParams.get("returnUrl") || searchParams.get("redirect") || "/";
 
   const handleSubmit = async (e: React.FormEvent<HTMLFormElement>) => {
     e.preventDefault();

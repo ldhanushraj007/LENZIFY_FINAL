@@ -117,6 +117,23 @@ const isContactLensProduct = (p: any): boolean => {
   );
 };
 
+const isReadingGlassesProduct = (p: any): boolean => {
+  const pt = (p.product_type || "").toLowerCase();
+  const cat = (p.category || "").toLowerCase();
+  const hasReadingCat = p.product_categories?.some((pc: any) =>
+    (pc.categories?.name || "").toLowerCase().includes("reading")
+  );
+  return (
+    pt === "reading-glasses" ||
+    pt === "reading_glasses" ||
+    pt.includes("reading") ||
+    cat === "reading-glasses" ||
+    cat === "reading glasses" ||
+    cat.includes("reading") ||
+    Boolean(hasReadingCat)
+  );
+};
+
 const parseSizeItem = (val: any): string[] => {
   if (!val) return [];
   let item = val;
@@ -453,6 +470,29 @@ export default function ProductGrid({ initialCategory, initialGender }: ProductG
     );
   }, [initialCategory, pathname, selectedTypes, searchParams]);
 
+  const isReadingGlassesPage = useMemo(() => {
+    const typeParam = (searchParams.get("type") || "").toLowerCase();
+    const catParam = (searchParams.get("category") || "").toLowerCase();
+    const hasReadingInTypes = selectedTypes.some((t) => {
+      const lower = (t || "").toLowerCase();
+      return (
+        lower.includes("reading") ||
+        lower === "reading-glasses" ||
+        lower === "reading_glasses"
+      );
+    });
+
+    return (
+      initialCategory === "reading-glasses" ||
+      initialCategory === "reading_glasses" ||
+      pathname === "/reading-glasses" ||
+      pathname.startsWith("/reading-glasses") ||
+      typeParam.includes("reading") ||
+      catParam.includes("reading") ||
+      hasReadingInTypes
+    );
+  }, [initialCategory, pathname, selectedTypes, searchParams]);
+
   const brands = useMemo(() => {
     const source = isContactLensPage
       ? products.filter(isContactLensProduct)
@@ -581,6 +621,11 @@ export default function ProductGrid({ initialCategory, initialGender }: ProductG
       result = result.filter(isContactLensProduct);
     }
 
+    // On reading glasses pages or filters, strictly constrain result to reading glasses products
+    if (isReadingGlassesPage) {
+      result = result.filter(isReadingGlassesProduct);
+    }
+
     if (routerSearch) {
       result = result.filter(
         (p) =>
@@ -621,6 +666,11 @@ export default function ProductGrid({ initialCategory, initialGender }: ProductG
             selectedLower.some((s) => s.includes("contact"))
           )
             return true;
+          if (
+            (t === "reading-glasses" || t === "reading_glasses" || t.includes("reading")) &&
+            selectedLower.some((s) => s.includes("reading"))
+          )
+            return true;
           return false;
         });
 
@@ -629,7 +679,9 @@ export default function ProductGrid({ initialCategory, initialGender }: ProductG
             pc.categories?.type === "product" &&
             (selectedLower.includes(pc.categories.name.toLowerCase()) ||
               (selectedLower.some((s) => s.includes("contact")) &&
-                pc.categories.name.toLowerCase().includes("contact")))
+                pc.categories.name.toLowerCase().includes("contact")) ||
+              (selectedLower.some((s) => s.includes("reading")) &&
+                pc.categories.name.toLowerCase().includes("reading")))
         );
 
         return matchesType || matchesCategory;

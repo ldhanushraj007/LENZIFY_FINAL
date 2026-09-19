@@ -13,13 +13,15 @@ import { useAuth } from "@/components/providers/AuthProvider";
 import { toast } from "react-hot-toast";
 import OrderSummary from "@/components/checkout/OrderSummary";
 import { applyCoupon } from "@/lib/db/coupon_actions";
+import { ShoppingBag } from "lucide-react";
+import { resolveProductImage } from "@/lib/image_utils";
 
 const supabaseInstance = createClient();
 
 function CartPageContent() {
   const { items, setItems, removeItem, updateQuantity } = useCartStore();
   const [loading, setLoading] = useState(true);
-  const { user } = useAuth();
+  const { user, loading: authLoading } = useAuth();
   const [error, setError] = useState<string | null>(null);
   const router = useRouter();
   const searchParams = useSearchParams();
@@ -76,7 +78,7 @@ function CartPageContent() {
         name: item.products?.name || "Product",
         brand: item.products?.brand || "LENZIFY",
         price: item.price || item.products?.discount_price || item.products?.offer_price || item.products?.price,
-        image: item.products?.primary_image || item.products?.product_images?.[0]?.image_url || "/placeholder.jpg",
+        image: resolveProductImage(item.products) || item.image || "/placeholder.jpg",
         category: item.products?.product_type === "contact-lens" || item.products?.product_type === "contact_lens" ? "Contact Lenses" : "Eyewear",
         quantity: item.quantity,
         stock: item.products?.stock ?? 99,
@@ -185,13 +187,56 @@ function CartPageContent() {
     router.push("/checkout");
   };
 
-  if (loading) return (
+  if (authLoading || (loading && user)) return (
     <div className="min-h-screen bg-[#F8F9FC] flex items-center justify-center">
       <p className="text-sm font-medium animate-pulse text-[#666666] tracking-widest">
         Loading your cart...
       </p>
     </div>
   );
+
+  if (!user) {
+    return (
+      <div className="bg-[#F8F9FC] min-h-screen pb-20">
+        <div className="bg-white pt-24 md:pt-32 pb-6 border-b border-[#E8EAF2]">
+          <main className="max-w-screen-2xl mx-auto px-4 sm:px-8">
+            <p className="text-xs font-semibold uppercase tracking-widest text-[#004AAD] mb-2">Shopping cart</p>
+            <h1 className="text-3xl md:text-5xl lg:text-6xl font-[var(--font-hero)] italic text-[#111111] leading-tight">
+              Your Cart
+            </h1>
+          </main>
+        </div>
+
+        <main className="max-w-screen-md mx-auto px-4 sm:px-8 py-16 md:py-24 text-center">
+          <div className="bg-white rounded-3xl p-8 sm:p-12 border border-[#ECECEC] shadow-sm max-w-lg mx-auto">
+            <div className="w-16 h-16 mx-auto mb-6 rounded-2xl bg-[#004AAD]/10 text-[#004AAD] flex items-center justify-center">
+              <ShoppingBag size={28} />
+            </div>
+            <h2 className="text-2xl sm:text-3xl font-bold text-[#111111] tracking-tight">
+              Your cart is waiting — log in to view it
+            </h2>
+            <p className="text-sm text-[#666666] mt-3 leading-relaxed">
+              Sign in to your Lenzify account to access saved items, customize prescription lenses, and complete your order.
+            </p>
+            <div className="mt-8 flex flex-col sm:flex-row gap-3 justify-center">
+              <Link
+                href="/auth/login?redirect=/cart&returnUrl=/cart"
+                className="w-full sm:w-auto px-8 py-3.5 rounded-full bg-[#03173D] text-white font-semibold text-sm hover:bg-[#004AAD] transition-colors shadow-md text-center"
+              >
+                Log In
+              </Link>
+              <Link
+                href="/auth/signup?redirect=/cart&returnUrl=/cart"
+                className="w-full sm:w-auto px-8 py-3.5 rounded-full border border-[#03173D] text-[#03173D] font-semibold text-sm hover:bg-[#03173D] hover:text-white transition-colors text-center"
+              >
+                Sign Up
+              </Link>
+            </div>
+          </div>
+        </main>
+      </div>
+    );
+  }
 
   return (
     <div className="bg-[#F8F9FC] min-h-screen pb-20">
@@ -211,49 +256,75 @@ function CartPageContent() {
           <div className="lg:col-span-8 space-y-4">
             <AnimatePresence mode="popLayout">
               {items.length > 0 ? (
-                items.map((item: any, i) => (
-                  <motion.div
-                    layout
-                    key={item.database_id || item.id}
-                    initial={{ opacity: 0, x: -20 }}
-                    animate={{ opacity: 1, x: 0 }}
-                    exit={{ opacity: 0, scale: 0.95 }}
-                    transition={{ duration: 0.4, ease: [0.22, 1, 0.36, 1] }}
-                    className="group relative bg-white rounded-3xl border border-[#ECECEC] shadow-[0_10px_30px_rgba(0,0,0,0.05)] p-6 flex flex-col sm:flex-row gap-6 hover:-translate-y-1 hover:shadow-[0_25px_60px_rgba(0,0,0,0.12)] transition-all duration-300"
-                  >
-                    {/* Item Image */}
-                    <div className="relative w-full sm:w-40 aspect-square rounded-2xl bg-[#F8F9FC] flex items-center justify-center flex-shrink-0 overflow-hidden">
-                      <Image
-                        src={item.image}
-                        alt={item.name}
-                        fill
-                        className="object-contain p-4 transition-transform duration-700 group-hover:scale-105"
-                      />
-                    </div>
+                items.map((item: any, i) => {
+                  const hasLensConfig = Boolean(
+                    item.lens_config &&
+                    (item.lens_config.type || item.lens_config.package || item.lens_config.package_name || item.lens_config.selected_index || item.lens_config.thickness || item.lens_price || item.lens_name)
+                  );
 
-                    {/* Item Details */}
-                    <div className="flex-grow flex flex-col justify-between py-1">
-                      <div className="space-y-3">
-                        <div className="flex justify-between items-start gap-4">
-                          <div>
-                            <p className="text-[#004AAD] text-xs font-semibold uppercase tracking-widest mb-1">
-                              {item.brand}
-                            </p>
-                            <h3 className="text-xl font-medium text-[#111111] leading-tight">
-                              {item.name}
-                            </h3>
-                            {item.lens_name && (
-                              <div className="mt-2 flex items-center gap-2">
-                                <span className="px-2.5 py-1 bg-[#004AAD]/5 border border-[#004AAD]/15 text-xs font-medium text-[#004AAD] rounded-full">
-                                  Lens: {item.lens_name}
-                                </span>
-                              </div>
+                  const rawLensPrice = Number(
+                    item.lens_price ||
+                    item.lens_config?.total_price ||
+                    item.lens_config?.lens_price ||
+                    item.lens_config?.price ||
+                    0
+                  );
+                  const unitTotal = Number(item.price) || 0;
+                  const baseProductPrice = Number(item.products?.offer_price || item.products?.price || item.product?.price || 0);
+                  const lensUnitPrice = rawLensPrice > 0
+                    ? rawLensPrice
+                    : (baseProductPrice > 0 && unitTotal > baseProductPrice ? unitTotal - baseProductPrice : 0);
+                  const frameUnitPrice = Math.max(0, unitTotal - lensUnitPrice);
+
+                  const lensType = item.lens_name || item.lens_config?.type?.name || item.lens_config?.lens_name || "Prescription Lens";
+                  const lensPackage = item.lens_config?.package_name || item.lens_config?.package || "Standard";
+                  const coatingsCount = Array.isArray(item.lens_config?.coatings) ? item.lens_config.coatings.length : 4;
+
+                  return (
+                    <motion.div
+                      layout
+                      key={item.database_id || item.id}
+                      initial={{ opacity: 0, x: -20 }}
+                      animate={{ opacity: 1, x: 0 }}
+                      exit={{ opacity: 0, scale: 0.95 }}
+                      transition={{ duration: 0.4, ease: [0.22, 1, 0.36, 1] }}
+                      className="group relative bg-white rounded-3xl border border-[#ECECEC] shadow-[0_10px_30px_rgba(0,0,0,0.05)] p-6 flex flex-col sm:flex-row gap-6 hover:-translate-y-1 hover:shadow-[0_25px_60px_rgba(0,0,0,0.12)] transition-all duration-300"
+                    >
+                      {/* Item Image */}
+                      <div className="relative w-full sm:w-40 aspect-square rounded-2xl bg-[#F8F9FC] flex items-center justify-center flex-shrink-0 overflow-hidden">
+                        <Image
+                          src={item.image}
+                          alt={item.name}
+                          fill
+                          className="object-contain p-4 transition-transform duration-700 group-hover:scale-105"
+                        />
+                      </div>
+
+                      {/* Item Details */}
+                      <div className="flex-grow flex flex-col justify-between py-1">
+                        <div className="space-y-3">
+                          <div className="flex justify-between items-start gap-4">
+                            <div>
+                              <p className="text-[#004AAD] text-xs font-semibold uppercase tracking-widest mb-1">
+                                {item.brand}
+                              </p>
+                              <h3 className="text-xl font-medium text-[#111111] leading-tight">
+                                {item.name}
+                              </h3>
+                              {item.lens_name && !hasLensConfig && (
+                                <div className="mt-2 flex items-center gap-2">
+                                  <span className="px-2.5 py-1 bg-[#004AAD]/5 border border-[#004AAD]/15 text-xs font-medium text-[#004AAD] rounded-full">
+                                    Lens: {item.lens_name}
+                                  </span>
+                                </div>
+                              )}
+                            </div>
+                            {!hasLensConfig && (
+                              <p className="text-xl font-bold text-[#111111] flex-shrink-0">
+                                ₹{((item.price || 0) * (item.quantity || 1)).toLocaleString()}
+                              </p>
                             )}
                           </div>
-                          <p className="text-xl font-bold text-[#111111] flex-shrink-0">
-                            ₹{(item.price || 0).toLocaleString()}
-                          </p>
-                        </div>
 
                         <div className="flex flex-wrap gap-x-6 gap-y-2">
                           <div>
@@ -317,6 +388,27 @@ function CartPageContent() {
                             )}
                           </div>
                         </div>
+
+                        {hasLensConfig && (
+                          <div className="bg-[#F8F9FC] border border-[#E8EAF2] rounded-2xl p-4 mt-3 space-y-2">
+                            <div className="flex justify-between text-sm text-[#444444]">
+                              <span>Frame</span>
+                              <span className="font-semibold text-[#111111]">₹{(frameUnitPrice * (item.quantity || 1)).toLocaleString("en-IN")}</span>
+                            </div>
+                            <div className="flex justify-between text-sm text-[#444444]">
+                              <span>{lensType} · {lensPackage}</span>
+                              <span className="font-semibold text-[#111111]">₹{(lensUnitPrice * (item.quantity || 1)).toLocaleString("en-IN")}</span>
+                            </div>
+                            <div className="flex justify-between text-sm text-[#444444]">
+                              <span>Included Coatings ({coatingsCount})</span>
+                              <span className="font-bold text-emerald-600 text-xs uppercase tracking-wider">FREE</span>
+                            </div>
+                            <div className="border-t border-[#E8EAF2] pt-2 flex justify-between items-center text-sm font-bold text-[#111111]">
+                              <span>Item Total</span>
+                              <span>₹{(unitTotal * (item.quantity || 1)).toLocaleString("en-IN")}</span>
+                            </div>
+                          </div>
+                        )}
                       </div>
 
                       {/* Quantity & Remove */}
@@ -348,7 +440,8 @@ function CartPageContent() {
                       </div>
                     </div>
                   </motion.div>
-                ))
+                );
+              })
               ) : (
                 <motion.div
                   initial={{ opacity: 0, y: 20 }}

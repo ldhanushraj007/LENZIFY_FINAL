@@ -9,6 +9,9 @@ import { useRouter } from "next/navigation";
 import { toggleWishlist } from "@/lib/db/customer_actions";
 import { useAuth } from "@/components/providers/AuthProvider";
 import { Heart } from "lucide-react";
+import LoginPromptModal from "@/components/auth/LoginPromptModal";
+
+import { resolveProductImage } from "@/lib/image_utils";
 
 interface ProductCardProps {
   product: {
@@ -71,32 +74,27 @@ export default function ProductCard({ product }: ProductCardProps) {
     .map(parseColor)
     .filter((c): c is { name: string; hex: string } => c !== null);
 
-  const getInitialImage = () => {
-    // Check primary_image but skip the generic placeholder — it means no real image was saved
-    const primaryImg = product.primary_image;
-    if (primaryImg && primaryImg !== "/placeholder.jpg" && !primaryImg.startsWith("/placeholder")) {
-      return primaryImg;
-    }
-    // Fall through to the product_images junction table (has the real uploaded URL)
-    if (product.product_images && product.product_images.length > 0) {
-      const primary = product.product_images.find((img: any) => img.is_primary);
-      const best = primary || product.product_images[0];
-      if (best?.image_url && best.image_url !== "/placeholder.jpg") {
-        return best.image_url;
-      }
-    }
-    // Legacy fallback
-    if (product.image && product.image !== "/placeholder.jpg") return product.image;
-    return "/placeholder.jpg";
-  };
-
-  const [imgSrc, setImgSrc] = useState(getInitialImage());
+  const [imgSrc, setImgSrc] = useState(() => resolveProductImage(product));
+  const [failedOnce, setFailedOnce] = useState(false);
   const [isLoaded, setIsLoaded] = useState(false);
 
   useEffect(() => {
-    setImgSrc(getInitialImage());
+    setImgSrc(resolveProductImage(product));
+    setFailedOnce(false);
     setIsLoaded(false);
   }, [product.id, product.primary_image, product.image, product.product_images]);
+
+  const handleImageError = () => {
+    if (!failedOnce) {
+      setFailedOnce(true);
+      const raw = product.primary_image || product.product_images?.[0]?.image_url;
+      if (raw && raw !== imgSrc && raw !== "/placeholder.jpg") {
+        setImgSrc(raw);
+        return;
+      }
+    }
+    setImgSrc("/placeholder.jpg");
+  };
 
   const rawPrice = Number(product.price) || 0;
   const rawDiscount = product.discount_price ? Number(product.discount_price) : null;
@@ -110,12 +108,14 @@ export default function ProductCard({ product }: ProductCardProps) {
   const isLowStock = !isOutOfStock && typeof product.stock === "number" && product.stock > 0 && product.stock <= 5;
   const isComingSoon = product.availability === "coming_soon";
 
+  const [showLoginModal, setShowLoginModal] = useState(false);
+
   const handleWishlist = async (e: React.MouseEvent) => {
     e.preventDefault();
     e.stopPropagation();
 
     if (!user) {
-      router.push(`/auth/login?redirect=${encodeURIComponent(window.location.pathname)}`);
+      setShowLoginModal(true);
       return;
     }
 
@@ -168,7 +168,8 @@ export default function ProductCard({ product }: ProductCardProps) {
             src={imgSrc}
             alt={product.name}
             fill
-            onError={() => setImgSrc("/placeholder.jpg")}
+            unoptimized
+            onError={handleImageError}
             onLoad={() => setIsLoaded(true)}
             className="object-contain p-4 group-hover:scale-105 transition-transform duration-500"
           />
@@ -276,6 +277,13 @@ export default function ProductCard({ product }: ProductCardProps) {
       >
         <Heart size={16} fill={wishlisted ? "currentColor" : "none"} />
       </button>
+
+      <LoginPromptModal
+        isOpen={showLoginModal}
+        onClose={() => setShowLoginModal(false)}
+        title="Sign in to continue"
+        message="Create a free account or log in to save items to your wishlist and complete your purchase."
+      />
     </div>
   );
 }

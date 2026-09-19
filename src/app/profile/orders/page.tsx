@@ -31,7 +31,7 @@ export default function ProfileOrdersPage() {
         .from("orders")
         .select(`
           *,
-          addresses!inner(*),
+          addresses(*),
           order_items(
             *,
             products(name, product_images(*))
@@ -127,7 +127,7 @@ export default function ProfileOrdersPage() {
 
                         {/* Action Module */}
                         <Link 
-                          href={`/profile/orders/${order.id}`}
+                          href={`/orders/${order.id}`}
                           className="py-6 px-10 border border-brand-navy/10 text-brand-navy text-[10px] font-black uppercase tracking-[0.3em] hover:bg-brand-navy hover:text-white transition-all flex items-center gap-4"
                         >
                            <span>Inspect Log</span>

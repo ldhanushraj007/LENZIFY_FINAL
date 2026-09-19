@@ -12,13 +12,14 @@ import UserMenu from "./UserMenu";
 import NotificationBell from "./NotificationBell";
 import { useAuth } from "@/components/providers/AuthProvider";
 import { getCart, getWishlist } from "@/lib/db/customer_actions";
+import { resolveProductImage } from "@/lib/image_utils";
 
 // Mega Menu Content
 const SHOP_CATEGORIES = [
   { name: "Eyeglasses", href: "/products?type=Eyeglasses" },
   { name: "Sunglasses", href: "/products?type=Sunglasses" },
   { name: "Computer Glasses", href: "/products?type=Computer Glasses" },
-  { name: "Reading Glasses", href: "/products?type=Reading Glasses" },
+  { name: "Reading Glasses", href: "/reading-glasses" },
   { name: "Contact Lenses", href: "/contact-lenses" },
   { name: "Accessories", href: "/products?type=Accessories" },
 ];
@@ -59,15 +60,19 @@ export default function Navbar() {
   const [lenses, setLenses] = useState<{ name: string; id: string }[]>([]);
   const [coatings, setCoatings] = useState<{ name: string; id: string }[]>([]);
 
-  const totalItems = useCartStore((state) =>
+  const rawTotalItems = useCartStore((state) =>
     state.items.reduce((acc, item) => acc + Number(item.quantity || 0), 0)
   );
+  const totalItems = user ? rawTotalItems : 0;
   const setItems = useCartStore((state) => state.setItems);
   const setWishlistItems = useWishlistStore((state) => state.setItems);
 
   // Sync cart count
   useEffect(() => {
-    if (!user) return;
+    if (!user) {
+      setItems([]);
+      return;
+    }
 
     const supabase = createClient();
 
@@ -82,7 +87,7 @@ export default function Navbar() {
           name: item.products?.name || "Eyewear",
           brand: item.products?.brand || "LENZIFY",
           price: item.price || item.products?.discount_price || item.products?.offer_price || item.products?.price,
-          image: item.products?.primary_image || item.products?.product_images?.[0]?.image_url || "/placeholder.jpg",
+          image: resolveProductImage(item.products) || item.image || "/placeholder.jpg",
           category: "Eyewear",
           quantity: item.quantity,
           stock: item.products?.stock ?? 99,
@@ -442,6 +447,21 @@ export default function Navbar() {
             </button>
           </div>
 
+          {/* Reading Glasses */}
+          <Link
+            href="/reading-glasses"
+            className={cn(
+              "font-medium transition-all duration-300 py-1",
+              pathname === "/reading-glasses" || pathname.startsWith("/reading-glasses")
+                ? isWhiteMode
+                  ? "text-[#004AAD] border-b border-[#004AAD]"
+                  : "text-white border-b border-white"
+                : linkColor
+            )}
+          >
+            Reading Glasses
+          </Link>
+
           {/* Contact Lenses */}
           <div className="relative">
             <button
@@ -627,7 +647,7 @@ export default function Navbar() {
             >
               shopping_cart
             </span>
-            {mounted && totalItems > 0 && (
+            {mounted && Boolean(user) && totalItems > 0 && (
               <span
                 suppressHydrationWarning
                 className="absolute -top-1 -right-1 flex h-4 w-4 items-center justify-center rounded-full bg-[#004AAD] text-[8px] font-bold text-white shadow-sm"
@@ -957,6 +977,21 @@ export default function Navbar() {
                 >
                   <span className="material-symbols-outlined text-xl">home</span>
                   Home
+                </Link>
+
+                {/* Reading Glasses */}
+                <Link
+                  href="/reading-glasses"
+                  onClick={() => setIsMobileMenuOpen(false)}
+                  className={cn(
+                    "text-xs font-black uppercase tracking-[0.2em] flex items-center gap-3 transition-colors",
+                    pathname.startsWith("/reading-glasses")
+                      ? "text-[#004AAD]"
+                      : "text-[#111111] hover:text-[#004AAD]"
+                  )}
+                >
+                  <span className="material-symbols-outlined text-xl">auto_stories</span>
+                  Reading Glasses
                 </Link>
 
                 {/* Shop */}

@@ -27,6 +27,7 @@ import {
 import { useAuth } from "@/components/providers/AuthProvider";
 import { useCartStore } from "@/store/cartStore";
 import OrderSummary, { ItemPrescription } from "@/components/checkout/OrderSummary";
+import { getGSTRate, calculateCartGST } from "@/lib/gst";
 
 const STEPS = [
   { id: 1, label: "Address", icon: MapPin },
@@ -57,6 +58,24 @@ export default function CheckoutPage() {
   const [orderProcessing, setOrderProcessing] = useState(false);
   const [activeStep, setActiveStep] = useState(1);
   const [paymentMethod, setPaymentMethod] = useState<"razorpay" | "cod">("razorpay");
+
+  const allSunglasses = cartItems.length > 0 && cartItems.every((item) => {
+    const cat = (
+      item.product?.category ||
+      item.products?.category ||
+      item.products?.categories?.name ||
+      item.products?.categories?.slug ||
+      item.category ||
+      ""
+    ).toLowerCase();
+    return cat.includes("sunglass");
+  });
+
+  useEffect(() => {
+    if (!allSunglasses && paymentMethod === "cod") {
+      setPaymentMethod("razorpay");
+    }
+  }, [allSunglasses, paymentMethod]);
 
   const [addressData, setAddressData] = useState({
     name: "",
@@ -359,22 +378,8 @@ export default function CheckoutPage() {
     }
     setOrderProcessing(true);
 
-    const subtotal = cartItems.reduce(
-      (acc, item) =>
-        acc + (item.price || item.products?.offer_price || item.products?.price || 0) * item.quantity,
-      0
-    );
-    const discountedSubtotal = Math.max(0, subtotal - couponDiscount);
-    const taxableSubtotal = cartItems
-      .filter((item) => !isContactLensItem(item))
-      .reduce(
-        (acc, item) =>
-          acc + (item.price || item.products?.offer_price || item.products?.price || 0) * item.quantity,
-        0
-      );
-    const taxableRatio = subtotal > 0 ? taxableSubtotal / subtotal : 0;
-    const tax = Math.round(discountedSubtotal * taxableRatio * 0.18);
-    const totalAmount = discountedSubtotal + tax;
+    const gstBreakdown = calculateCartGST(cartItems, couponDiscount);
+    const totalAmount = gstBreakdown.grandTotal;
 
     // Helper to resolve prescription payload per item
     const getResolvedItemPrescription = (item: any) => {
@@ -410,15 +415,24 @@ export default function CheckoutPage() {
       try {
         const codId = `COD-${Date.now()}-${Math.random().toString(36).substring(2, 7).toUpperCase()}`;
         const orderRes = await placeOrder({
-          items: cartItems.map((item) => ({
-            id: item.product_id,
-            quantity: item.quantity,
-            price: item.price || item.products?.offer_price || item.products?.price || 0,
-            lens_id: item.lens_id,
-            selected_color: item.selected_color,
-            selected_size: item.selected_size,
-            prescription_json: getResolvedItemPrescription(item),
-          })),
+          items: cartItems.map((item) => {
+            const rate = getGSTRate(item);
+            const itemPrice = item.price || item.products?.offer_price || item.products?.price || 0;
+            const itemTotal = itemPrice * item.quantity;
+            const numericRate = rate === 'included' ? 0 : rate;
+            const gstAmount = Math.round(itemTotal * numericRate);
+            return {
+              id: item.product_id,
+              quantity: item.quantity,
+              price: itemPrice,
+              lens_id: item.lens_id,
+              selected_color: item.selected_color,
+              selected_size: item.selected_size,
+              prescription_json: getResolvedItemPrescription(item),
+              gst_rate: numericRate,
+              gst_amount: gstAmount,
+            };
+          }),
           total_price: totalAmount,
           address: addressData,
           prescription: prescription.left_eye || prescription.file_url ? prescription : undefined,
@@ -500,15 +514,24 @@ export default function CheckoutPage() {
             }
 
             const orderRes = await placeOrder({
-              items: cartItems.map((item) => ({
-                id: item.product_id,
-                quantity: item.quantity,
-                price: item.price || item.products?.offer_price || item.products?.price || 0,
-                lens_id: item.lens_id,
-                selected_color: item.selected_color,
-                selected_size: item.selected_size,
-                prescription_json: getResolvedItemPrescription(item),
-              })),
+              items: cartItems.map((item) => {
+                const rate = getGSTRate(item);
+                const itemPrice = item.price || item.products?.offer_price || item.products?.price || 0;
+                const itemTotal = itemPrice * item.quantity;
+                const numericRate = rate === 'included' ? 0 : rate;
+                const gstAmount = Math.round(itemTotal * numericRate);
+                return {
+                  id: item.product_id,
+                  quantity: item.quantity,
+                  price: itemPrice,
+                  lens_id: item.lens_id,
+                  selected_color: item.selected_color,
+                  selected_size: item.selected_size,
+                  prescription_json: getResolvedItemPrescription(item),
+                  gst_rate: numericRate,
+                  gst_amount: gstAmount,
+                };
+              }),
               total_price: totalAmount,
               address: addressData,
               prescription: prescription.left_eye || prescription.file_url ? prescription : undefined,
@@ -560,22 +583,8 @@ export default function CheckoutPage() {
   }
 
   // Calculate totals for payment button label
-  const subtotal = cartItems.reduce(
-    (acc: number, i: any) =>
-      acc + (i.price || i.products?.offer_price || i.products?.price || 0) * i.quantity,
-    0
-  );
-  const discountedSubtotal = Math.max(0, subtotal - couponDiscount);
-  const taxableSubtotal = cartItems
-    .filter((item) => !isContactLensItem(item))
-    .reduce(
-      (acc: number, item: any) =>
-        acc + (item.price || item.products?.offer_price || item.products?.price || 0) * item.quantity,
-      0
-    );
-  const taxableRatio = subtotal > 0 ? taxableSubtotal / subtotal : 0;
-  const tax = Math.round(discountedSubtotal * taxableRatio * 0.18);
-  const grandTotal = discountedSubtotal + tax;
+  const gstBreakdown = calculateCartGST(cartItems, couponDiscount);
+  const { subtotal, discountedSubtotal, grandTotal } = gstBreakdown;
 
   // Determine steps shown in stepper
   const visibleSteps = isFrameOnly
@@ -1040,43 +1049,45 @@ export default function CheckoutPage() {
                         </div>
                       </div>
 
-                      {/* Cash on Delivery Option */}
-                      <div
-                        onClick={() => setPaymentMethod("cod")}
-                        className={cn(
-                          "p-5 rounded-2xl flex items-center gap-4 cursor-pointer transition-all border-2",
-                          paymentMethod === "cod"
-                            ? "border-[#03173D] bg-[#F0F4FF] shadow-sm"
-                            : "border-[#ECECEC] bg-white hover:border-[#CCCCCC] hover:bg-[#F8F9FC]"
-                        )}
-                      >
+                      {/* Cash on Delivery Option - only for sunglasses-only cart */}
+                      {allSunglasses && (
                         <div
+                          onClick={() => setPaymentMethod("cod")}
                           className={cn(
-                            "w-10 h-10 rounded-xl flex items-center justify-center shrink-0 transition-colors",
+                            "p-5 rounded-2xl flex items-center gap-4 cursor-pointer transition-all border-2",
                             paymentMethod === "cod"
-                              ? "bg-[#03173D] text-white"
-                              : "bg-[#F4F6F8] text-[#555555]"
+                              ? "border-[#03173D] bg-[#F0F4FF] shadow-sm"
+                              : "border-[#ECECEC] bg-white hover:border-[#CCCCCC] hover:bg-[#F8F9FC]"
                           )}
                         >
-                          <Banknote size={20} />
+                          <div
+                            className={cn(
+                              "w-10 h-10 rounded-xl flex items-center justify-center shrink-0 transition-colors",
+                              paymentMethod === "cod"
+                                ? "bg-[#03173D] text-white"
+                                : "bg-[#F4F6F8] text-[#555555]"
+                            )}
+                          >
+                            <Banknote size={20} />
+                          </div>
+                          <div className="flex-1">
+                            <p className="font-semibold text-[#111111] text-sm">Cash on Delivery (COD)</p>
+                            <p className="text-[#666666] text-xs mt-0.5">
+                              Pay in cash or UPI directly when your package arrives at your doorstep
+                            </p>
+                          </div>
+                          <div
+                            className={cn(
+                              "w-5 h-5 rounded-full flex items-center justify-center shrink-0 border transition-all",
+                              paymentMethod === "cod"
+                                ? "bg-[#03173D] border-[#03173D]"
+                                : "border-[#CCCCCC] bg-white"
+                            )}
+                          >
+                            {paymentMethod === "cod" && <CheckCircle2 size={12} className="text-white" />}
+                          </div>
                         </div>
-                        <div className="flex-1">
-                          <p className="font-semibold text-[#111111] text-sm">Cash on Delivery (COD)</p>
-                          <p className="text-[#666666] text-xs mt-0.5">
-                            Pay in cash or UPI directly when your package arrives at your doorstep
-                          </p>
-                        </div>
-                        <div
-                          className={cn(
-                            "w-5 h-5 rounded-full flex items-center justify-center shrink-0 border transition-all",
-                            paymentMethod === "cod"
-                              ? "bg-[#03173D] border-[#03173D]"
-                              : "border-[#CCCCCC] bg-white"
-                          )}
-                        >
-                          {paymentMethod === "cod" && <CheckCircle2 size={12} className="text-white" />}
-                        </div>
-                      </div>
+                      )}
                     </div>
 
                     <div className="p-4 rounded-xl bg-[#F8F9FC] border border-[#E8EAF2] flex items-start gap-3">
