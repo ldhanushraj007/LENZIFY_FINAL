@@ -39,7 +39,7 @@ const commonQuestions = [
   { q: "Can I change my prescription after ordering?", a: "Contact us within 2 hours of placing your order and we'll update the prescription at no extra cost." },
   { q: "What payment methods do you accept?", a: "We accept UPI, Net Banking, Credit/Debit cards via Razorpay, and Cash on Delivery." },
   { q: "How long does delivery take?", a: "Standard delivery takes 5-7 business days. Prescription eyewear may take 7-10 business days due to lens grinding." },
-  { q: "Do you offer free shipping?", a: "Yes, we offer complimentary shipping on all orders across India." },
+  { q: "Do you offer free shipping?", a: "Yes, we offer complimentary shipping on all orders above ₹2,000 across India. For orders below ₹2,000, a flat delivery fee of ₹99 applies." },
   { q: "How do I replace my lenses?", a: "Visit our Replace Lenses page, follow the 6-step wizard, and we'll handle the rest with doorstep pickup." },
 ];
 

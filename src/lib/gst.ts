@@ -32,6 +32,9 @@ export function getGSTRate(productOrItem: any): GSTRateResult {
   return 0.05;
 }
 
+export const FREE_SHIPPING_THRESHOLD = 2000;
+export const STANDARD_SHIPPING_FEE = 99;
+
 export interface GSTBreakdown {
   subtotal: number;
   discountedSubtotal: number;
@@ -39,6 +42,7 @@ export interface GSTBreakdown {
   gst18Total: number;
   hasContactLens: boolean;
   totalGST: number;
+  shippingFee: number;
   grandTotal: number;
 }
 
@@ -70,7 +74,11 @@ export function calculateCartGST(items: any[], couponDiscount: number = 0): GSTB
   });
 
   const totalGST = gst5Total + gst18Total;
-  const grandTotal = discountedSubtotal + totalGST;
+  const shippingFee =
+    items.length === 0 || discountedSubtotal >= FREE_SHIPPING_THRESHOLD
+      ? 0
+      : STANDARD_SHIPPING_FEE;
+  const grandTotal = discountedSubtotal + totalGST + shippingFee;
 
   return {
     subtotal,
@@ -79,6 +87,7 @@ export function calculateCartGST(items: any[], couponDiscount: number = 0): GSTB
     gst18Total,
     hasContactLens,
     totalGST,
+    shippingFee,
     grandTotal
   };
 }

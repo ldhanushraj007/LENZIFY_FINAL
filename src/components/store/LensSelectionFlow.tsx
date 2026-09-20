@@ -2,11 +2,11 @@
 
 import { useState, useMemo, useRef, useEffect } from "react";
 import { motion, AnimatePresence } from "framer-motion";
-import { X, CheckCircle2, ChevronRight, ArrowLeft, Info, HelpCircle, Upload, Check } from "lucide-react";
+import { X, CheckCircle2, ChevronRight, ArrowLeft, Info, HelpCircle, Upload } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { createClient } from "@/lib/supabase/client";
 
-import { getIndexOptions, getRecommendedIndexValue, IndexOption } from "@/lib/lens-index-pricing";
+import { getIndexOptions, IndexOption } from "@/lib/lens-index-pricing";
 import { resolveProductImage } from "@/lib/image_utils";
 
 interface LensSelectionFlowProps {
@@ -16,11 +16,11 @@ interface LensSelectionFlowProps {
   onAddToCart: (lensData: any) => void;
 }
 
-type Step = "TYPE" | "PACKAGES" | "PRESCRIPTION" | "MATERIAL" | "SUMMARY";
+type Step = "PRESCRIPTION" | "TYPE" | "MATERIAL" | "PACKAGES" | "SUMMARY";
 type PackageKey = "standard" | "photochromatic" | "photochromatic_bluecut";
 
 export default function LensSelectionFlow({ product, availableLenses, onClose, onAddToCart }: LensSelectionFlowProps) {
-  const [step, setStep] = useState<Step>("TYPE");
+  const [step, setStep] = useState<Step>("PRESCRIPTION");
   const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
@@ -39,29 +39,50 @@ export default function LensSelectionFlow({ product, availableLenses, onClose, o
   const [selectedThickness, setSelectedThickness] = useState<any | null>(null);
   const [selectedTint, setSelectedTint] = useState<any | null>(null);
 
-  // Prescription State
+  // Prescription State (Step 1 - Mandatory)
   const [prescription, setPrescription] = useState({
     od_sph: "", od_cyl: "", od_axis: "", od_add: "",
     os_sph: "", os_cyl: "", os_axis: "", os_add: "",
     pd: "",
+    age: "",
     file_url: ""
   });
   const [uploadingFile, setUploadingFile] = useState(false);
   const [uploadedFileName, setUploadedFileName] = useState<string | null>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
-  // Filter main lens types (parent lenses only, exclude standalone Blue Cut, Photochromic, and individual Progressive tiers)
+  // Check if ADD power is present (non-zero on either eye)
+  const odAddVal = parseFloat(prescription.od_add) || 0;
+  const osAddVal = parseFloat(prescription.os_add) || 0;
+  const hasAdd = odAddVal > 0 || osAddVal > 0;
+  const ageVal = parseInt(prescription.age || "0", 10);
+
+  // Filter main lens types (parent lenses only, exclude standalone Blue Cut, Photochromic, and individual Progressive child tiers)
   const lensTypes = useMemo(() => {
     return availableLenses.filter(l => {
       if (l.category !== "type") return false;
       const nameLower = l.name?.toLowerCase() || "";
-      if (nameLower === "blue cut") return false; // Fix 4: Blue Cut is not a standalone lens type
-      if (nameLower.includes("photochro")) return false; // FIX 1: Photochromic is an upgrade package only
-      if (l.tier && ["silver", "gold", "platinum"].includes(l.tier.toLowerCase())) return false; // Progressive child tiers handled inline
+      if (nameLower === "blue cut") return false;
+      if (nameLower.includes("photochro")) return false;
+      if (l.tier && ["silver", "gold", "platinum"].includes(l.tier.toLowerCase())) return false;
       if (nameLower.startsWith("progressive ") && (nameLower.includes("silver") || nameLower.includes("gold") || nameLower.includes("platinum"))) return false;
       return true;
     });
   }, [availableLenses]);
+
+  // Strict Filter for Step 2:
+  // - No ADD: render ONLY Single Vision
+  // - ADD present: render ONLY Bifocal + Progressive (Single Vision excluded)
+  const filteredLensTypes = useMemo(() => {
+    if (!hasAdd) {
+      return lensTypes.filter(l => l.name.toLowerCase().includes("single"));
+    } else {
+      return lensTypes.filter(l => 
+        l.name.toLowerCase().includes("bifocal") || 
+        l.name.toLowerCase().includes("progressive")
+      );
+    }
+  }, [lensTypes, hasAdd]);
 
   // Progressive tiers lookup
   const progressiveTiers = useMemo(() => {
@@ -106,10 +127,6 @@ export default function LensSelectionFlow({ product, availableLenses, onClose, o
     ];
   }, [availableLenses]);
 
-  // Materials & componentry
-  const lensMaterials = useMemo(() => availableLenses.filter(l => l.category === "material"), [availableLenses]);
-  const lensTints = useMemo(() => availableLenses.filter(l => l.category === "tint"), [availableLenses]);
-
   const isRimless = (product?.frame_type || "").toLowerCase() === "rimless";
 
   // Maximum SPH from manual prescription
@@ -132,9 +149,16 @@ export default function LensSelectionFlow({ product, availableLenses, onClose, o
     });
   }, [selectedType, selectedTier, product?.frame_type, maxSph]);
 
-  // Compute recommended index based on prescription SPH (and rimless check)
+  // Index auto-recommendation according to requirements:
+  // SPH ≤ ±2.00 → recommend 1.50 or 1.56
+  // SPH ±2.25 to ±3.00 → recommend 1.60
+  // SPH > ±3.00 → recommend 1.67
   const getRecommendedIndex = () => {
-    return getRecommendedIndexValue(maxSph, isRimless);
+    if (isRimless) return "1.59";
+    if (maxSph === null || isNaN(maxSph)) return "1.56";
+    if (maxSph <= 2.00) return "1.56";
+    if (maxSph <= 3.00) return "1.60";
+    return "1.67";
   };
 
   const handleFileUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -168,7 +192,7 @@ export default function LensSelectionFlow({ product, availableLenses, onClose, o
     }
   };
 
-  // Package Flat Pricing Lookup (Fix 2)
+  // Package Flat Pricing Lookup
   const getPackagePricing = () => {
     const typeName = selectedType?.name?.toLowerCase() || "";
     const tierKey = selectedTier?.tier?.toLowerCase() || "";
@@ -244,20 +268,16 @@ export default function LensSelectionFlow({ product, availableLenses, onClose, o
   const isProgressive = selectedType?.name?.toLowerCase().includes("progressive");
 
   const handleNext = () => {
-    if (step === "TYPE") {
-      if (!selectedType) return;
-      if (isProgressive && !selectedTier) {
-        setError("Please select a Progressive tier (Silver, Gold, or Platinum) before proceeding.");
+    // STEP 1 -> STEP 2: PRESCRIPTION -> TYPE
+    if (step === "PRESCRIPTION") {
+      const od_sph = prescription.od_sph.trim();
+      const os_sph = prescription.os_sph.trim();
+
+      if (!od_sph || !os_sph) {
+        setError("Both Right Eye (OD) and Left Eye (OS) SPH values are required to proceed.");
         return;
       }
-      setError(null);
-      setStep("PACKAGES");
-    }
-    else if (step === "PACKAGES") {
-      setError(null);
-      setStep("PRESCRIPTION");
-    }
-    else if (step === "PRESCRIPTION") {
+
       const od_cyl = prescription.od_cyl.trim();
       const od_axis = prescription.od_axis.trim();
       const os_cyl = prescription.os_cyl.trim();
@@ -271,26 +291,66 @@ export default function LensSelectionFlow({ product, availableLenses, onClose, o
         setError("Axis is required for Left Eye (OS) when Cylinder is present.");
         return;
       }
-      
-      // Auto-set recommended refractive index if not manually set yet
+
+      // Auto-select lens type based on prescription ADD and Age
+      if (!hasAdd) {
+        const sv = lensTypes.find(l => l.name.toLowerCase().includes("single")) || lensTypes[0];
+        setSelectedType(sv);
+        setSelectedTier(null);
+      } else {
+        if (ageVal >= 40) {
+          const prog = lensTypes.find(l => l.name.toLowerCase().includes("progressive")) || lensTypes[0];
+          setSelectedType(prog);
+          setSelectedTier(progressiveTiers[0]);
+        } else {
+          const bifocal = lensTypes.find(l => l.name.toLowerCase().includes("bifocal")) || lensTypes.find(l => l.name.toLowerCase().includes("progressive")) || lensTypes[0];
+          setSelectedType(bifocal);
+          setSelectedTier(null);
+        }
+      }
+
+      setError(null);
+      setStep("TYPE");
+    }
+    // STEP 2 -> STEP 3: TYPE -> MATERIAL (REFRACTIVE INDEX)
+    else if (step === "TYPE") {
+      if (!selectedType) {
+        setError("Please select a lens type.");
+        return;
+      }
+      if (isProgressive && !selectedTier) {
+        setError("Please select a Progressive tier (Silver, Gold, or Platinum) before proceeding.");
+        return;
+      }
+
+      // Auto-set recommended refractive index
       const rec = getRecommendedIndex();
       if (isRimless) {
         setSelectedThickness(indexOptions[0]);
         setSelectedMaterial({ name: "Polycarbonate", price: 0 });
-      } else if (rec && (!selectedThickness || !indexOptions.some(o => o.indexValue === selectedThickness.indexValue))) {
+      } else {
         const matchingOpt = indexOptions.find(o => o.indexValue === rec && o.available) || indexOptions.find(o => o.available) || indexOptions[0];
         setSelectedThickness(matchingOpt);
-      } else if (!selectedThickness) {
-        setSelectedThickness(indexOptions[0]);
       }
 
       setError(null);
       setStep("MATERIAL");
     }
+    // STEP 3 -> STEP 4: MATERIAL -> PACKAGES
     else if (step === "MATERIAL") {
+      if (!selectedThickness) {
+        setError("Please select a refractive index.");
+        return;
+      }
+      setError(null);
+      setStep("PACKAGES");
+    }
+    // STEP 4 -> STEP 5: PACKAGES -> SUMMARY
+    else if (step === "PACKAGES") {
       setError(null);
       setStep("SUMMARY");
     }
+    // STEP 5: FINAL CONFIRMATION & INJECT TO CART
     else if (step === "SUMMARY") {
       const activeLens = selectedTier?.lens || selectedType;
       const finalLensName = selectedTier 
@@ -330,19 +390,25 @@ export default function LensSelectionFlow({ product, availableLenses, onClose, o
 
   const handleBack = () => {
     setError(null);
-    if (step === "PACKAGES") setStep("TYPE");
-    else if (step === "PRESCRIPTION") setStep("PACKAGES");
-    else if (step === "MATERIAL") setStep("PRESCRIPTION");
-    else if (step === "SUMMARY") setStep("MATERIAL");
+    if (step === "TYPE") setStep("PRESCRIPTION");
+    else if (step === "MATERIAL") setStep("TYPE");
+    else if (step === "PACKAGES") setStep("MATERIAL");
+    else if (step === "SUMMARY") setStep("PACKAGES");
   };
 
   const stepInfo = {
-    TYPE: { title: "Step 01: Lens Matrix", subtitle: "Select your primary vision correction technology." },
-    PACKAGES: { title: "Step 02: Core Coatings & Packages", subtitle: "All 4 essential coatings are included free. Select an optional upgrade package." },
-    PRESCRIPTION: { title: "Step 03: Ocular Data", subtitle: "Input your clinical prescription metrics or upload your prescription slip." },
-    MATERIAL: { title: "Step 04: Refractive Index", subtitle: "Choose lens thickness calibrated for your prescription power." },
-    SUMMARY: { title: "Step 05: Final Auth", subtitle: "Review your configuration before calibration." }
+    PRESCRIPTION: { title: "Step 01: Prescription", subtitle: "Enter clinical metrics calibrated for your lenses." },
+    TYPE: { title: "Step 02: Lens Matrix", subtitle: "Auto-filtered options based on your prescription." },
+    MATERIAL: { title: "Step 03: Refractive Index", subtitle: "Thickness profile calibrated for your optical power." },
+    PACKAGES: { title: "Step 04: Lens Packages", subtitle: "All 4 essential coatings included free. Select an upgrade package." },
+    SUMMARY: { title: "Step 05: Final Review", subtitle: "Review your configuration before calibration." }
   };
+
+  const isRxFilled = prescription.od_sph.trim() !== "" && prescription.os_sph.trim() !== "";
+  const isProceedDisabled =
+    (step === "PRESCRIPTION" && !isRxFilled) ||
+    (step === "TYPE" && (!selectedType || (isProgressive && !selectedTier))) ||
+    (step === "MATERIAL" && !selectedThickness);
 
   return (
     <div data-lenis-prevent className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-brand-navy/60 backdrop-blur-md">
@@ -372,6 +438,23 @@ export default function LensSelectionFlow({ product, availableLenses, onClose, o
                      <span className="text-[10px] uppercase font-bold tracking-widest opacity-40 italic">Base Frame</span>
                      <span className="font-bold tracking-wider italic">₹{(product.discount_price || product.price).toLocaleString()}</span>
                   </div>
+
+                  {prescription.od_sph && prescription.os_sph && (
+                    <div className="border-b border-brand-navy/5 pb-2 text-[10px] space-y-1">
+                      <span className="uppercase font-bold tracking-widest opacity-40 italic">Prescription (OD / OS)</span>
+                      <p className="font-bold text-brand-navy">
+                        OD: {prescription.od_sph} {prescription.od_cyl && `| Cyl ${prescription.od_cyl}`}
+                      </p>
+                      <p className="font-bold text-brand-navy">
+                        OS: {prescription.os_sph} {prescription.os_cyl && `| Cyl ${prescription.os_cyl}`}
+                      </p>
+                      {hasAdd && (
+                        <p className="text-[9px] text-secondary font-semibold">
+                          ADD: +{prescription.od_add || prescription.os_add} {prescription.age ? `(Age ${prescription.age})` : ""}
+                        </p>
+                      )}
+                    </div>
+                  )}
                   
                   {selectedType && (
                     <motion.div initial={{ opacity: 0, x: -10 }} animate={{ opacity: 1, x: 0 }} className="flex justify-between items-start border-b border-brand-navy/5 pb-2">
@@ -399,13 +482,6 @@ export default function LensSelectionFlow({ product, availableLenses, onClose, o
                     </motion.div>
                   )}
 
-                  {selectedMaterial && (
-                    <div className="flex justify-between items-end border-b border-brand-navy/5 pb-2 text-[10px]">
-                       <span className="uppercase font-bold tracking-widest opacity-40 italic">{selectedMaterial.name}</span>
-                       <span className="font-bold tracking-wider">₹{selectedMaterial.price.toLocaleString()}</span>
-                    </div>
-                  )}
-
                   {selectedThickness && (
                     <div className="flex justify-between items-end border-b border-brand-navy/5 pb-2 text-[10px]">
                        <span className="uppercase font-bold tracking-widest opacity-40 italic">{selectedThickness.name}</span>
@@ -426,8 +502,8 @@ export default function LensSelectionFlow({ product, availableLenses, onClose, o
         <div data-lenis-prevent className="w-full md:w-[68%] flex flex-col bg-white overflow-hidden h-full max-h-full min-h-0">
           <header className="p-8 border-b border-brand-navy/5 flex justify-between items-center bg-white/80 backdrop-blur-md sticky top-0 z-20 shrink-0">
             <div className="flex gap-6 items-center">
-               {step !== "TYPE" && (
-                   <button onClick={handleBack} className="p-3 border border-brand-navy/10 text-brand-navy hover:text-secondary hover:border-secondary transition-all group">
+               {step !== "PRESCRIPTION" && (
+                   <button onClick={handleBack} className="p-3 border border-brand-navy/10 text-brand-navy hover:text-secondary hover:border-secondary transition-all group rounded-xl">
                      <ArrowLeft size={16} className="group-hover:-translate-x-1 transition-transform" />
                    </button>
                )}
@@ -446,11 +522,179 @@ export default function LensSelectionFlow({ product, availableLenses, onClose, o
           >
              <div className="p-8 lg:p-10 space-y-8 pb-24">
              <AnimatePresence mode="wait">
-                {/* STEP 1: LENS TYPE & INLINE PROGRESSIVE TIERS */}
+                {/* STEP 1: PRESCRIPTION (MANDATORY) */}
+                {step === "PRESCRIPTION" && (
+                   <motion.div key="st-pres" initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: -10 }} className="space-y-6">
+                      <div className="bg-amber-50/80 border border-amber-200 text-amber-900 rounded-2xl p-4 flex items-center gap-3">
+                        <Info size={18} className="text-amber-600 shrink-0" />
+                        <p className="text-xs font-semibold">
+                          Prescription is required before configuring lenses. Please fill at least Right Eye (OD) and Left Eye (OS) SPH values.
+                        </p>
+                      </div>
+
+                      <div className="grid grid-cols-1 gap-6">
+                         {/* Right Eye */}
+                         <div className="bg-brand-navy p-8 text-white space-y-6 rounded-2xl">
+                            <div className="flex justify-between items-center border-b border-white/10 pb-4">
+                               <h4 className="text-[11px] font-black uppercase tracking-[0.5em]">Right Eye (OD)</h4>
+                               <span className="text-[10px] italic opacity-50 uppercase tracking-widest">Oculus Dexter</span>
+                            </div>
+                            <div className="grid grid-cols-2 lg:grid-cols-4 gap-6">
+                               {["SPH", "CYL", "AXIS", "ADD"].map(f => (
+                                  <div key={`od-${f}`} className="space-y-2">
+                                     <label className="text-[8px] font-bold tracking-widest uppercase opacity-40">
+                                       {f} {f === "SPH" && <span className="text-secondary">*</span>}
+                                     </label>
+                                     <input 
+                                       value={prescription[`od_${f.toLowerCase()}` as keyof typeof prescription]}
+                                       onChange={(e) => setPrescription({...prescription, [`od_${f.toLowerCase()}`]: e.target.value})}
+                                       className="w-full bg-white/5 border border-white/10 p-4 text-[11px] font-bold outline-none focus:border-secondary transition-all rounded-xl" 
+                                       placeholder={f === "AXIS" ? "0° - 180°" : f === "ADD" ? "+0.00" : "+0.00"}
+                                     />
+                                  </div>
+                               ))}
+                            </div>
+                         </div>
+
+                         {/* Left Eye */}
+                         <div className="bg-brand-navy p-8 text-white space-y-6 rounded-2xl">
+                            <div className="flex justify-between items-center border-b border-white/10 pb-4">
+                               <h4 className="text-[11px] font-black uppercase tracking-[0.5em]">Left Eye (OS)</h4>
+                               <span className="text-[10px] italic opacity-50 uppercase tracking-widest">Oculus Sinister</span>
+                            </div>
+                            <div className="grid grid-cols-2 lg:grid-cols-4 gap-6">
+                               {["SPH", "CYL", "AXIS", "ADD"].map(f => (
+                                  <div key={`os-${f}`} className="space-y-2">
+                                     <label className="text-[8px] font-bold tracking-widest uppercase opacity-40">
+                                       {f} {f === "SPH" && <span className="text-secondary">*</span>}
+                                     </label>
+                                     <input 
+                                       value={prescription[`os_${f.toLowerCase()}` as keyof typeof prescription]}
+                                       onChange={(e) => setPrescription({...prescription, [`os_${f.toLowerCase()}`]: e.target.value})}
+                                       className="w-full bg-white/5 border border-white/10 p-4 text-[11px] font-bold outline-none focus:border-secondary transition-all rounded-xl" 
+                                       placeholder={f === "AXIS" ? "0° - 180°" : f === "ADD" ? "+0.00" : "+0.00"}
+                                     />
+                                  </div>
+                               ))}
+                            </div>
+                         </div>
+                         
+                         {/* PD and Age (Optional) */}
+                         <div className="p-8 border border-brand-navy/10 space-y-6 rounded-2xl bg-slate-50/50">
+                            <div className="grid grid-cols-1 sm:grid-cols-2 gap-6">
+                               <div className="space-y-2">
+                                  <label className="text-[10px] font-black uppercase tracking-widest text-brand-navy">
+                                    Pupillary Distance (PD)
+                                  </label>
+                                  <input 
+                                    value={prescription.pd}
+                                    onChange={(e) => setPrescription({...prescription, pd: e.target.value})}
+                                    className="w-full bg-white border border-brand-navy/10 p-4 text-[11px] font-bold outline-none focus:border-secondary transition-all rounded-xl" 
+                                    placeholder="e.g. 62"
+                                  />
+                                  <p className="text-[9px] text-brand-text-muted">Optional. Used for optical centering alignment.</p>
+                               </div>
+
+                               <div className="space-y-2">
+                                  <label className="text-[10px] font-black uppercase tracking-widest text-brand-navy">
+                                    Age (Years) — Optional
+                                  </label>
+                                  <input 
+                                    type="number"
+                                    min="1"
+                                    max="120"
+                                    value={prescription.age}
+                                    onChange={(e) => setPrescription({...prescription, age: e.target.value})}
+                                    className="w-full bg-white border border-brand-navy/10 p-4 text-[11px] font-bold outline-none focus:border-secondary transition-all rounded-xl" 
+                                    placeholder="e.g. 45"
+                                  />
+                                  <p className="text-[9px] text-brand-text-muted">Used to calibrate Bifocal vs Progressive recommendation when ADD is present.</p>
+                               </div>
+                            </div>
+
+                            {calculatePowerRangeExtra() > 0 && (
+                               <div className="p-4 bg-secondary/10 border border-secondary/20 flex items-center justify-between text-brand-navy rounded-xl">
+                                  <div>
+                                     <p className="text-[10px] font-black uppercase tracking-widest text-brand-navy">High Power Prescription Surcharge</p>
+                                     <p className="text-[9px] text-brand-text-muted mt-0.5">Applied automatically based on power range requirements.</p>
+                                  </div>
+                                  <span className="text-xs font-black text-secondary">+₹{calculatePowerRangeExtra().toLocaleString()}</span>
+                                </div>
+                            )}
+
+                            {/* Optional Prescription File Upload */}
+                            <div className="pt-4 border-t border-brand-navy/5">
+                              <input 
+                                type="file" 
+                                ref={fileInputRef} 
+                                onChange={handleFileUpload} 
+                                accept="image/*,application/pdf" 
+                                className="hidden" 
+                              />
+                              <div 
+                                onClick={() => fileInputRef.current?.click()}
+                                className="border-2 border-dashed border-brand-navy/15 bg-white rounded-xl p-5 text-center cursor-pointer hover:border-secondary hover:bg-secondary/5 transition-all"
+                              >
+                                {uploadingFile ? (
+                                  <p className="text-[11px] font-bold text-secondary uppercase tracking-widest animate-pulse">Uploading prescription slip...</p>
+                                ) : prescription.file_url ? (
+                                  <div className="flex items-center justify-center gap-2 text-emerald-700">
+                                    <CheckCircle2 size={16} />
+                                    <span className="text-[11px] font-bold uppercase tracking-wider">
+                                      Prescription Slip Attached {uploadedFileName ? `(${uploadedFileName})` : ""}
+                                    </span>
+                                  </div>
+                                ) : (
+                                  <div className="flex items-center justify-center gap-3 text-brand-navy">
+                                    <Upload size={16} className="text-secondary" />
+                                    <span className="text-[10px] font-bold uppercase tracking-wider">
+                                      Attach Prescription Slip / Photo (Optional)
+                                    </span>
+                                    <span className="text-[9px] text-brand-text-muted">JPG, PNG or PDF</span>
+                                  </div>
+                                )}
+                              </div>
+                            </div>
+                         </div>
+                      </div>
+                   </motion.div>
+                )}
+
+                {/* STEP 2: LENS TYPE MATRIX (STRICT FILTERING & AUTO-SELECTION) */}
                 {step === "TYPE" && (
                    <motion.div key="st-type" initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: -10 }} className="space-y-8">
+                      {/* Recommendation Header Banner */}
+                      {!hasAdd ? (
+                        <div className="bg-emerald-50 border border-emerald-200 rounded-2xl p-5 flex flex-col sm:flex-row items-center justify-between gap-3 shadow-sm">
+                          <div className="flex items-center gap-2.5">
+                            <span className="w-2.5 h-2.5 rounded-full bg-emerald-500" />
+                            <span className="text-[11px] font-bold text-emerald-950">
+                              Based on your prescription: <span className="font-black text-[#004AAD]">Single Vision recommended</span> (No ADD power detected)
+                            </span>
+                          </div>
+                          <span className="text-[9px] font-black uppercase tracking-wider bg-emerald-100 text-emerald-800 px-3.5 py-1.5 rounded-full shadow-sm">
+                            Auto-Selected
+                          </span>
+                        </div>
+                      ) : (
+                        <div className="bg-blue-50 border border-[#004AAD]/20 rounded-2xl p-5 flex flex-col sm:flex-row items-center justify-between gap-3 shadow-sm">
+                          <div className="flex items-center gap-2.5">
+                            <span className="w-2.5 h-2.5 rounded-full bg-[#004AAD]" />
+                            <span className="text-[11px] font-bold text-[#03173D]">
+                              Based on your prescription (ADD power present):{" "}
+                              <span className="font-black text-[#004AAD]">
+                                {ageVal >= 40 ? "Progressive recommended (Age 40+)" : "Bifocal recommended"}
+                              </span>
+                            </span>
+                          </div>
+                          <span className="text-[9px] font-black uppercase tracking-wider bg-[#004AAD] text-white px-3.5 py-1.5 rounded-full shadow-sm">
+                            Multifocal Calibrated
+                          </span>
+                        </div>
+                      )}
+
                       <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
-                         {lensTypes.map(lens => {
+                         {filteredLensTypes.map(lens => {
                             const isThisProgressive = lens.name.toLowerCase().includes("progressive");
                             const isSelected = selectedType?.id === lens.id;
 
@@ -487,7 +731,7 @@ export default function LensSelectionFlow({ product, availableLenses, onClose, o
                          })}
                       </div>
 
-                      {/* Inline Progressive Tier Selection (Fix 3) */}
+                      {/* Inline Progressive Tier Selection */}
                       {isProgressive && (
                         <motion.div 
                           initial={{ opacity: 0, height: 0 }}
@@ -567,10 +811,137 @@ export default function LensSelectionFlow({ product, availableLenses, onClose, o
                    </motion.div>
                 )}
 
-                {/* STEP 2: INCLUDED COATINGS & UPGRADE PACKAGES (Fix 1 & Fix 2) */}
+                {/* STEP 3: REFRACTIVE INDEX (THICKNESS) — AUTO RECOMMENDED */}
+                {step === "MATERIAL" && (
+                   <motion.div key="st-mat" initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} className="space-y-8">
+                      {/* Rimless Frame Notice or Clinical Recommendation */}
+                      {isRimless ? (
+                        <div className="bg-blue-50 border-2 border-[#004AAD]/30 rounded-2xl p-5 flex flex-col sm:flex-row items-center justify-between gap-3 shadow-sm">
+                          <div>
+                            <span className="text-[9px] font-black uppercase tracking-[0.3em] text-[#004AAD] block mb-1">
+                              Rimless Frame Requirement
+                            </span>
+                            <p className="text-[11px] font-black uppercase tracking-widest text-[#03173D] flex items-center gap-2">
+                              <span className="w-2.5 h-2.5 rounded-full bg-[#004AAD]" />
+                              Polycarbonate 1.59 Required: <span className="text-[#004AAD] font-black">Impact-Resistant Calibrated</span>
+                            </p>
+                            <p className="text-[9px] text-slate-500 mt-1">
+                              Rimless frames require polycarbonate material to prevent stress cracking around drill holes.
+                            </p>
+                          </div>
+                          <span className="text-[9px] font-black uppercase tracking-wider bg-[#004AAD] text-white px-3.5 py-1.5 rounded-full shadow">
+                            Rimless Locked
+                          </span>
+                        </div>
+                      ) : getRecommendedIndex() ? (
+                        <div className="bg-secondary/15 border-2 border-secondary rounded-2xl p-5 flex flex-col sm:flex-row items-center justify-between gap-3 shadow-sm">
+                          <div>
+                            <span className="text-[9px] font-black uppercase tracking-[0.3em] text-brand-navy block mb-1">
+                              Clinical Index Recommendation
+                            </span>
+                            <p className="text-[11px] font-black uppercase tracking-widest text-brand-navy flex items-center gap-2">
+                              <span className="w-2.5 h-2.5 rounded-full bg-secondary" />
+                              Recommended for your power: <span className="text-secondary font-black underline">{getRecommendedIndex()} ({indexOptions.find(o => o.indexValue === getRecommendedIndex())?.label})</span>
+                            </p>
+                          </div>
+                          <span className="text-[9px] font-black uppercase tracking-wider bg-brand-navy text-white px-3.5 py-1.5 rounded-full shadow">
+                            Auto-Recommended
+                          </span>
+                        </div>
+                      ) : (
+                        <div className="bg-slate-50 border border-slate-200 rounded-2xl p-5 text-center space-y-1">
+                          <p className="text-[11px] font-black uppercase tracking-widest text-brand-navy">
+                            Select your preferred refractive index & thickness
+                          </p>
+                          <p className="text-[9px] text-brand-text-muted">
+                            Higher index numbers provide thinner, flatter profiles for stronger prescriptions.
+                          </p>
+                        </div>
+                      )}
+
+                      <div className="space-y-4">
+                         <div className="flex justify-between items-center">
+                            <h4 className="text-[10px] font-black uppercase tracking-[0.3em] text-brand-navy flex items-center gap-3">
+                               <span className="w-2 h-2 bg-secondary rounded-full" />
+                               Refractive Index (Thickness)
+                            </h4>
+                            <span className="text-[9px] uppercase font-bold tracking-widest text-brand-text-muted">
+                              Select Preferred Profile
+                            </span>
+                         </div>
+
+                         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+                            {indexOptions.map(opt => {
+                               const isRecommended = getRecommendedIndex() === opt.indexValue;
+                               const isSelected = selectedThickness?.indexValue === opt.indexValue;
+                               const isAvailable = opt.available;
+
+                               return (
+                                 <button 
+                                   key={opt.id} 
+                                   disabled={!isAvailable}
+                                   onClick={() => {
+                                     if (isAvailable) setSelectedThickness(opt);
+                                   }}
+                                   className={cn(
+                                     "p-6 border text-left transition-all rounded-2xl relative flex flex-col justify-between space-y-4",
+                                     !isAvailable && "opacity-40 cursor-not-allowed grayscale",
+                                     isSelected 
+                                       ? "bg-brand-navy text-white border-secondary shadow-xl ring-2 ring-secondary/20" 
+                                       : isRecommended 
+                                         ? "bg-secondary/5 border-secondary/50 text-brand-navy hover:border-secondary" 
+                                         : "bg-brand-background border-brand-navy/10 text-brand-navy hover:border-brand-navy/30"
+                                   )}
+                                 >
+                                    <div>
+                                       <div className="flex justify-between items-start mb-1">
+                                          <span className={cn(
+                                            "text-xs font-black uppercase tracking-wider",
+                                            isSelected ? "text-white" : "text-brand-navy"
+                                          )}>
+                                             {opt.name}
+                                          </span>
+                                          {isRecommended && isAvailable && (
+                                            <span className="text-[8px] font-black uppercase tracking-wider bg-secondary text-brand-navy px-2 py-0.5 rounded-full">
+                                              ★ Recommended
+                                            </span>
+                                          )}
+                                          {!isAvailable && (
+                                            <span className="text-[8px] font-bold uppercase tracking-wider bg-red-100 text-red-700 px-2 py-0.5 rounded">
+                                              N/A
+                                            </span>
+                                          )}
+                                       </div>
+                                       <p className={cn("text-[10px] leading-relaxed mt-1", isSelected ? "text-white/70" : "text-brand-text-muted")}>
+                                          {opt.unavailableReason || opt.desc}
+                                       </p>
+                                    </div>
+
+                                    <div className="flex justify-between items-center pt-3 border-t border-brand-navy/5">
+                                       <span className={cn("text-[9px] font-bold uppercase tracking-wider", isSelected ? "text-secondary" : "text-brand-text-muted")}>
+                                          {opt.material}
+                                       </span>
+                                       <div className="flex items-center gap-2">
+                                          <span className={cn("text-[11px] font-black", isSelected ? "text-secondary" : "text-brand-navy")}>
+                                            {opt.price > 0 ? `+₹${opt.price.toLocaleString('en-IN')}` : "Included"}
+                                          </span>
+                                          {isSelected && (
+                                            <CheckCircle2 size={16} className="text-secondary" />
+                                          )}
+                                       </div>
+                                    </div>
+                                 </button>
+                               );
+                            })}
+                         </div>
+                      </div>
+                   </motion.div>
+                )}
+
+                {/* STEP 4: INCLUDED COATINGS & UPGRADE PACKAGES */}
                 {step === "PACKAGES" && (
                    <motion.div key="st-packages" initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} className="space-y-8">
-                      {/* FIX 1: Read-only "Included in your lens" block */}
+                      {/* Included in your lens block */}
                       <div className="bg-emerald-50/80 border border-emerald-200 rounded-2xl p-6 space-y-4">
                         <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2">
                           <div>
@@ -600,7 +971,7 @@ export default function LensSelectionFlow({ product, availableLenses, onClose, o
                         </div>
                       </div>
 
-                      {/* FIX 2: Flat Upgrade Packages */}
+                      {/* Flat Upgrade Packages */}
                       <div className="space-y-4">
                         <div className="flex justify-between items-center">
                           <h4 className="text-xs font-black uppercase tracking-widest text-brand-navy">
@@ -668,283 +1039,6 @@ export default function LensSelectionFlow({ product, availableLenses, onClose, o
                    </motion.div>
                 )}
 
-                {/* STEP 3: PRESCRIPTION */}
-                {step === "PRESCRIPTION" && (
-                   <motion.div key="st-pres" initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} className="space-y-8">
-                      {/* Live Index Recommendation Preview */}
-                      {getRecommendedIndex() && (
-                        <div className="bg-secondary/10 border-2 border-secondary/30 rounded-2xl p-4 flex flex-col sm:flex-row items-center justify-between gap-3">
-                          <div className="flex items-center gap-2.5">
-                            <span className="w-2.5 h-2.5 rounded-full bg-secondary animate-pulse" />
-                            <span className="text-[10px] font-black uppercase tracking-widest text-brand-navy">
-                              Auto Calibration Detected
-                            </span>
-                          </div>
-                          <span className="text-[10px] font-black uppercase tracking-wider bg-secondary text-brand-navy px-3.5 py-1.5 rounded-full shadow-sm">
-                            Recommended for your power: {getRecommendedIndex()} ({indexOptions.find(o => o.indexValue === getRecommendedIndex())?.label})
-                          </span>
-                        </div>
-                      )}
-
-                      <div className="grid grid-cols-1 gap-6">
-                         <div className="bg-brand-navy p-8 text-white space-y-6 rounded-2xl">
-                            <div className="flex justify-between items-center border-b border-white/10 pb-4">
-                               <h4 className="text-[11px] font-black uppercase tracking-[0.5em]">Right Eye (OD)</h4>
-                               <span className="text-[10px] italic opacity-50 uppercase tracking-widest">Oculus Dexter</span>
-                            </div>
-                            <div className="grid grid-cols-2 lg:grid-cols-4 gap-6">
-                               {["SPH", "CYL", "AXIS", "ADD"].map(f => (
-                                  <div key={`od-${f}`} className="space-y-2">
-                                     <label className="text-[8px] font-bold tracking-widest uppercase opacity-40">{f}</label>
-                                     <input 
-                                       value={prescription[`od_${f.toLowerCase()}` as keyof typeof prescription]}
-                                       onChange={(e) => setPrescription({...prescription, [`od_${f.toLowerCase()}`]: e.target.value})}
-                                       className="w-full bg-white/5 border border-white/10 p-4 text-[11px] font-bold outline-none focus:border-secondary transition-all rounded-xl" 
-                                       placeholder="+0.00"
-                                     />
-                                  </div>
-                               ))}
-                            </div>
-                         </div>
-
-                         <div className="bg-brand-navy p-8 text-white space-y-6 rounded-2xl">
-                            <div className="flex justify-between items-center border-b border-white/10 pb-4">
-                               <h4 className="text-[11px] font-black uppercase tracking-[0.5em]">Left Eye (OS)</h4>
-                               <span className="text-[10px] italic opacity-50 uppercase tracking-widest">Oculus Sinister</span>
-                            </div>
-                            <div className="grid grid-cols-2 lg:grid-cols-4 gap-6">
-                               {["SPH", "CYL", "AXIS", "ADD"].map(f => (
-                                  <div key={`os-${f}`} className="space-y-2">
-                                     <label className="text-[8px] font-bold tracking-widest uppercase opacity-40">{f}</label>
-                                     <input 
-                                       value={prescription[`os_${f.toLowerCase()}` as keyof typeof prescription]}
-                                       onChange={(e) => setPrescription({...prescription, [`os_${f.toLowerCase()}`]: e.target.value})}
-                                       className="w-full bg-white/5 border border-white/10 p-4 text-[11px] font-bold outline-none focus:border-secondary transition-all rounded-xl" 
-                                       placeholder="+0.00"
-                                     />
-                                  </div>
-                               ))}
-                            </div>
-                         </div>
-                         
-                         <div className="p-8 border border-brand-navy/10 space-y-6 rounded-2xl">
-                            <div className="flex flex-col sm:flex-row items-center gap-4">
-                               <div className="w-full sm:flex-1 space-y-2">
-                                  <label className="text-[10px] font-black uppercase tracking-widest text-brand-navy">Pupillary Distance (PD)</label>
-                                  <input 
-                                    value={prescription.pd}
-                                    onChange={(e) => setPrescription({...prescription, pd: e.target.value})}
-                                    className="w-full bg-brand-background border border-brand-navy/10 p-4 text-[11px] font-bold outline-none focus:border-secondary transition-all rounded-xl" 
-                                    placeholder="62"
-                                  />
-                                </div>
-                               <div className="w-full sm:flex-1 p-4 bg-secondary/5 rounded-xl border border-secondary/10 flex items-center gap-4">
-                                  <HelpCircle size={20} className="text-secondary shrink-0" />
-                                  <p className="text-[9px] uppercase font-bold tracking-widest text-secondary leading-relaxed">Required for correct optical centering alignment.</p>
-                                </div>
-                            </div>
-
-                            {calculatePowerRangeExtra() > 0 && (
-                               <div className="p-4 bg-secondary/10 border border-secondary/20 flex items-center justify-between text-brand-navy rounded-xl">
-                                  <div>
-                                     <p className="text-[10px] font-black uppercase tracking-widest text-brand-navy">High Power Prescription Adjustment</p>
-                                     <p className="text-[9px] text-brand-text-muted mt-0.5">Applied automatically based on power range matrix.</p>
-                                  </div>
-                                  <span className="text-xs font-black text-secondary">+₹{calculatePowerRangeExtra().toLocaleString()}</span>
-                                </div>
-                            )}
-
-                            {/* Optional Prescription File Upload (Fix 4) */}
-                            <div className="pt-4 border-t border-brand-navy/5">
-                              <input 
-                                type="file" 
-                                ref={fileInputRef} 
-                                onChange={handleFileUpload} 
-                                accept="image/*,application/pdf" 
-                                className="hidden" 
-                              />
-                              <div 
-                                onClick={() => fileInputRef.current?.click()}
-                                className="border-2 border-dashed border-brand-navy/15 rounded-xl p-5 text-center cursor-pointer hover:border-secondary hover:bg-secondary/5 transition-all"
-                              >
-                                {uploadingFile ? (
-                                  <p className="text-[11px] font-bold text-secondary uppercase tracking-widest animate-pulse">Uploading prescription slip...</p>
-                                ) : prescription.file_url ? (
-                                  <div className="flex items-center justify-center gap-2 text-emerald-700">
-                                    <CheckCircle2 size={16} />
-                                    <span className="text-[11px] font-bold uppercase tracking-wider">
-                                      Prescription Attached {uploadedFileName ? `(${uploadedFileName})` : ""}
-                                    </span>
-                                  </div>
-                                ) : (
-                                  <div className="flex items-center justify-center gap-3 text-brand-navy">
-                                    <Upload size={16} className="text-secondary" />
-                                    <span className="text-[10px] font-bold uppercase tracking-wider">
-                                      Attach Prescription Slip / Photo (Optional)
-                                    </span>
-                                    <span className="text-[9px] text-brand-text-muted">JPG, PNG or PDF</span>
-                                  </div>
-                                )}
-                              </div>
-                            </div>
-
-                            <div className="flex flex-col sm:flex-row items-center gap-4">
-                               <div className="w-full sm:flex-1 space-y-2">
-                                  <label className="text-[10px] font-black uppercase tracking-widest text-brand-navy">Pupillary Distance (PD) (Optional)</label>
-                                  <input 
-                                    value={prescription.pd}
-                                    onChange={(e) => setPrescription({...prescription, pd: e.target.value})}
-                                    className="w-full bg-brand-background border border-brand-navy/10 p-4 text-[11px] font-bold outline-none focus:border-secondary transition-all rounded-xl" 
-                                    placeholder="62"
-                                  />
-                                </div>
-                               <div className="w-full sm:flex-1 p-4 bg-secondary/5 rounded-xl border border-secondary/10 flex items-center gap-4">
-                                  <HelpCircle size={20} className="text-secondary shrink-0" />
-                                  <p className="text-[9px] uppercase font-bold tracking-widest text-secondary leading-relaxed">Optional. Recommended for precision optical centering alignment.</p>
-                                </div>
-                            </div>
-
-                            {calculatePowerRangeExtra() > 0 && (
-                               <div className="p-4 bg-secondary/10 border border-secondary/20 flex items-center justify-between text-brand-navy rounded-xl">
-                                  <div>
-                                     <p className="text-[10px] font-black uppercase tracking-widest text-brand-navy">High Power Prescription Adjustment</p>
-                                     <p className="text-[9px] text-brand-text-muted mt-0.5">Applied automatically based on power range matrix.</p>
-                                  </div>
-                                  <span className="text-xs font-black text-secondary">+₹{calculatePowerRangeExtra().toLocaleString()}</span>
-                                </div>
-                            )}
-                         </div>
-                      </div>
-                   </motion.div>
-                )}
-
-                {/* STEP 4: REFRACTIVE INDEX (THICKNESS) — FIX 2 & FIX 3 */}
-                {step === "MATERIAL" && (
-                   <motion.div key="st-mat" initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} className="space-y-8">
-                      {/* Rimless Frame Notice */}
-                      {isRimless ? (
-                        <div className="bg-blue-50 border-2 border-[#004AAD]/30 rounded-2xl p-5 flex flex-col sm:flex-row items-center justify-between gap-3 shadow-sm">
-                          <div>
-                            <span className="text-[9px] font-black uppercase tracking-[0.3em] text-[#004AAD] block mb-1">
-                              Rimless Frame Requirement
-                            </span>
-                            <p className="text-[11px] font-black uppercase tracking-widest text-[#03173D] flex items-center gap-2">
-                              <span className="w-2.5 h-2.5 rounded-full bg-[#004AAD]" />
-                              Polycarbonate 1.59 Required: <span className="text-[#004AAD] font-black">Impact-Resistant Calibrated</span>
-                            </p>
-                            <p className="text-[9px] text-slate-500 mt-1">
-                              Rimless frames require polycarbonate material to prevent stress cracking around drill holes.
-                            </p>
-                          </div>
-                          <span className="text-[9px] font-black uppercase tracking-wider bg-[#004AAD] text-white px-3.5 py-1.5 rounded-full shadow">
-                            Rimless Locked
-                          </span>
-                        </div>
-                      ) : getRecommendedIndex() ? (
-                        <div className="bg-secondary/15 border-2 border-secondary rounded-2xl p-5 flex flex-col sm:flex-row items-center justify-between gap-3 shadow-sm">
-                          <div>
-                            <span className="text-[9px] font-black uppercase tracking-[0.3em] text-brand-navy block mb-1">
-                              Clinical Index Recommendation
-                            </span>
-                            <p className="text-[11px] font-black uppercase tracking-widest text-brand-navy flex items-center gap-2">
-                              <span className="w-2.5 h-2.5 rounded-full bg-secondary" />
-                              Recommended for your power: <span className="text-secondary font-black underline">{getRecommendedIndex()} ({indexOptions.find(o => o.indexValue === getRecommendedIndex())?.label})</span>
-                            </p>
-                          </div>
-                          <span className="text-[9px] font-black uppercase tracking-wider bg-brand-navy text-white px-3.5 py-1.5 rounded-full shadow">
-                            Auto-Recommended
-                          </span>
-                        </div>
-                      ) : (
-                        <div className="bg-slate-50 border border-slate-200 rounded-2xl p-5 text-center space-y-1">
-                          <p className="text-[11px] font-black uppercase tracking-widest text-brand-navy">
-                            Select your preferred refractive index & thickness
-                          </p>
-                          <p className="text-[9px] text-brand-text-muted">
-                            Higher index numbers provide thinner, flatter profiles for stronger prescriptions.
-                          </p>
-                        </div>
-                      )}
-
-                      <div className="space-y-4">
-                         <div className="flex justify-between items-center">
-                            <h4 className="text-[10px] font-black uppercase tracking-[0.3em] text-brand-navy flex items-center gap-3">
-                               <span className="w-2 h-2 bg-secondary rounded-full" />
-                               Refractive Index (Thickness)
-                            </h4>
-                            <span className="text-[9px] uppercase font-bold tracking-widest text-brand-text-muted">
-                              Select Preferred Profile
-                            </span>
-                         </div>
-
-                         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
-                            {indexOptions.map(opt => {
-                               const isRecommended = getRecommendedIndex() === opt.indexValue;
-                               const isSelected = selectedThickness?.indexValue === opt.indexValue;
-                               const isAvailable = opt.available;
-
-                               return (
-                                 <button 
-                                   key={opt.id}
-                                   disabled={!isAvailable}
-                                   onClick={() => {
-                                     if (isAvailable) setSelectedThickness(opt);
-                                   }}
-                                   className={cn(
-                                     "p-6 border text-left transition-all rounded-2xl relative flex flex-col justify-between space-y-4",
-                                     !isAvailable && "opacity-40 cursor-not-allowed grayscale",
-                                     isSelected 
-                                       ? "bg-brand-navy text-white border-secondary shadow-xl ring-2 ring-secondary/20" 
-                                       : isRecommended 
-                                         ? "bg-secondary/5 border-secondary/50 text-brand-navy hover:border-secondary" 
-                                         : "bg-brand-background border-brand-navy/10 text-brand-navy hover:border-brand-navy/30"
-                                   )}
-                                 >
-                                    <div>
-                                       <div className="flex justify-between items-start mb-1">
-                                          <span className={cn(
-                                            "text-xs font-black uppercase tracking-wider",
-                                            isSelected ? "text-white" : "text-brand-navy"
-                                          )}>
-                                             {opt.name}
-                                          </span>
-                                          {isRecommended && isAvailable && (
-                                            <span className="text-[8px] font-black uppercase tracking-wider bg-secondary text-brand-navy px-2 py-0.5 rounded-full">
-                                              ★ Recommended
-                                            </span>
-                                          )}
-                                          {!isAvailable && (
-                                            <span className="text-[8px] font-bold uppercase tracking-wider bg-red-100 text-red-700 px-2 py-0.5 rounded">
-                                              N/A
-                                            </span>
-                                          )}
-                                       </div>
-                                       <p className={cn("text-[10px] leading-relaxed mt-1", isSelected ? "text-white/70" : "text-brand-text-muted")}>
-                                          {opt.unavailableReason || opt.desc}
-                                       </p>
-                                    </div>
-
-                                    <div className="flex justify-between items-center pt-3 border-t border-brand-navy/5">
-                                       <span className={cn("text-[9px] font-bold uppercase tracking-wider", isSelected ? "text-secondary" : "text-brand-text-muted")}>
-                                          {opt.material}
-                                       </span>
-                                       <div className="flex items-center gap-2">
-                                          <span className={cn("text-[11px] font-black", isSelected ? "text-secondary" : "text-brand-navy")}>
-                                            {opt.price > 0 ? `+₹${opt.price.toLocaleString('en-IN')}` : "Included"}
-                                          </span>
-                                          {isSelected && (
-                                            <CheckCircle2 size={16} className="text-secondary" />
-                                          )}
-                                       </div>
-                                    </div>
-                                 </button>
-                               );
-                            })}
-                         </div>
-                      </div>
-                   </motion.div>
-                )}
-
                 {/* STEP 5: FINAL CONFIRMATION & CALIBRATION REVIEW */}
                 {step === "SUMMARY" && (
                    <motion.div key="st-sum" initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} className="space-y-8">
@@ -989,12 +1083,6 @@ export default function LensSelectionFlow({ product, availableLenses, onClose, o
                                     </span>
                                  </div>
                                )}
-                               {selectedMaterial && (
-                                 <div className="flex justify-between p-4 bg-brand-background border-l-4 border-secondary/40 rounded-r-xl">
-                                    <span className="text-[10px] uppercase font-bold tracking-widest text-brand-navy">Material</span>
-                                    <span className="text-[10px] font-black uppercase tracking-widest">{selectedMaterial.name}</span>
-                                 </div>
-                               )}
                             </div>
                          </div>
 
@@ -1030,7 +1118,7 @@ export default function LensSelectionFlow({ product, availableLenses, onClose, o
              )}
              <button 
                onClick={handleNext}
-               disabled={step === "TYPE" && (!selectedType || (isProgressive && !selectedTier))}
+               disabled={isProceedDisabled}
                className="w-full py-7 bg-brand-navy text-white text-[12px] font-black uppercase tracking-[0.5em] hover:bg-secondary hover:text-brand-navy transition-all duration-700 flex items-center justify-center gap-6 shadow-[0_20px_40px_rgba(0,0,0,0.2)] disabled:opacity-20 disabled:grayscale active:scale-95 rounded-xl"
              >
                 <span>{step === "SUMMARY" ? "INJECT TO CART" : "PROCEED TO NEXT PHASE"}</span>

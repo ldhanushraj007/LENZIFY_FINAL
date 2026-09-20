@@ -846,7 +846,7 @@ function Testimonials({ items }: { items?: any[] }) {
 // ─── Trust Badges ─────────────────────────────────────────────────────────────
 function TrustBadges() {
   const badges = [
-    { icon: Truck, title: "Free Shipping", desc: "On all orders above ₹999" },
+    { icon: Truck, title: "Free Shipping", desc: "On all orders above ₹2,000" },
     { icon: CheckCircle, title: "2-Year Warranty", desc: "On all frames & lenses" },
     { icon: Eye, title: "Expert Opticians", desc: "Certified lens specialists" },
     { icon: Star, title: "Easy Returns", desc: "7-day hassle-free returns" },

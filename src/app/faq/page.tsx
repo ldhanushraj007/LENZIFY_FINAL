@@ -48,7 +48,7 @@ const faqs = [
       },
       {
         q: "Do you offer free shipping?",
-        a: "Yes, we offer complimentary shipping on all orders across India."
+        a: "Yes, we offer complimentary shipping on orders above ₹2,000 across India. For orders below ₹2,000, a standard delivery fee of ₹99 applies."
       }
     ]
   },

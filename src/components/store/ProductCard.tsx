@@ -168,7 +168,8 @@ export default function ProductCard({ product }: ProductCardProps) {
             src={imgSrc}
             alt={product.name}
             fill
-            unoptimized
+            sizes="(max-width: 640px) 50vw, (max-width: 1024px) 33vw, 25vw"
+            loading="lazy"
             onError={handleImageError}
             onLoad={() => setIsLoaded(true)}
             className="object-contain p-4 group-hover:scale-105 transition-transform duration-500"

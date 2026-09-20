@@ -5,7 +5,7 @@ import Image from "next/image";
 import Link from "next/link";
 import { Shield, Eye, ShieldCheck, Tag, X, FileText, CheckCircle2 } from "lucide-react";
 import { cn } from "@/lib/utils";
-import { getGSTRate, calculateCartGST } from "@/lib/gst";
+import { getGSTRate, calculateCartGST, FREE_SHIPPING_THRESHOLD } from "@/lib/gst";
 import { resolveProductImage } from "@/lib/image_utils";
 
 export interface ItemPrescription {
@@ -70,32 +70,97 @@ export default function OrderSummary({
     );
   };
 
+  const isReadingGlassesItem = (item: any) => {
+    const pType = item.product_type || item.products?.product_type;
+    const cat = item.category || item.products?.category || item.products?.categories?.name || item.products?.categories?.slug;
+    const name = item.name || item.products?.name || "";
+    const brand = item.brand || item.products?.brand || "";
+    return (
+      pType === "reading-glasses" ||
+      pType === "reading_glasses" ||
+      cat === "Reading Glasses" ||
+      cat === "reading-glasses" ||
+      name.toLowerCase().includes("reading glass") ||
+      brand.toLowerCase().includes("reading glass")
+    );
+  };
+
+  const isAccessoryItem = (item: any) => {
+    const pType = item.product_type || item.products?.product_type;
+    const cat = item.category || item.products?.category || item.products?.categories?.name || item.products?.categories?.slug;
+    const name = item.name || item.products?.name || "";
+    return (
+      pType === "accessory" ||
+      pType === "accessories" ||
+      cat === "Accessories" ||
+      cat === "accessories" ||
+      name.toLowerCase().includes("accessory") ||
+      name.toLowerCase().includes("cleaning kit") ||
+      name.toLowerCase().includes("case") ||
+      name.toLowerCase().includes("chain")
+    );
+  };
+
+  const isComputerGlassesItem = (item: any) => {
+    const cat = item.category || item.products?.category || item.products?.categories?.name || item.products?.categories?.slug;
+    const name = item.name || item.products?.name || "";
+    return (
+      cat === "Computer Glasses" ||
+      cat === "computer-glasses" ||
+      name.toLowerCase().includes("computer glass")
+    );
+  };
+
+  const isFrameOnlyItem = (item: any) => {
+    if (isContactLensItem(item) || isReadingGlassesItem(item) || isAccessoryItem(item) || isComputerGlassesItem(item)) {
+      return false;
+    }
+    const hasLens = Boolean(
+      item.lens_id ||
+      (item.lens_config && (item.lens_config.type || item.lens_config.package || item.lens_config.package_name || item.lens_config.selected_index || item.lens_price))
+    );
+    return !hasLens;
+  };
+
   const gstBreakdown = calculateCartGST(items, couponDiscount);
-  const { subtotal, discountedSubtotal, gst5Total, gst18Total, hasContactLens, grandTotal } = gstBreakdown;
+  const { subtotal, discountedSubtotal, gst5Total, gst18Total, hasContactLens, shippingFee, grandTotal } = gstBreakdown;
 
   // Resolve prescription for a specific line item
   const getItemPrescription = (item: any): ItemPrescription | null => {
+    if (isReadingGlassesItem(item)) return null;
+    if (isAccessoryItem(item)) return null;
+    if (isComputerGlassesItem(item)) return null;
+    if (isFrameOnlyItem(item)) return null;
+
     const itemKey = item.id || item.product_id || item.database_id;
+    let rx: any = null;
+
     // 1. From itemPrescriptions prop
     if (itemPrescriptions && itemKey && itemPrescriptions[itemKey]) {
-      return itemPrescriptions[itemKey];
+      rx = itemPrescriptions[itemKey];
     }
     // 2. From item.prescription_json
-    if (item.prescription_json) {
-      return item.prescription_json;
+    else if (item.prescription_json) {
+      rx = item.prescription_json;
     }
     // 3. From item.prescription
-    if (item.prescription) {
-      return item.prescription;
+    else if (item.prescription) {
+      rx = item.prescription;
     }
     // 4. Fallback to checkoutPrescription if this item requires a lens
-    if (
-      (item.lens_id || item.lens_config || item.lens_name) &&
+    else if (
+      (item.lens_id || item.lens_config) &&
       checkoutPrescription &&
-      (checkoutPrescription.left_eye || checkoutPrescription.right_eye || checkoutPrescription.file_url)
+      (checkoutPrescription.left_eye || checkoutPrescription.right_eye || checkoutPrescription.file_url || checkoutPrescription.od_sph || checkoutPrescription.os_sph)
     ) {
-      return checkoutPrescription;
+      rx = checkoutPrescription;
     }
+
+    // Ensure rx contains actual prescription power or file, not empty or reading power
+    if (rx && (rx.file_url || rx.od_sph || rx.os_sph || rx.left_eye || rx.right_eye)) {
+      return rx;
+    }
+
     return null;
   };
 
@@ -142,9 +207,14 @@ export default function OrderSummary({
             : [];
           const allCoatings = Array.from(new Set([...coatings, ...features])).filter(Boolean);
 
-          const hasLensConfig = Boolean(
+          const isReading = isReadingGlassesItem(item);
+          const isAccessory = isAccessoryItem(item);
+          const isComputer = isComputerGlassesItem(item);
+          const isFrameOnly = isFrameOnlyItem(item);
+
+          const hasLensConfig = !isReading && !isAccessory && !isComputer && !isFrameOnly && Boolean(
             lensCfg &&
-            (lensCfg.type || lensCfg.package || lensCfg.package_name || lensCfg.selected_index || lensCfg.thickness || item.lens_price || item.lens_name)
+            (lensCfg.type || lensCfg.package || lensCfg.package_name || lensCfg.selected_index || lensCfg.thickness || (Number(item.lens_price) > 0))
           );
 
           const totalItemUnitPrice = item.price || item.products?.offer_price || item.products?.price || 0;
@@ -203,6 +273,9 @@ export default function OrderSummary({
                       </p>
                       <h4 className="font-semibold text-[#111111] text-sm leading-tight mt-0.5">
                         {productName}
+                        {isReading && <span className="text-[#666666] font-normal"> — Reading Glasses</span>}
+                        {isComputer && <span className="text-[#666666] font-normal"> — Computer Glasses</span>}
+                        {isFrameOnly && <span className="text-[#666666] font-normal"> (Frame Only)</span>}
                       </h4>
                     </div>
                     {!hasLensConfig && (
@@ -269,7 +342,7 @@ export default function OrderSummary({
               )}
 
               {/* Per-Item Prescription Specs */}
-              {rx ? (
+              {!isReading && !isAccessory && !isComputer && !isFrameOnly && rx ? (
                 <div className="bg-[#F0F4FF]/70 border border-[#004AAD]/15 rounded-xl p-2.5 text-xs space-y-1">
                   <div className="flex items-center gap-1.5 text-[#004AAD] font-semibold text-[11px]">
                     <FileText size={12} />
@@ -305,7 +378,7 @@ export default function OrderSummary({
                     </div>
                   )}
                 </div>
-              ) : (item.lens_id || item.lens_name || item.lens_config) ? (
+              ) : !isReading && !isAccessory && !isComputer && !isFrameOnly && (item.lens_id || item.lens_config) ? (
                 <div className="bg-amber-50/70 border border-amber-200 text-amber-800 rounded-xl p-2 text-[11px] flex items-center gap-1.5">
                   <span className="w-1.5 h-1.5 rounded-full bg-amber-500 shrink-0" />
                   <span>Prescription details pending in Step 2</span>
@@ -363,13 +436,15 @@ export default function OrderSummary({
           <div className="flex justify-between items-center text-xs">
             <span className="text-[#666666]">Free shipping progress</span>
             <span className="font-semibold text-[#004AAD]">
-              {subtotal >= 2000 ? "Unlocked!" : `₹${(2000 - subtotal).toLocaleString("en-IN")} away`}
+              {discountedSubtotal >= FREE_SHIPPING_THRESHOLD
+                ? "Unlocked!"
+                : `₹${(FREE_SHIPPING_THRESHOLD - discountedSubtotal).toLocaleString("en-IN")} away`}
             </span>
           </div>
           <div className="h-1.5 bg-[#F8F9FC] border border-[#E8EAF2] rounded-full overflow-hidden">
             <div
               className="h-full bg-[#004AAD] rounded-full transition-all duration-500"
-              style={{ width: `${Math.min((subtotal / 2000) * 100, 100)}%` }}
+              style={{ width: `${Math.min((discountedSubtotal / FREE_SHIPPING_THRESHOLD) * 100, 100)}%` }}
             />
           </div>
         </div>
@@ -410,9 +485,13 @@ export default function OrderSummary({
           </div>
         ) : null}
 
-        <div className="flex justify-between text-sm text-[#004AAD] font-semibold">
-          <span>Delivery</span>
-          <span>Free</span>
+        <div className="flex justify-between text-sm font-semibold">
+          <span className={shippingFee === 0 ? "text-[#004AAD]" : "text-[#666666]"}>
+            {shippingFee === 0 ? "Delivery" : "Delivery Fee"}
+          </span>
+          <span className={shippingFee === 0 ? "text-[#004AAD]" : "text-[#111111]"}>
+            {shippingFee === 0 ? "Free" : `₹${shippingFee}`}
+          </span>
         </div>
 
         <div className="border-t border-[#ECECEC] pt-3 flex justify-between items-baseline">

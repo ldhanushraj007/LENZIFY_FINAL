@@ -12,14 +12,29 @@ import { Star, ShoppingBag, Heart, Verified, RotateCw, ChevronRight, Truck, Shie
 import { useCartStore } from "@/store/cartStore";
 import { useWishlistStore } from "@/store/wishlistStore";
 import { useAuth } from "@/components/providers/AuthProvider";
-import Product360Viewer from "./Product360Viewer";
-import LensSelectionFlow from "@/components/store/LensSelectionFlow";
-import ReviewForm from "@/components/shop/ReviewForm";
+import dynamic from "next/dynamic";
+
+const Product360Viewer = dynamic(() => import("./Product360Viewer"), {
+  ssr: false,
+  loading: () => (
+    <div className="aspect-square bg-[#F8F9FC] rounded-3xl flex items-center justify-center animate-pulse">
+      <span className="text-xs text-[#666666]">Loading 360° viewer...</span>
+    </div>
+  ),
+});
+const LensSelectionFlow = dynamic(() => import("@/components/store/LensSelectionFlow"), {
+  ssr: false,
+});
+const ReviewForm = dynamic(() => import("@/components/shop/ReviewForm"), {
+  ssr: false,
+});
 import { ProductJsonLd } from "@/components/seo/JsonLd";
 import ProductCard from "@/components/store/ProductCard";
 import toast from "react-hot-toast";
 import ContactLensPowerCustomizer, { ContactLensPrescriptionData, validateContactLensPower } from "@/components/store/ContactLensPowerCustomizer";
-import LoginPromptModal from "@/components/auth/LoginPromptModal";
+const LoginPromptModal = dynamic(() => import("@/components/auth/LoginPromptModal"), {
+  ssr: false,
+});
 import { resolveProductImage } from "@/lib/image_utils";
 
 interface ProductDetailsClientProps {
@@ -62,15 +77,26 @@ export default function ProductDetailsClient({
   }, [product.product_type, product.category, product.categories]);
 
   const isReadingGlasses = useMemo(() => {
+    const catName = product.categories?.name || product.category;
+    const catSlug = product.categories?.slug;
     return (
       product.product_type === "reading-glasses" ||
       product.product_type === "reading_glasses" ||
-      product.category === "Reading Glasses" ||
-      product.category === "reading-glasses" ||
-      product.categories?.slug === "reading-glasses" ||
-      (Array.isArray(product.categories) && product.categories.some((c: any) => c.slug === "reading-glasses"))
+      catName === "Reading Glasses" ||
+      catSlug === "reading-glasses" ||
+      (Array.isArray(product.categories) && product.categories.some((c: any) => c.name === "Reading Glasses" || c.slug === "reading-glasses"))
     );
   }, [product.product_type, product.category, product.categories]);
+
+  const isComputerGlasses = useMemo(() => {
+    const catName = product.categories?.name || product.category;
+    const catSlug = product.categories?.slug;
+    return (
+      catName === "Computer Glasses" ||
+      catSlug === "computer-glasses" ||
+      (Array.isArray(product.categories) && product.categories.some((c: any) => c.name === "Computer Glasses" || c.slug === "computer-glasses"))
+    );
+  }, [product.category, product.categories]);
 
   const parsedContactSpecs = useMemo(() => {
     let s = product.specifications;
@@ -156,19 +182,19 @@ export default function ProductDetailsClient({
       brand: product.brand || "LENZIFY",
       price: displayPrice,
       image: mainImageSrc || "/placeholder.jpg",
-      category: isContactLens ? "Contact Lenses" : isReadingGlasses ? "Reading Glasses" : "Eyewear",
-      product_type: product.product_type || (isReadingGlasses ? "reading-glasses" : "frame"),
+      category: isContactLens ? "Contact Lenses" : isReadingGlasses ? "Reading Glasses" : isComputerGlasses ? "Computer Glasses" : "Eyewear",
+      product_type: product.product_type || (isReadingGlasses ? "reading-glasses" : isContactLens ? "contact-lens" : "frame"),
       quantity: 1,
       stock: product.stock,
       selected_color: selectedColor,
       selected_size: selectedSize,
       reading_power: isReadingGlasses ? readingPower : undefined,
       lens_name: isReadingGlasses
-        ? `Reading Lens (${readingPower})`
+        ? undefined
         : isContactLens
         ? (customPower ? "Custom Power Lenses" : "Standard Contact Lens")
         : (lensData?.lens_config?.type?.name || lensData?.lens_name),
-      lens_config: lensData?.lens_config,
+      lens_config: isReadingGlasses ? undefined : lensData?.lens_config,
       prescription: isReadingGlasses
         ? { reading_power: readingPower }
         : (customPower || lensData?.prescription_json),
@@ -584,25 +610,9 @@ export default function ProductDetailsClient({
               </div>
             )}
 
-            {/* Lens customization CTA */}
-            {product.product_type === "frame" && (
-              <div className="bg-[#F8F9FC] rounded-2xl p-4 border border-[#ECECEC]">
-                <button
-                  onClick={handleOpenLensFlow}
-                  suppressHydrationWarning
-                  className="w-full flex items-center justify-between text-left"
-                >
-                  <div>
-                    <p className="text-sm font-semibold text-[#111111]">Customize Your Lenses</p>
-                    <p className="text-xs text-[#666666] mt-0.5">Add prescription or tinted lenses</p>
-                  </div>
-                  <ChevronRight size={18} className="text-[#004AAD] flex-shrink-0" />
-                </button>
-              </div>
-            )}
 
             {/* LensSelectionFlow modal */}
-            {showLensFlow && (
+            {showLensFlow && !isReadingGlasses && !isComputerGlasses && (
               <LensSelectionFlow
                 product={product}
                 availableLenses={availableLenses}
@@ -613,7 +623,7 @@ export default function ProductDetailsClient({
 
             {/* Action buttons */}
             <div className="space-y-3">
-              {product.product_type === "frame" && !isReadingGlasses ? (
+              {product.product_type === "frame" && !isReadingGlasses && !isComputerGlasses ? (
                 <>
                   <button
                     onClick={handleOpenLensFlow}

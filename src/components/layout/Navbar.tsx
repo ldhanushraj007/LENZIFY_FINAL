@@ -447,20 +447,7 @@ export default function Navbar() {
             </button>
           </div>
 
-          {/* Reading Glasses */}
-          <Link
-            href="/reading-glasses"
-            className={cn(
-              "font-medium transition-all duration-300 py-1",
-              pathname === "/reading-glasses" || pathname.startsWith("/reading-glasses")
-                ? isWhiteMode
-                  ? "text-[#004AAD] border-b border-[#004AAD]"
-                  : "text-white border-b border-white"
-                : linkColor
-            )}
-          >
-            Reading Glasses
-          </Link>
+
 
           {/* Contact Lenses */}
           <div className="relative">
@@ -733,7 +720,7 @@ export default function Navbar() {
           >
             <div className="max-w-screen-2xl mx-auto px-12 py-10 flex gap-20">
               <div className="flex flex-col gap-4">
-                <h3 className="text-xs font-black uppercase tracking-[0.2em] text-[#666666] mb-2">
+                <h3 className="text-xs font-black uppercase tracking-[0.2em] text-[#03173D] mb-2">
                   By Category
                 </h3>
                 {SHOP_CATEGORIES.map((link) => (
@@ -747,7 +734,7 @@ export default function Navbar() {
                 ))}
               </div>
               <div className="flex flex-col gap-4">
-                <h3 className="text-xs font-black uppercase tracking-[0.2em] text-[#666666] mb-2">
+                <h3 className="text-xs font-black uppercase tracking-[0.2em] text-[#03173D] mb-2">
                   By Gender
                 </h3>
                 {SHOP_GENDER.map((link) => (
@@ -761,7 +748,7 @@ export default function Navbar() {
                 ))}
               </div>
               <div className="flex flex-col gap-4">
-                <h3 className="text-xs font-black uppercase tracking-[0.2em] text-[#666666] mb-2">
+                <h3 className="text-xs font-black uppercase tracking-[0.2em] text-[#03173D] mb-2">
                   By Collection
                 </h3>
                 {SHOP_COLLECTION.map((link) => (
@@ -803,7 +790,7 @@ export default function Navbar() {
             className="absolute top-full left-[calc(50%-220px)] bg-white border border-[#E8EAF2] shadow-2xl p-4 flex flex-col gap-2 z-50 rounded-2xl hidden lg:flex min-w-[320px] mt-4"
           >
             <div className="flex items-center justify-between border-b border-[#E8EAF2] pb-2 px-2">
-              <h3 className="text-[10px] font-black uppercase tracking-[0.2em] text-[#666666]">
+              <h3 className="text-[10px] font-black uppercase tracking-[0.2em] text-[#03173D]">
                 Featured Lens Brands
               </h3>
               <span className="text-[9px] font-bold text-[#004AAD] bg-[#004AAD]/10 px-2 py-0.5 rounded">
@@ -850,7 +837,7 @@ export default function Navbar() {
             {activeMenu === "lenses" && (
               <div className="space-y-3 p-2">
                 <div className="flex items-center justify-between border-b border-[#E8EAF2] pb-2 px-3">
-                  <h3 className="text-[10px] font-black uppercase tracking-[0.2em] text-[#666666]">
+                  <h3 className="text-[10px] font-black uppercase tracking-[0.2em] text-[#03173D]">
                     Prescription Lens Types
                   </h3>
                   <span className="text-[9px] font-bold text-emerald-700 bg-emerald-50 px-2 py-0.5 rounded">
@@ -979,29 +966,14 @@ export default function Navbar() {
                   Home
                 </Link>
 
-                {/* Reading Glasses */}
-                <Link
-                  href="/reading-glasses"
-                  onClick={() => setIsMobileMenuOpen(false)}
-                  className={cn(
-                    "text-xs font-black uppercase tracking-[0.2em] flex items-center gap-3 transition-colors",
-                    pathname.startsWith("/reading-glasses")
-                      ? "text-[#004AAD]"
-                      : "text-[#111111] hover:text-[#004AAD]"
-                  )}
-                >
-                  <span className="material-symbols-outlined text-xl">auto_stories</span>
-                  Reading Glasses
-                </Link>
-
                 {/* Shop */}
                 <div>
-                  <h3 className="text-xs font-black uppercase tracking-[0.2em] text-[#999999] mb-4 border-b border-[#E8EAF2] pb-2">
+                  <h3 className="text-xs font-black uppercase tracking-[0.2em] text-[#03173D] mb-4 border-b border-[#E8EAF2] pb-2">
                     Shop
                   </h3>
                   <div className="space-y-4 pl-2">
                     <div className="space-y-3 pb-2 border-b border-[#F0F2F8]">
-                      <p className="text-[10px] font-bold text-[#999999] uppercase">
+                      <p className="text-[10px] font-bold text-[#03173D] uppercase">
                         By Category
                       </p>
                       {SHOP_CATEGORIES.map((link) => (
@@ -1016,7 +988,7 @@ export default function Navbar() {
                       ))}
                     </div>
                     <div className="space-y-3 pb-2 border-b border-[#F0F2F8]">
-                      <p className="text-[10px] font-bold text-[#999999] uppercase">
+                      <p className="text-[10px] font-bold text-[#03173D] uppercase">
                         By Gender
                       </p>
                       {SHOP_GENDER.map((link) => (
@@ -1031,7 +1003,7 @@ export default function Navbar() {
                       ))}
                     </div>
                     <div className="space-y-3">
-                      <p className="text-[10px] font-bold text-[#999999] uppercase">
+                      <p className="text-[10px] font-bold text-[#03173D] uppercase">
                         By Collection
                       </p>
                       {SHOP_COLLECTION.map((link) => (
@@ -1050,7 +1022,7 @@ export default function Navbar() {
 
                 {/* Contact Lenses Mobile Section */}
                 <div>
-                  <h3 className="text-xs font-black uppercase tracking-[0.2em] text-[#999999] mb-4 border-b border-[#E8EAF2] pb-2">
+                  <h3 className="text-xs font-black uppercase tracking-[0.2em] text-[#03173D] mb-4 border-b border-[#E8EAF2] pb-2">
                     Contact Lenses
                   </h3>
                   <div className="space-y-3 pl-2">
@@ -1061,7 +1033,7 @@ export default function Navbar() {
                     >
                       All Contact Lenses →
                     </Link>
-                    <p className="text-[10px] font-bold text-[#999999] uppercase pt-1">
+                    <p className="text-[10px] font-bold text-[#03173D] uppercase pt-1">
                       By Brand
                     </p>
                     {contactLensBrands.map((brand) => (
@@ -1079,12 +1051,12 @@ export default function Navbar() {
 
                 {/* Lenses */}
                 <div>
-                  <h3 className="text-xs font-black uppercase tracking-[0.2em] text-[#999999] mb-4 border-b border-[#E8EAF2] pb-2">
+                  <h3 className="text-xs font-black uppercase tracking-[0.2em] text-[#03173D] mb-4 border-b border-[#E8EAF2] pb-2">
                     Lenses
                   </h3>
                   <div className="space-y-6 pl-2">
                     <div className="space-y-3">
-                      <p className="text-[10px] font-bold text-[#999999] uppercase">
+                      <p className="text-[10px] font-bold text-[#03173D] uppercase">
                         Lens Types
                       </p>
                       {lenses.map((lens) => (
@@ -1111,7 +1083,7 @@ export default function Navbar() {
 
                 {/* Offers */}
                 <div>
-                  <h3 className="text-xs font-black uppercase tracking-[0.2em] text-[#999999] mb-4 border-b border-[#E8EAF2] pb-2">
+                  <h3 className="text-xs font-black uppercase tracking-[0.2em] text-[#03173D] mb-4 border-b border-[#E8EAF2] pb-2">
                     Offers
                   </h3>
                   <div className="space-y-3 pl-2">

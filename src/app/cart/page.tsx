@@ -71,23 +71,63 @@ function CartPageContent() {
         setLoading(false);
         return;
       }
-      const mappedItems = cartData.map((item: any) => ({
-        id: `${item.product_id}-${item.selected_color || ""}-${item.selected_size || ""}-${item.lens_id || ""}`,
-        database_id: item.id,
-        product_id: item.product_id,
-        name: item.products?.name || "Product",
-        brand: item.products?.brand || "LENZIFY",
-        price: item.price || item.products?.discount_price || item.products?.offer_price || item.products?.price,
-        image: resolveProductImage(item.products) || item.image || "/placeholder.jpg",
-        category: item.products?.product_type === "contact-lens" || item.products?.product_type === "contact_lens" ? "Contact Lenses" : "Eyewear",
-        quantity: item.quantity,
-        stock: item.products?.stock ?? 99,
-        lens_name: item.lens_config?.type?.name || item.lens_config?.lens_name || item.lenses?.name || (item.prescription_json ? "Custom Power Lenses" : undefined),
-        lens_config: item.lens_config,
-        prescription: item.prescription_json,
-        selected_color: item.selected_color,
-        selected_size: item.selected_size,
-      }));
+      const mappedItems = cartData.map((item: any) => {
+        const pType = item.products?.product_type || item.product_type;
+        const cat = item.products?.categories?.name || item.products?.categories?.slug || item.category || (pType === "contact-lens" || pType === "contact_lens" ? "Contact Lenses" : pType === "reading-glasses" ? "Reading Glasses" : "Eyewear");
+        const prodName = item.products?.name || item.name || "Product";
+        const brandName = item.products?.brand || item.brand || "LENZIFY";
+        const isReading = (
+          pType === "reading-glasses" ||
+          pType === "reading_glasses" ||
+          cat === "Reading Glasses" ||
+          cat === "reading-glasses" ||
+          prodName.toLowerCase().includes("reading glass") ||
+          brandName.toLowerCase().includes("reading glass")
+        );
+        const isAccessory = (
+          pType === "accessory" ||
+          pType === "accessories" ||
+          cat === "Accessories" ||
+          cat === "accessories" ||
+          prodName.toLowerCase().includes("accessory") ||
+          prodName.toLowerCase().includes("cleaning kit") ||
+          prodName.toLowerCase().includes("case") ||
+          prodName.toLowerCase().includes("chain")
+        );
+        const isComputer = (
+          cat === "Computer Glasses" ||
+          cat === "computer-glasses" ||
+          prodName.toLowerCase().includes("computer glass")
+        );
+
+        const hasActualLens = !isReading && !isAccessory && !isComputer && Boolean(
+          item.lens_id ||
+          (item.lens_config && (item.lens_config.type || item.lens_config.package || item.lens_config.package_name || item.lens_config.selected_index || (Number(item.lens_price) > 0)))
+        );
+
+        return {
+          id: `${item.product_id}-${item.selected_color || ""}-${item.selected_size || ""}-${item.lens_id || ""}`,
+          database_id: item.id,
+          product_id: item.product_id,
+          name: prodName,
+          brand: brandName,
+          price: item.price || item.products?.discount_price || item.products?.offer_price || item.products?.price,
+          image: resolveProductImage(item.products) || item.image || "/placeholder.jpg",
+          category: cat,
+          product_type: pType,
+          products: item.products,
+          quantity: item.quantity,
+          stock: item.products?.stock ?? 99,
+          lens_name: hasActualLens
+            ? (item.lens_config?.type?.name || item.lens_config?.lens_name || item.lenses?.name || "Custom Power Lenses")
+            : undefined,
+          lens_config: hasActualLens ? item.lens_config : null,
+          prescription: hasActualLens ? item.prescription_json : null,
+          reading_power: item.prescription_json?.reading_power || item.reading_power,
+          selected_color: item.selected_color,
+          selected_size: item.selected_size,
+        };
+      });
       setItems(mappedItems as any);
       setLoading(false);
 
@@ -144,6 +184,58 @@ function CartPageContent() {
     const pType = item.product_type || item.products?.product_type;
     const cat = item.category || item.products?.category || item.products?.categories?.slug;
     return pType === "contact-lens" || pType === "contact_lens" || cat === "contact-lenses" || cat === "Contact Lenses";
+  };
+
+  const isReadingGlassesItem = (item: any) => {
+    const pType = item.product_type || item.products?.product_type;
+    const cat = item.category || item.products?.category || item.products?.categories?.name || item.products?.categories?.slug;
+    const name = item.name || item.products?.name || "";
+    const brand = item.brand || item.products?.brand || "";
+    return (
+      pType === "reading-glasses" ||
+      pType === "reading_glasses" ||
+      cat === "Reading Glasses" ||
+      cat === "reading-glasses" ||
+      name.toLowerCase().includes("reading glass") ||
+      brand.toLowerCase().includes("reading glass")
+    );
+  };
+
+  const isAccessoryItem = (item: any) => {
+    const pType = item.product_type || item.products?.product_type;
+    const cat = item.category || item.products?.category || item.products?.categories?.name || item.products?.categories?.slug;
+    const name = item.name || item.products?.name || "";
+    return (
+      pType === "accessory" ||
+      pType === "accessories" ||
+      cat === "Accessories" ||
+      cat === "accessories" ||
+      name.toLowerCase().includes("accessory") ||
+      name.toLowerCase().includes("cleaning kit") ||
+      name.toLowerCase().includes("case") ||
+      name.toLowerCase().includes("chain")
+    );
+  };
+
+  const isComputerGlassesItem = (item: any) => {
+    const cat = item.category || item.products?.category || item.products?.categories?.name || item.products?.categories?.slug;
+    const name = item.name || item.products?.name || "";
+    return (
+      cat === "Computer Glasses" ||
+      cat === "computer-glasses" ||
+      name.toLowerCase().includes("computer glass")
+    );
+  };
+
+  const isFrameOnlyItem = (item: any) => {
+    if (isContactLensItem(item) || isReadingGlassesItem(item) || isAccessoryItem(item) || isComputerGlassesItem(item)) {
+      return false;
+    }
+    const hasLens = Boolean(
+      item.lens_id ||
+      (item.lens_config && (item.lens_config.type || item.lens_config.package || item.lens_config.package_name || item.lens_config.selected_index || (Number(item.lens_price) > 0)))
+    );
+    return !hasLens;
   };
 
   const subtotal = items.reduce((acc, item) => acc + (item.price * item.quantity), 0);
@@ -257,9 +349,13 @@ function CartPageContent() {
             <AnimatePresence mode="popLayout">
               {items.length > 0 ? (
                 items.map((item: any, i) => {
-                  const hasLensConfig = Boolean(
+                  const isReading = isReadingGlassesItem(item);
+                  const isAccessory = isAccessoryItem(item);
+                  const isComputer = isComputerGlassesItem(item);
+                  const isFrameOnly = isFrameOnlyItem(item);
+                  const hasLensConfig = !isReading && !isAccessory && !isComputer && !isFrameOnly && Boolean(
                     item.lens_config &&
-                    (item.lens_config.type || item.lens_config.package || item.lens_config.package_name || item.lens_config.selected_index || item.lens_config.thickness || item.lens_price || item.lens_name)
+                    (item.lens_config.type || item.lens_config.package || item.lens_config.package_name || item.lens_config.selected_index || item.lens_config.thickness || (Number(item.lens_price) > 0))
                   );
 
                   const rawLensPrice = Number(
@@ -310,8 +406,11 @@ function CartPageContent() {
                               </p>
                               <h3 className="text-xl font-medium text-[#111111] leading-tight">
                                 {item.name}
+                                {isReading && <span className="text-[#666666] font-normal"> — Reading Glasses</span>}
+                                {isComputer && <span className="text-[#666666] font-normal"> — Computer Glasses</span>}
+                                {isFrameOnly && <span className="text-[#666666] font-normal"> (Frame Only)</span>}
                               </h3>
-                              {item.lens_name && !hasLensConfig && (
+                              {item.lens_name && hasLensConfig && (
                                 <div className="mt-2 flex items-center gap-2">
                                   <span className="px-2.5 py-1 bg-[#004AAD]/5 border border-[#004AAD]/15 text-xs font-medium text-[#004AAD] rounded-full">
                                     Lens: {item.lens_name}
@@ -343,7 +442,7 @@ function CartPageContent() {
                               <p className="text-xs text-[#111111] font-medium mt-0.5">{item.selected_size}</p>
                             </div>
                           )}
-                          {item.lens_config && (
+                          {item.lens_config && !isReading && !isAccessory && !isComputer && !isFrameOnly && (
                             <>
                               {(item.lens_config.thickness?.name || item.lens_config.index_label || item.lens_config.selected_index) && (
                                 <div>
@@ -371,11 +470,11 @@ function CartPageContent() {
                               )}
                             </>
                           )}
-                          {item.prescription && (
+                          {item.prescription && !isReading && !isAccessory && !isComputer && !isFrameOnly && (item.prescription.od_sph || item.prescription.os_sph) && (
                             <div>
                               <p className="text-[10px] text-[#666666] uppercase tracking-widest font-medium">Prescription</p>
                               <p className="text-xs text-[#111111] font-medium mt-0.5">
-                                OD: {item.prescription.od_sph} | OS: {item.prescription.os_sph}
+                                OD: {item.prescription.od_sph || "0.00"} | OS: {item.prescription.os_sph || "0.00"}
                               </p>
                             </div>
                           )}

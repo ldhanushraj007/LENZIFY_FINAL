@@ -1063,7 +1063,7 @@ export default function ProductGrid({ initialCategory, initialGender }: ProductG
         let banner = {
           image: "/images/banners/shop-all-banner.jpg",
           tagline: "Discover India's Premier Curated Eyewear & Contact Lens Boutique",
-          badges: ["🏆 10,000+ Happy Eyes", "🚚 Free Fast Shipping Above ₹999", "⭐ 2-Year Frame Warranty"],
+          badges: ["🏆 10,000+ Happy Eyes", "🚚 Free Fast Shipping Above ₹2,000", "⭐ 2-Year Frame Warranty"],
         };
 
         if (c.includes("contact") || t.includes("contact")) {

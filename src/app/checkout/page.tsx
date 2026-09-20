@@ -124,9 +124,52 @@ export default function CheckoutPage() {
     );
   };
 
+  const isComputerGlassesItem = (item: any) => {
+    const cat = item.category || item.products?.category || item.products?.categories?.name || item.products?.categories?.slug;
+    const name = item.name || item.products?.name || "";
+    return cat === "Computer Glasses" || cat === "computer-glasses" || name.toLowerCase().includes("computer glass");
+  };
+
+  const isReadingGlassesItem = (item: any) => {
+    const pType = item.product_type || item.products?.product_type;
+    const cat = item.category || item.products?.category || item.products?.categories?.name || item.products?.categories?.slug;
+    const name = item.name || item.products?.name || "";
+    const brand = item.brand || item.products?.brand || "";
+    return (
+      pType === "reading-glasses" ||
+      pType === "reading_glasses" ||
+      cat === "Reading Glasses" ||
+      cat === "reading-glasses" ||
+      name.toLowerCase().includes("reading glass") ||
+      brand.toLowerCase().includes("reading glass")
+    );
+  };
+
+  const isAccessoryItem = (item: any) => {
+    const pType = item.product_type || item.products?.product_type;
+    const cat = item.category || item.products?.category || item.products?.categories?.name || item.products?.categories?.slug;
+    const name = item.name || item.products?.name || "";
+    return (
+      pType === "accessory" ||
+      pType === "accessories" ||
+      cat === "Accessories" ||
+      cat === "accessories" ||
+      name.toLowerCase().includes("accessory") ||
+      name.toLowerCase().includes("cleaning kit") ||
+      name.toLowerCase().includes("case") ||
+      name.toLowerCase().includes("chain")
+    );
+  };
+
   const isPrescriptionRequiredItem = (item: any) => {
     if (isContactLensItem(item)) return false;
-    return Boolean(item.lens_id || item.lens_config || item.lens_name);
+    if (isComputerGlassesItem(item)) return false;
+    if (isReadingGlassesItem(item)) return false;
+    if (isAccessoryItem(item)) return false;
+    return Boolean(
+      item.lens_id ||
+      (item.lens_config && (item.lens_config.type || item.lens_config.package || item.lens_config.package_name || item.lens_config.selected_index || (Number(item.lens_price) > 0)))
+    );
   };
 
   // Prescription-requiring items in this cart
