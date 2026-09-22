@@ -74,11 +74,8 @@ export function calculateCartGST(items: any[], couponDiscount: number = 0): GSTB
   });
 
   const totalGST = gst5Total + gst18Total;
-  const shippingFee =
-    items.length === 0 || discountedSubtotal >= FREE_SHIPPING_THRESHOLD
-      ? 0
-      : STANDARD_SHIPPING_FEE;
-  const grandTotal = discountedSubtotal + totalGST + shippingFee;
+  const shippingFee = 0;
+  const grandTotal = discountedSubtotal + totalGST;
 
   return {
     subtotal,

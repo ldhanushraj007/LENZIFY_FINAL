@@ -5,7 +5,7 @@ import Image from "next/image";
 import Link from "next/link";
 import { Shield, Eye, ShieldCheck, Tag, X, FileText, CheckCircle2 } from "lucide-react";
 import { cn } from "@/lib/utils";
-import { getGSTRate, calculateCartGST, FREE_SHIPPING_THRESHOLD } from "@/lib/gst";
+import { getGSTRate, calculateCartGST } from "@/lib/gst";
 import { resolveProductImage } from "@/lib/image_utils";
 
 export interface ItemPrescription {
@@ -19,8 +19,8 @@ export interface ItemPrescription {
   os_add?: string;
   pd?: string;
   file_url?: string;
-  left_eye?: string;
-  right_eye?: string;
+  left_eye?: any;
+  right_eye?: any;
   is_contact_lens?: boolean;
 }
 
@@ -36,7 +36,6 @@ export interface OrderSummaryProps {
   couponDiscount?: number;
   applyingCoupon?: boolean;
   showCoupon?: boolean;
-  showShippingProgress?: boolean;
   actionButton?: React.ReactNode;
   footerNote?: React.ReactNode;
   className?: string;
@@ -54,7 +53,6 @@ export default function OrderSummary({
   couponDiscount = 0,
   applyingCoupon = false,
   showCoupon = true,
-  showShippingProgress = false,
   actionButton,
   footerNote,
   className,
@@ -211,6 +209,7 @@ export default function OrderSummary({
           const isAccessory = isAccessoryItem(item);
           const isComputer = isComputerGlassesItem(item);
           const isFrameOnly = isFrameOnlyItem(item);
+          const isContactLens = isContactLensItem(item);
 
           const hasLensConfig = !isReading && !isAccessory && !isComputer && !isFrameOnly && Boolean(
             lensCfg &&
@@ -332,7 +331,7 @@ export default function OrderSummary({
                 </div>
               ) : (
                 <div className="flex justify-between items-center text-xs text-[#666666] pt-1 px-1">
-                  <span>GST:</span>
+                  <span>{rate === 'included' ? "GST (5%):" : "GST:"}</span>
                   <span className="font-medium text-[#111111]">
                     {rate === 'included'
                       ? "Included in price"
@@ -343,42 +342,89 @@ export default function OrderSummary({
 
               {/* Per-Item Prescription Specs */}
               {!isReading && !isAccessory && !isComputer && !isFrameOnly && rx ? (
-                <div className="bg-[#F0F4FF]/70 border border-[#004AAD]/15 rounded-xl p-2.5 text-xs space-y-1">
-                  <div className="flex items-center gap-1.5 text-[#004AAD] font-semibold text-[11px]">
-                    <FileText size={12} />
-                    <span>Prescription Details</span>
-                  </div>
+                (() => {
+                  const rightEyeDisplay =
+                    typeof rx.right_eye === "object"
+                      ? rx.right_eye?.sph || "0.00"
+                      : typeof rx.od_sph === "string"
+                      ? rx.od_sph
+                      : typeof rx.right_eye === "string"
+                      ? rx.right_eye
+                      : "0.00";
 
-                  {rx.file_url ? (
-                    <div className="flex items-center gap-1 text-emerald-700 text-[11px] font-medium mt-0.5">
-                      <CheckCircle2 size={12} />
-                      <span>Prescription Slip Attached</span>
-                    </div>
-                  ) : (
-                    <div className="grid grid-cols-2 gap-x-2 gap-y-1 text-[11px] text-[#333333] pt-0.5">
-                      <div className="bg-white/80 border border-[#D8E2F8] px-2 py-1 rounded">
-                        <span className="font-bold text-[#03173D]">OD (Right):</span>{" "}
-                        {rx.od_sph || rx.right_eye || "0.00"}
-                        {rx.od_cyl && ` | Cyl: ${rx.od_cyl}`}
-                        {rx.od_axis && ` | Axis: ${rx.od_axis}°`}
-                        {rx.od_add && ` | Add: ${rx.od_add}`}
+                  const leftEyeDisplay =
+                    typeof rx.left_eye === "object"
+                      ? rx.left_eye?.sph || "0.00"
+                      : typeof rx.os_sph === "string"
+                      ? rx.os_sph
+                      : typeof rx.left_eye === "string"
+                      ? rx.left_eye
+                      : "0.00";
+
+                  const rightCylDisplay =
+                    typeof rx.right_eye === "object"
+                      ? (rx.right_eye?.cyl && rx.right_eye.cyl !== "0.00 (None)" ? rx.right_eye.cyl : null)
+                      : rx.od_cyl || null;
+
+                  const leftCylDisplay =
+                    typeof rx.left_eye === "object"
+                      ? (rx.left_eye?.cyl && rx.left_eye.cyl !== "0.00 (None)" ? rx.left_eye.cyl : null)
+                      : rx.os_cyl || null;
+
+                  const rightAxisDisplay =
+                    typeof rx.right_eye === "object"
+                      ? (rx.right_eye?.axis && rx.right_eye.axis !== "None" ? rx.right_eye.axis : null)
+                      : rx.od_axis || null;
+
+                  const leftAxisDisplay =
+                    typeof rx.left_eye === "object"
+                      ? (rx.left_eye?.axis && rx.left_eye.axis !== "None" ? rx.left_eye.axis : null)
+                      : rx.os_axis || null;
+
+                  const rightBcDisplay = typeof rx.right_eye === "object" ? rx.right_eye?.bc : null;
+                  const rightDiaDisplay = typeof rx.right_eye === "object" ? rx.right_eye?.dia : null;
+
+                  return (
+                    <div className="bg-[#F0F4FF]/70 border border-[#004AAD]/15 rounded-xl p-2.5 text-xs space-y-1">
+                      <div className="flex items-center gap-1.5 text-[#004AAD] font-semibold text-[11px]">
+                        <FileText size={12} />
+                        <span>{isContactLens ? "Contact Lens Power" : "Prescription Details"}</span>
                       </div>
-                      <div className="bg-white/80 border border-[#D8E2F8] px-2 py-1 rounded">
-                        <span className="font-bold text-[#03173D]">OS (Left):</span>{" "}
-                        {rx.os_sph || rx.left_eye || "0.00"}
-                        {rx.os_cyl && ` | Cyl: ${rx.os_cyl}`}
-                        {rx.os_axis && ` | Axis: ${rx.os_axis}°`}
-                        {rx.os_add && ` | Add: ${rx.os_add}`}
-                      </div>
-                      {rx.pd && (
-                        <div className="col-span-2 text-[10px] text-[#555555] mt-0.5">
-                          Pupillary Distance (PD): <span className="font-semibold">{rx.pd}mm</span>
+
+                      {rx.file_url ? (
+                        <div className="flex items-center gap-1 text-emerald-700 text-[11px] font-medium mt-0.5">
+                          <CheckCircle2 size={12} />
+                          <span>Prescription Slip Attached</span>
+                        </div>
+                      ) : (
+                        <div className="grid grid-cols-2 gap-x-2 gap-y-1 text-[11px] text-[#333333] pt-0.5">
+                          <div className="bg-white/80 border border-[#D8E2F8] px-2 py-1 rounded">
+                            <span className="font-bold text-[#03173D]">OD (Right):</span>{" "}
+                            {rightEyeDisplay}
+                            {rightCylDisplay && ` | Cyl: ${rightCylDisplay}`}
+                            {rightAxisDisplay && ` | Axis: ${rightAxisDisplay}°`}
+                            {rightBcDisplay && ` | BC: ${rightBcDisplay}`}
+                            {rightDiaDisplay && ` | DIA: ${rightDiaDisplay}`}
+                          </div>
+                          <div className="bg-white/80 border border-[#D8E2F8] px-2 py-1 rounded">
+                            <span className="font-bold text-[#03173D]">OS (Left):</span>{" "}
+                            {leftEyeDisplay}
+                            {leftCylDisplay && ` | Cyl: ${leftCylDisplay}`}
+                            {leftAxisDisplay && ` | Axis: ${leftAxisDisplay}°`}
+                            {rightBcDisplay && ` | BC: ${rightBcDisplay}`}
+                            {rightDiaDisplay && ` | DIA: ${rightDiaDisplay}`}
+                          </div>
+                          {rx.pd && !isContactLens && (
+                            <div className="col-span-2 text-[10px] text-[#555555] mt-0.5">
+                              Pupillary Distance (PD): <span className="font-semibold">{rx.pd}mm</span>
+                            </div>
+                          )}
                         </div>
                       )}
                     </div>
-                  )}
-                </div>
-              ) : !isReading && !isAccessory && !isComputer && !isFrameOnly && (item.lens_id || item.lens_config) ? (
+                  );
+                })()
+              ) : !isReading && !isAccessory && !isComputer && !isFrameOnly && !isContactLens && (item.lens_id || item.lens_config) ? (
                 <div className="bg-amber-50/70 border border-amber-200 text-amber-800 rounded-xl p-2 text-[11px] flex items-center gap-1.5">
                   <span className="w-1.5 h-1.5 rounded-full bg-amber-500 shrink-0" />
                   <span>Prescription details pending in Step 2</span>
@@ -430,25 +476,6 @@ export default function OrderSummary({
         </div>
       )}
 
-      {/* Free Shipping Progress (optional, useful on cart) */}
-      {showShippingProgress && (
-        <div className="border-t border-[#ECECEC] pt-4 space-y-2">
-          <div className="flex justify-between items-center text-xs">
-            <span className="text-[#666666]">Free shipping progress</span>
-            <span className="font-semibold text-[#004AAD]">
-              {discountedSubtotal >= FREE_SHIPPING_THRESHOLD
-                ? "Unlocked!"
-                : `₹${(FREE_SHIPPING_THRESHOLD - discountedSubtotal).toLocaleString("en-IN")} away`}
-            </span>
-          </div>
-          <div className="h-1.5 bg-[#F8F9FC] border border-[#E8EAF2] rounded-full overflow-hidden">
-            <div
-              className="h-full bg-[#004AAD] rounded-full transition-all duration-500"
-              style={{ width: `${Math.min((discountedSubtotal / FREE_SHIPPING_THRESHOLD) * 100, 100)}%` }}
-            />
-          </div>
-        </div>
-      )}
 
       {/* Price breakdown */}
       <div className="border-t border-[#ECECEC] pt-4 space-y-2.5">
@@ -481,17 +508,13 @@ export default function OrderSummary({
         {hasContactLens ? (
           <div className="flex justify-between text-sm text-emerald-600 font-medium">
             <span>Contact Lenses</span>
-            <span>GST Included</span>
+            <span>GST (5%): Included in price</span>
           </div>
         ) : null}
 
         <div className="flex justify-between text-sm font-semibold">
-          <span className={shippingFee === 0 ? "text-[#004AAD]" : "text-[#666666]"}>
-            {shippingFee === 0 ? "Delivery" : "Delivery Fee"}
-          </span>
-          <span className={shippingFee === 0 ? "text-[#004AAD]" : "text-[#111111]"}>
-            {shippingFee === 0 ? "Free" : `₹${shippingFee}`}
-          </span>
+          <span className="text-[#004AAD]">Delivery</span>
+          <span className="text-[#004AAD] uppercase font-bold tracking-wider">FREE</span>
         </div>
 
         <div className="border-t border-[#ECECEC] pt-3 flex justify-between items-baseline">

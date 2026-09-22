@@ -429,9 +429,28 @@ export default function CheckoutPage() {
       const key = String(item.database_id || item.id || item.product_id);
       const itemRx = itemPrescriptions[key] || item.prescription_json || item.prescription;
       if (itemRx) {
+        const re = itemRx.right_eye as any;
+        const le = itemRx.left_eye as any;
+        if (typeof re === "object" || typeof le === "object") {
+          return {
+            is_contact_lens: true,
+            od_sph: typeof re === "object" ? re?.sph || "0.00" : String(re || "0.00"),
+            os_sph: typeof le === "object" ? le?.sph || "0.00" : String(le || "0.00"),
+            od_cyl: typeof re === "object" ? (re?.cyl && re?.cyl !== "0.00 (None)" ? re?.cyl : "") : itemRx.od_cyl || "",
+            os_cyl: typeof le === "object" ? (le?.cyl && le?.cyl !== "0.00 (None)" ? le?.cyl : "") : itemRx.os_cyl || "",
+            od_axis: typeof re === "object" ? (re?.axis && re?.axis !== "None" ? re?.axis : "") : itemRx.od_axis || "",
+            os_axis: typeof le === "object" ? (le?.axis && le?.axis !== "None" ? le?.axis : "") : itemRx.os_axis || "",
+            od_add: typeof re === "object" ? (re?.add && re?.add !== "None" ? re?.add : "") : itemRx.od_add || "",
+            os_add: typeof le === "object" ? (le?.add && le?.add !== "None" ? le?.add : "") : itemRx.os_add || "",
+            pd: itemRx.pd || "",
+            file_url: itemRx.file_url || null,
+            right_eye: typeof re === "object" ? re : undefined,
+            left_eye: typeof le === "object" ? le : undefined,
+          };
+        }
         return {
-          od_sph: itemRx.od_sph || itemRx.right_eye || "0.00",
-          os_sph: itemRx.os_sph || itemRx.left_eye || "0.00",
+          od_sph: typeof itemRx.right_eye === "string" ? itemRx.right_eye : itemRx.od_sph || "0.00",
+          os_sph: typeof itemRx.left_eye === "string" ? itemRx.left_eye : itemRx.os_sph || "0.00",
           od_cyl: itemRx.od_cyl || "",
           os_cyl: itemRx.os_cyl || "",
           od_axis: itemRx.od_axis || "",
@@ -441,6 +460,9 @@ export default function CheckoutPage() {
           pd: itemRx.pd || prescription.pd || "",
           file_url: itemRx.file_url || prescription.file_url || null,
         };
+      }
+      if (isContactLensItem(item)) {
+        return null; // Standard contact lenses do not inherit eyeglasses prescription
       }
       if (prescription.left_eye || prescription.right_eye || prescription.file_url) {
         return {

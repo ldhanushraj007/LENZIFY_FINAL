@@ -486,6 +486,12 @@ function CartPageContent() {
                               <p className="text-xs text-red-500 font-medium mt-0.5">Out of Stock</p>
                             )}
                           </div>
+                          {isContactLensItem(item) && (
+                            <div>
+                              <p className="text-[10px] text-[#666666] uppercase tracking-widest font-medium">Taxes</p>
+                              <p className="text-xs text-emerald-600 font-semibold mt-0.5">GST (5%): Included in price</p>
+                            </div>
+                          )}
                         </div>
 
                         {hasLensConfig && (
@@ -588,7 +594,6 @@ function CartPageContent() {
                 couponApplied={couponApplied}
                 couponDiscount={couponDiscount}
                 applyingCoupon={applyingCoupon}
-                showShippingProgress={true}
                 actionButton={
                   <button
                     disabled={items.length === 0}
