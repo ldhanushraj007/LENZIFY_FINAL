@@ -65,38 +65,72 @@ export default function ProductDetailsClient({
 
   const [activeTab, setActiveTab] = useState<"description" | "specs" | "reviews">("description");
 
+  const allCategories = useMemo(() => {
+    const list: any[] = [];
+    if (product.categories) {
+      if (Array.isArray(product.categories)) list.push(...product.categories);
+      else list.push(product.categories);
+    }
+    if (Array.isArray((product as any).product_categories)) {
+      (product as any).product_categories.forEach((pc: any) => {
+        if (pc.categories) list.push(pc.categories);
+      });
+    }
+    return list;
+  }, [product.categories, (product as any).product_categories]);
+
   const isContactLens = useMemo(() => {
+    const pType = (product.product_type || "").toLowerCase();
     return (
-      product.product_type === "contact-lens" ||
-      product.product_type === "contact_lens" ||
-      product.category === "Contact Lenses" ||
-      product.category === "contact-lenses" ||
-      product.categories?.slug === "contact-lenses" ||
-      (Array.isArray(product.categories) && product.categories.some((c: any) => c.slug === "contact-lenses"))
+      pType === "contact-lens" ||
+      pType === "contact_lens" ||
+      pType === "contactlens" ||
+      allCategories.some((c: any) => {
+        const name = (c?.name || "").toLowerCase();
+        const slug = (c?.slug || "").toLowerCase();
+        return name.includes("contact") || slug.includes("contact");
+      })
     );
-  }, [product.product_type, product.category, product.categories]);
+  }, [product.product_type, allCategories]);
 
   const isReadingGlasses = useMemo(() => {
-    const catName = product.categories?.name || product.category;
-    const catSlug = product.categories?.slug;
+    const pType = (product.product_type || "").toLowerCase();
     return (
-      product.product_type === "reading-glasses" ||
-      product.product_type === "reading_glasses" ||
-      catName === "Reading Glasses" ||
-      catSlug === "reading-glasses" ||
-      (Array.isArray(product.categories) && product.categories.some((c: any) => c.name === "Reading Glasses" || c.slug === "reading-glasses"))
+      pType === "reading-glasses" ||
+      pType === "reading_glasses" ||
+      allCategories.some((c: any) => {
+        const name = (c?.name || "").toLowerCase();
+        const slug = (c?.slug || "").toLowerCase();
+        return name.includes("reading") || slug.includes("reading");
+      })
     );
-  }, [product.product_type, product.category, product.categories]);
+  }, [product.product_type, allCategories]);
 
   const isComputerGlasses = useMemo(() => {
-    const catName = product.categories?.name || product.category;
-    const catSlug = product.categories?.slug;
+    const pType = (product.product_type || "").toLowerCase();
     return (
-      catName === "Computer Glasses" ||
-      catSlug === "computer-glasses" ||
-      (Array.isArray(product.categories) && product.categories.some((c: any) => c.name === "Computer Glasses" || c.slug === "computer-glasses"))
+      pType === "computer-glasses" ||
+      pType === "computer_glasses" ||
+      allCategories.some((c: any) => {
+        const name = (c?.name || "").toLowerCase();
+        const slug = (c?.slug || "").toLowerCase();
+        return name.includes("computer") || slug.includes("computer");
+      })
     );
-  }, [product.category, product.categories]);
+  }, [product.product_type, allCategories]);
+
+  const isSunglasses = useMemo(() => {
+    const pType = (product.product_type || "").toLowerCase();
+    return (
+      pType === "sunglasses" ||
+      pType === "sunglass" ||
+      allCategories.some((c: any) => {
+        const name = (c?.name || "").toLowerCase();
+        const slug = (c?.slug || "").toLowerCase();
+        return name.includes("sunglass") || slug.includes("sunglass");
+      })
+    );
+  }, [product.product_type, allCategories]);
 
   const parsedContactSpecs = useMemo(() => {
     let s = product.specifications;
@@ -518,19 +552,26 @@ export default function ProductDetailsClient({
             )}
 
             {/* Price */}
-            <div className="flex items-baseline gap-3 flex-wrap">
-              {hasDiscount && (
-                <span className="text-lg text-[#999999] line-through">
-                  ₹{originalPrice.toLocaleString()}
+            <div>
+              <div className="flex items-baseline gap-3 flex-wrap">
+                {hasDiscount && (
+                  <span className="text-lg text-[#999999] line-through">
+                    ₹{originalPrice.toLocaleString()}
+                  </span>
+                )}
+                <span className="text-3xl font-bold text-[#111111]">
+                  ₹{displayPrice.toLocaleString()}
                 </span>
-              )}
-              <span className="text-3xl font-bold text-[#111111]">
-                ₹{displayPrice.toLocaleString()}
-              </span>
-              {hasDiscount && savingsPercent > 0 && (
-                <span className="bg-[#004AAD]/10 text-[#004AAD] text-sm font-semibold rounded-full px-3 py-1">
-                  {savingsPercent}% off
-                </span>
+                {hasDiscount && savingsPercent > 0 && (
+                  <span className="bg-[#004AAD]/10 text-[#004AAD] text-sm font-semibold rounded-full px-3 py-1">
+                    {savingsPercent}% off
+                  </span>
+                )}
+              </div>
+              {isSunglasses && (
+                <p className="text-xs font-semibold text-emerald-700 mt-1">
+                  MRP inclusive of 18% GST
+                </p>
               )}
             </div>
 
@@ -612,7 +653,7 @@ export default function ProductDetailsClient({
 
 
             {/* LensSelectionFlow modal */}
-            {showLensFlow && !isReadingGlasses && !isComputerGlasses && (
+            {showLensFlow && !isReadingGlasses && !isComputerGlasses && !isSunglasses && (
               <LensSelectionFlow
                 product={product}
                 availableLenses={availableLenses}
@@ -623,7 +664,7 @@ export default function ProductDetailsClient({
 
             {/* Action buttons */}
             <div className="space-y-3">
-              {product.product_type === "frame" && !isReadingGlasses && !isComputerGlasses ? (
+              {product.product_type === "frame" && !isReadingGlasses && !isComputerGlasses && !isSunglasses ? (
                 <>
                   <button
                     onClick={handleOpenLensFlow}
@@ -675,7 +716,7 @@ export default function ProductDetailsClient({
                         )}
                       </div>
                       <div className="grid grid-cols-4 sm:grid-cols-6 gap-2">
-                        {["+1.00", "+1.25", "+1.50", "+1.75", "+2.00", "+2.25", "+2.50", "+2.75", "+3.00", "+3.25", "+3.50"].map((p) => (
+                        {["+1.00", "+1.25", "+1.50", "+1.75", "+2.00", "+2.25", "+2.50", "+2.75", "+3.00"].map((p) => (
                           <button
                             key={p}
                             type="button"
@@ -707,9 +748,9 @@ export default function ProductDetailsClient({
                           className="w-full bg-[#03173D] text-white rounded-full py-4 font-semibold flex items-center justify-center gap-2 hover:bg-[#004AAD] transition-all disabled:opacity-40 disabled:pointer-events-none"
                         >
                           <ShoppingBag size={18} />
-                          {product.stock > 0 ? "Add to Cart" : "Out of Stock"}
+                          {product.stock > 0 ? (isSunglasses ? "Add Sunglasses to Cart" : "Add to Cart") : "Out of Stock"}
                         </button>
-                        {product.stock > 0 && (
+                        {product.stock > 0 && !isSunglasses && (
                           <button
                             onClick={() => handleAddToCart(undefined, true)}
                             disabled={!canPurchase}

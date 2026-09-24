@@ -358,6 +358,14 @@ function CartPageContent() {
                     (item.lens_config.type || item.lens_config.package || item.lens_config.package_name || item.lens_config.selected_index || item.lens_config.thickness || (Number(item.lens_price) > 0))
                   );
 
+                  const baseFramePrice = Number(
+                    item.products?.offer_price ??
+                    item.products?.discount_price ??
+                    item.products?.price ??
+                    item.product?.offer_price ??
+                    item.product?.price ??
+                    0
+                  );
                   const rawLensPrice = Number(
                     item.lens_price ||
                     item.lens_config?.total_price ||
@@ -365,15 +373,18 @@ function CartPageContent() {
                     item.lens_config?.price ||
                     0
                   );
-                  const unitTotal = Number(item.price) || 0;
-                  const baseProductPrice = Number(item.products?.offer_price || item.products?.price || item.product?.price || 0);
-                  const lensUnitPrice = rawLensPrice > 0
-                    ? rawLensPrice
-                    : (baseProductPrice > 0 && unitTotal > baseProductPrice ? unitTotal - baseProductPrice : 0);
-                  const frameUnitPrice = Math.max(0, unitTotal - lensUnitPrice);
+                  const indexPrice = Number(item.lens_config?.index_price ?? item.lens_config?.thickness?.price ?? 0);
+                  const packagePrice = Number(
+                    item.lens_config?.package_price ??
+                    (rawLensPrice > indexPrice ? rawLensPrice - indexPrice : (rawLensPrice > 0 ? rawLensPrice : 0))
+                  );
+                  const frameUnitPrice = baseFramePrice > 0 ? baseFramePrice : Math.max(0, (Number(item.price) || 0) - rawLensPrice);
+                  const itemTotal = (frameUnitPrice + packagePrice + indexPrice) * (item.quantity || 1);
+                  const gstAmount = (itemTotal * 0.05).toFixed(2);
 
-                  const lensType = item.lens_name || item.lens_config?.type?.name || item.lens_config?.lens_name || "Prescription Lens";
+                  const lensType = item.lens_config?.type?.name || item.lens_name || "Prescription Lens";
                   const lensPackage = item.lens_config?.package_name || item.lens_config?.package || "Standard";
+                  const indexLabel = item.lens_config?.thickness?.name || item.lens_config?.index_label || (item.lens_config?.selected_index ? `Index ${item.lens_config.selected_index}` : null);
                   const coatingsCount = Array.isArray(item.lens_config?.coatings) ? item.lens_config.coatings.length : 4;
 
                   return (
@@ -502,15 +513,27 @@ function CartPageContent() {
                             </div>
                             <div className="flex justify-between text-sm text-[#444444]">
                               <span>{lensType} · {lensPackage}</span>
-                              <span className="font-semibold text-[#111111]">₹{(lensUnitPrice * (item.quantity || 1)).toLocaleString("en-IN")}</span>
+                              <span className="font-semibold text-[#111111]">₹{(packagePrice * (item.quantity || 1)).toLocaleString("en-IN")}</span>
                             </div>
+                            {indexLabel && (
+                              <div className="flex justify-between text-sm text-[#444444]">
+                                <span>{indexLabel}</span>
+                                <span className="font-semibold text-[#111111]">
+                                  {indexPrice > 0 ? `+₹${(indexPrice * (item.quantity || 1)).toLocaleString("en-IN")}` : "Included"}
+                                </span>
+                              </div>
+                            )}
                             <div className="flex justify-between text-sm text-[#444444]">
-                              <span>Included Coatings ({coatingsCount})</span>
+                              <span>Coatings ({coatingsCount})</span>
                               <span className="font-bold text-emerald-600 text-xs uppercase tracking-wider">FREE</span>
                             </div>
                             <div className="border-t border-[#E8EAF2] pt-2 flex justify-between items-center text-sm font-bold text-[#111111]">
                               <span>Item Total</span>
-                              <span>₹{(unitTotal * (item.quantity || 1)).toLocaleString("en-IN")}</span>
+                              <span>₹{(itemTotal).toLocaleString("en-IN")}</span>
+                            </div>
+                            <div className="flex justify-between text-xs text-[#666666]">
+                              <span>GST (5%)</span>
+                              <span>₹{gstAmount}</span>
                             </div>
                           </div>
                         )}

@@ -57,7 +57,11 @@ export default async function ProductDetailPage({ params }: { params: Promise<{ 
     .select(`
       *,
       product_images(*),
-      categories (*)
+      categories (*),
+      product_categories (
+        category_id,
+        categories (*)
+      )
     `)
     .eq("id", id)
     .single();

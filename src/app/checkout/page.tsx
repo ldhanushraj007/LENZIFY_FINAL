@@ -484,7 +484,7 @@ export default function CheckoutPage() {
             const rate = getGSTRate(item);
             const itemPrice = item.price || item.products?.offer_price || item.products?.price || 0;
             const itemTotal = itemPrice * item.quantity;
-            const numericRate = rate === 'included' ? 0 : rate;
+            const numericRate = (rate === 'included' || rate === 'included-18') ? 0 : rate;
             const gstAmount = Math.round(itemTotal * numericRate);
             return {
               id: item.product_id,
@@ -583,7 +583,7 @@ export default function CheckoutPage() {
                 const rate = getGSTRate(item);
                 const itemPrice = item.price || item.products?.offer_price || item.products?.price || 0;
                 const itemTotal = itemPrice * item.quantity;
-                const numericRate = rate === 'included' ? 0 : rate;
+                const numericRate = (rate === 'included' || rate === 'included-18') ? 0 : rate;
                 const gstAmount = Math.round(itemTotal * numericRate);
                 return {
                   id: item.product_id,

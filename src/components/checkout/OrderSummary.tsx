@@ -121,7 +121,7 @@ export default function OrderSummary({
   };
 
   const gstBreakdown = calculateCartGST(items, couponDiscount);
-  const { subtotal, discountedSubtotal, gst5Total, gst18Total, hasContactLens, shippingFee, grandTotal } = gstBreakdown;
+  const { subtotal, discountedSubtotal, gst5Total, gst18Total, hasContactLens, hasSunglasses, shippingFee, grandTotal } = gstBreakdown;
 
   // Resolve prescription for a specific line item
   const getItemPrescription = (item: any): ItemPrescription | null => {
@@ -233,8 +233,9 @@ export default function OrderSummary({
           const frameUnitPrice = Math.max(0, totalItemUnitPrice - lensUnitPrice);
 
           const rate = getGSTRate(item);
-          const gstRatePct = rate === 'included' ? 0 : rate === 0.18 ? 18 : 5;
-          const gstAmount = rate === 'included' ? 0 : Math.round(itemTotalPrice * (rate as number));
+          const isIncluded = rate === 'included' || rate === 'included-18';
+          const gstRatePct = isIncluded ? 0 : rate === 0.18 ? 18 : 5;
+          const gstAmount = isIncluded ? 0 : Math.round(itemTotalPrice * (rate as number));
           const coatingsCount = allCoatings.length > 0 ? allCoatings.length : 4;
 
           const imageUrl =
@@ -509,6 +510,13 @@ export default function OrderSummary({
           <div className="flex justify-between text-sm text-emerald-600 font-medium">
             <span>Contact Lenses</span>
             <span>GST (5%): Included in price</span>
+          </div>
+        ) : null}
+
+        {hasSunglasses ? (
+          <div className="flex justify-between text-sm text-emerald-600 font-medium">
+            <span>Sunglasses</span>
+            <span>GST (18%): Included in price</span>
           </div>
         ) : null}
 

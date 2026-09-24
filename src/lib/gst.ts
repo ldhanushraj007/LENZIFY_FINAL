@@ -5,7 +5,7 @@
  * - Eyeglasses / Computer Glasses / Reading Glasses / Accessories / Prescription lenses: 5%
  */
 
-export type GSTRateResult = 0.05 | 0.18 | 'included';
+export type GSTRateResult = 0.05 | 0.18 | 'included' | 'included-18';
 
 export function getGSTRate(productOrItem: any): GSTRateResult {
   if (!productOrItem) return 0.05;
@@ -20,7 +20,8 @@ export function getGSTRate(productOrItem: any): GSTRateResult {
     productOrItem.products?.categories?.slug ||
     productOrItem.product?.category ||
     productOrItem.product?.categories?.name ||
-    productOrItem.product?.categories?.slug ||
+    productOrItem.product_categories?.map((pc: any) => `${pc.categories?.name} ${pc.categories?.slug}`).join(' ') ||
+    productOrItem.products?.product_categories?.map((pc: any) => `${pc.categories?.name} ${pc.categories?.slug}`).join(' ') ||
     productOrItem.product_type ||
     productOrItem.products?.product_type ||
     productOrItem.type ||
@@ -28,7 +29,7 @@ export function getGSTRate(productOrItem: any): GSTRateResult {
   ).toLowerCase();
 
   if (cat.includes('contact')) return 'included';
-  if (cat.includes('sunglass')) return 0.18;
+  if (cat.includes('sunglass')) return 'included-18';
   return 0.05;
 }
 
@@ -41,6 +42,7 @@ export interface GSTBreakdown {
   gst5Total: number;
   gst18Total: number;
   hasContactLens: boolean;
+  hasSunglasses: boolean;
   totalGST: number;
   shippingFee: number;
   grandTotal: number;
@@ -58,6 +60,7 @@ export function calculateCartGST(items: any[], couponDiscount: number = 0): GSTB
   let gst5Total = 0;
   let gst18Total = 0;
   let hasContactLens = false;
+  let hasSunglasses = false;
 
   items.forEach((item) => {
     const rate = getGSTRate(item);
@@ -66,6 +69,8 @@ export function calculateCartGST(items: any[], couponDiscount: number = 0): GSTB
 
     if (rate === 'included') {
       hasContactLens = true;
+    } else if (rate === 'included-18') {
+      hasSunglasses = true;
     } else if (rate === 0.18) {
       gst18Total += Math.round(itemTotal * 0.18);
     } else if (rate === 0.05) {
@@ -83,6 +88,7 @@ export function calculateCartGST(items: any[], couponDiscount: number = 0): GSTB
     gst5Total,
     gst18Total,
     hasContactLens,
+    hasSunglasses,
     totalGST,
     shippingFee,
     grandTotal

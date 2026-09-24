@@ -38,6 +38,7 @@ export default function LensSelectionFlow({ product, availableLenses, onClose, o
   const [selectedMaterial, setSelectedMaterial] = useState<any | null>(null);
   const [selectedThickness, setSelectedThickness] = useState<any | null>(null);
   const [selectedTint, setSelectedTint] = useState<any | null>(null);
+  const [userManuallySelectedIndex, setUserManuallySelectedIndex] = useState(false);
 
   // Prescription State (Step 1 - Mandatory)
   const [prescription, setPrescription] = useState({
@@ -323,14 +324,16 @@ export default function LensSelectionFlow({ product, availableLenses, onClose, o
         return;
       }
 
-      // Auto-set recommended refractive index
-      const rec = getRecommendedIndex();
-      if (isRimless) {
-        setSelectedThickness(indexOptions[0]);
-        setSelectedMaterial({ name: "Polycarbonate", price: 0 });
-      } else {
-        const matchingOpt = indexOptions.find(o => o.indexValue === rec && o.available) || indexOptions.find(o => o.available) || indexOptions[0];
-        setSelectedThickness(matchingOpt);
+      // Auto-set recommended refractive index if not manually chosen for this lens type
+      if (!userManuallySelectedIndex || !selectedThickness) {
+        const rec = getRecommendedIndex();
+        if (isRimless) {
+          setSelectedThickness(indexOptions[0]);
+          setSelectedMaterial({ name: "Polycarbonate", price: 0 });
+        } else {
+          const matchingOpt = indexOptions.find(o => o.indexValue === rec && o.available) || indexOptions.find(o => o.available) || indexOptions[0];
+          setSelectedThickness(matchingOpt);
+        }
       }
 
       setError(null);
@@ -702,7 +705,11 @@ export default function LensSelectionFlow({ product, availableLenses, onClose, o
                               <button 
                                 key={lens.id} 
                                 onClick={() => {
-                                  setSelectedType(lens);
+                                  if (selectedType?.id !== lens.id) {
+                                    setSelectedType(lens);
+                                    setUserManuallySelectedIndex(false);
+                                    setSelectedThickness(null);
+                                  }
                                   if (!isThisProgressive) {
                                     setSelectedTier(null);
                                   } else if (!selectedTier) {
@@ -757,7 +764,13 @@ export default function LensSelectionFlow({ product, availableLenses, onClose, o
                               return (
                                 <div
                                   key={tier.tier}
-                                  onClick={() => setSelectedTier(tier)}
+                                  onClick={() => {
+                                    if (selectedTier?.tier !== tier.tier) {
+                                      setSelectedTier(tier);
+                                      setUserManuallySelectedIndex(false);
+                                      setSelectedThickness(null);
+                                    }
+                                  }}
                                   className={cn(
                                     "p-5 rounded-xl border-2 transition-all cursor-pointer space-y-3 relative flex flex-col justify-between",
                                     isTierSelected 
@@ -881,7 +894,10 @@ export default function LensSelectionFlow({ product, availableLenses, onClose, o
                                    key={opt.id} 
                                    disabled={!isAvailable}
                                    onClick={() => {
-                                     if (isAvailable) setSelectedThickness(opt);
+                                     if (isAvailable) {
+                                       setUserManuallySelectedIndex(true);
+                                       setSelectedThickness(opt);
+                                     }
                                    }}
                                    className={cn(
                                      "p-6 border text-left transition-all rounded-2xl relative flex flex-col justify-between space-y-4",
@@ -1004,6 +1020,7 @@ export default function LensSelectionFlow({ product, availableLenses, onClose, o
                             ]
                           ).map((pkg) => {
                             const isPkgSelected = selectedPackage === pkg.key;
+                            const pkgTotalLensPrice = pkg.price + (selectedThickness?.price || 0);
                             return (
                               <div
                                 key={pkg.key}
@@ -1028,7 +1045,7 @@ export default function LensSelectionFlow({ product, availableLenses, onClose, o
                                   </div>
                                 </div>
                                 <div className="text-right shrink-0 pl-9 sm:pl-0">
-                                  <span className="text-lg font-black text-brand-navy">₹{pkg.price.toLocaleString()}</span>
+                                  <span className="text-lg font-black text-brand-navy">₹{pkgTotalLensPrice.toLocaleString()}</span>
                                   <p className="text-[9px] text-brand-text-muted font-bold uppercase tracking-wider">Total Lens Price</p>
                                 </div>
                               </div>
