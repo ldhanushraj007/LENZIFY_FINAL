@@ -129,7 +129,6 @@ export default function ProductDetailsClient({
   }, [product.product_type, allCategories, hasEyeglassesCategory]);
 
   const isSunglasses = useMemo(() => {
-    if (hasEyeglassesCategory) return false;
     const pType = (product.product_type || "").toLowerCase();
     return (
       pType === "sunglasses" ||
@@ -140,7 +139,7 @@ export default function ProductDetailsClient({
         return name.includes("sunglass") || slug.includes("sunglass");
       })
     );
-  }, [product.product_type, allCategories, hasEyeglassesCategory]);
+  }, [product.product_type, allCategories]);
 
   const parsedContactSpecs = useMemo(() => {
     let s = product.specifications;
@@ -663,7 +662,7 @@ export default function ProductDetailsClient({
 
 
             {/* LensSelectionFlow modal */}
-            {showLensFlow && (hasEyeglassesCategory || product.product_type === "frame") && !isReadingGlasses && !isComputerGlasses && !isSunglasses && (
+            {showLensFlow && !isReadingGlasses && !isComputerGlasses && (
               <LensSelectionFlow
                 product={product}
                 availableLenses={availableLenses}
@@ -674,7 +673,7 @@ export default function ProductDetailsClient({
 
             {/* Action buttons */}
             <div className="space-y-3">
-              {(hasEyeglassesCategory || product.product_type === "frame") && !isReadingGlasses && !isComputerGlasses && !isSunglasses ? (
+              {(hasEyeglassesCategory || product.product_type === "frame" || isSunglasses) && !isReadingGlasses && !isComputerGlasses ? (
                 <>
                   <button
                     onClick={handleOpenLensFlow}
@@ -691,7 +690,7 @@ export default function ProductDetailsClient({
                     suppressHydrationWarning
                     className="w-full border border-[#03173D] text-[#03173D] rounded-full py-4 font-semibold hover:bg-[#03173D] hover:text-white transition-all disabled:opacity-40 disabled:pointer-events-none"
                   >
-                    {product.stock > 0 ? "Add Frame Only" : "Out of Stock"}
+                    {product.stock > 0 ? (isSunglasses ? "Add Sunglasses to Cart" : "Add Frame Only") : "Out of Stock"}
                   </button>
                 </>
               ) : (
