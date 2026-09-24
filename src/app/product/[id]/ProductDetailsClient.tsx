@@ -79,6 +79,14 @@ export default function ProductDetailsClient({
     return list;
   }, [product.categories, (product as any).product_categories]);
 
+  const hasEyeglassesCategory = useMemo(() => {
+    return allCategories.some((c: any) => {
+      const name = (c?.name || "").toLowerCase();
+      const slug = (c?.slug || "").toLowerCase();
+      return name === "eyeglasses" || slug === "eyeglasses";
+    });
+  }, [allCategories]);
+
   const isContactLens = useMemo(() => {
     const pType = (product.product_type || "").toLowerCase();
     return (
@@ -107,6 +115,7 @@ export default function ProductDetailsClient({
   }, [product.product_type, allCategories]);
 
   const isComputerGlasses = useMemo(() => {
+    if (hasEyeglassesCategory) return false;
     const pType = (product.product_type || "").toLowerCase();
     return (
       pType === "computer-glasses" ||
@@ -117,9 +126,10 @@ export default function ProductDetailsClient({
         return name.includes("computer") || slug.includes("computer");
       })
     );
-  }, [product.product_type, allCategories]);
+  }, [product.product_type, allCategories, hasEyeglassesCategory]);
 
   const isSunglasses = useMemo(() => {
+    if (hasEyeglassesCategory) return false;
     const pType = (product.product_type || "").toLowerCase();
     return (
       pType === "sunglasses" ||
@@ -130,7 +140,7 @@ export default function ProductDetailsClient({
         return name.includes("sunglass") || slug.includes("sunglass");
       })
     );
-  }, [product.product_type, allCategories]);
+  }, [product.product_type, allCategories, hasEyeglassesCategory]);
 
   const parsedContactSpecs = useMemo(() => {
     let s = product.specifications;
@@ -653,7 +663,7 @@ export default function ProductDetailsClient({
 
 
             {/* LensSelectionFlow modal */}
-            {showLensFlow && !isReadingGlasses && !isComputerGlasses && !isSunglasses && (
+            {showLensFlow && (hasEyeglassesCategory || product.product_type === "frame") && !isReadingGlasses && !isComputerGlasses && !isSunglasses && (
               <LensSelectionFlow
                 product={product}
                 availableLenses={availableLenses}
@@ -664,7 +674,7 @@ export default function ProductDetailsClient({
 
             {/* Action buttons */}
             <div className="space-y-3">
-              {product.product_type === "frame" && !isReadingGlasses && !isComputerGlasses && !isSunglasses ? (
+              {(hasEyeglassesCategory || product.product_type === "frame") && !isReadingGlasses && !isComputerGlasses && !isSunglasses ? (
                 <>
                   <button
                     onClick={handleOpenLensFlow}
