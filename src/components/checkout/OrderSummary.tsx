@@ -6,6 +6,7 @@ import Link from "next/link";
 import { Shield, Eye, ShieldCheck, Tag, X, FileText, CheckCircle2 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { getGSTRate, calculateCartGST } from "@/lib/gst";
+import { getItemPricing } from "@/lib/pricing";
 import { resolveProductImage } from "@/lib/image_utils";
 
 export interface ItemPrescription {
@@ -186,24 +187,8 @@ export default function OrderSummary({
         {items.map((item, idx) => {
           const itemKey = item.database_id || item.id || item.product_id || idx;
           const lensCfg = item.lens_config || {};
-          const indexName =
-            lensCfg.index_label ||
-            lensCfg.thickness?.name ||
-            (lensCfg.selected_index ? `Index ${lensCfg.selected_index}` : null);
-          const lensTypeName =
-            item.lenses?.name || lensCfg.type?.name || item.lens_name || lensCfg.lens_name;
-          const tierName = lensCfg.tier ? `(${String(lensCfg.tier).toUpperCase()})` : "";
           const frameType = item.products?.frame_type || lensCfg.frame_type;
           const rx = getItemPrescription(item);
-
-          // Coatings & features
-          const coatings: string[] = Array.isArray(lensCfg.coatings)
-            ? lensCfg.coatings.map((c: any) => (typeof c === "string" ? c : c.name || c.title))
-            : [];
-          const features: string[] = Array.isArray(lensCfg.features)
-            ? lensCfg.features.map((f: any) => (typeof f === "string" ? f : f.name || f.title))
-            : [];
-          const allCoatings = Array.from(new Set([...coatings, ...features])).filter(Boolean);
 
           const isReading = isReadingGlassesItem(item);
           const isAccessory = isAccessoryItem(item);
@@ -211,32 +196,19 @@ export default function OrderSummary({
           const isFrameOnly = isFrameOnlyItem(item);
           const isContactLens = isContactLensItem(item);
 
-          const hasLensConfig = !isReading && !isAccessory && !isComputer && !isFrameOnly && Boolean(
-            lensCfg &&
-            (lensCfg.type || lensCfg.package || lensCfg.package_name || lensCfg.selected_index || lensCfg.thickness || (Number(item.lens_price) > 0))
-          );
-
-          const totalItemUnitPrice = item.price || item.products?.offer_price || item.products?.price || 0;
-          const itemTotalPrice = totalItemUnitPrice * item.quantity;
-
-          const rawLensPrice = Number(
-            item.lens_price ||
-            lensCfg.total_price ||
-            lensCfg.lens_price ||
-            lensCfg.price ||
-            0
-          );
-          const baseProductPrice = Number(item.products?.offer_price || item.products?.price || item.product?.price || 0);
-          const lensUnitPrice = rawLensPrice > 0
-            ? rawLensPrice
-            : (baseProductPrice > 0 && totalItemUnitPrice > baseProductPrice ? totalItemUnitPrice - baseProductPrice : 0);
-          const frameUnitPrice = Math.max(0, totalItemUnitPrice - lensUnitPrice);
+          const pricing = getItemPricing(item);
+          const hasLensConfig = pricing.hasLens;
+          const frameUnitPrice = pricing.frameUnitPrice;
+          const lensUnitPrice = pricing.lensUnitPrice;
+          const itemTotalPrice = pricing.totalPrice;
+          const gstAmount = pricing.gstAmount;
+          const coatingsCount = pricing.coatingsCount;
+          const lensTypeName = pricing.lensType;
+          const lensPackageName = pricing.lensPackage;
 
           const rate = getGSTRate(item);
           const isIncluded = rate === 'included' || rate === 'included-18';
           const gstRatePct = isIncluded ? 0 : rate === 0.18 ? 18 : 5;
-          const gstAmount = isIncluded ? 0 : Math.round(itemTotalPrice * (rate as number));
-          const coatingsCount = allCoatings.length > 0 ? allCoatings.length : 4;
 
           const imageUrl =
             resolveProductImage(item.products || item) ||
@@ -314,7 +286,7 @@ export default function OrderSummary({
                     <span className="font-medium text-[#111111]">₹{(frameUnitPrice * item.quantity).toLocaleString("en-IN")}</span>
                   </div>
                   <div className="flex justify-between text-[#555555]">
-                    <span>{lensTypeName || "Prescription Lens"} · {lensCfg.package_name || lensCfg.package || "Standard"}</span>
+                    <span>{String(lensTypeName || "Prescription Lens")} · {String(lensPackageName || "Standard")}</span>
                     <span className="font-medium text-[#111111]">₹{(lensUnitPrice * item.quantity).toLocaleString("en-IN")}</span>
                   </div>
                   <div className="flex justify-between text-[#555555]">

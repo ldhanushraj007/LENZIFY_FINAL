@@ -28,6 +28,7 @@ import { useAuth } from "@/components/providers/AuthProvider";
 import { useCartStore } from "@/store/cartStore";
 import OrderSummary, { ItemPrescription } from "@/components/checkout/OrderSummary";
 import { getGSTRate, calculateCartGST } from "@/lib/gst";
+import { getItemPricing } from "@/lib/pricing";
 
 const STEPS = [
   { id: 1, label: "Address", icon: MapPin },
@@ -336,7 +337,7 @@ export default function CheckoutPage() {
     setApplyingCoupon(true);
     const subtotal = cartItems.reduce(
       (acc: number, item: any) =>
-        acc + (item.price || item.products?.offer_price || item.products?.price || 0) * item.quantity,
+        acc + getItemPricing(item).totalPrice,
       0
     );
     const result = await applyCoupon(couponCode.trim(), subtotal);
@@ -481,21 +482,19 @@ export default function CheckoutPage() {
         const codId = `COD-${Date.now()}-${Math.random().toString(36).substring(2, 7).toUpperCase()}`;
         const orderRes = await placeOrder({
           items: cartItems.map((item) => {
+            const pricing = getItemPricing(item);
             const rate = getGSTRate(item);
-            const itemPrice = item.price || item.products?.offer_price || item.products?.price || 0;
-            const itemTotal = itemPrice * item.quantity;
-            const numericRate = (rate === 'included' || rate === 'included-18') ? 0 : rate;
-            const gstAmount = Math.round(itemTotal * numericRate);
+            const numericRate = (rate === 'included' || rate === 'included-18') ? 0 : (rate === 0.18 ? 0.18 : 0.05);
             return {
               id: item.product_id,
               quantity: item.quantity,
-              price: itemPrice,
+              price: pricing.unitPrice,
               lens_id: item.lens_id,
               selected_color: item.selected_color,
               selected_size: item.selected_size,
               prescription_json: getResolvedItemPrescription(item),
               gst_rate: numericRate,
-              gst_amount: gstAmount,
+              gst_amount: pricing.gstAmount,
             };
           }),
           total_price: totalAmount,
@@ -580,21 +579,19 @@ export default function CheckoutPage() {
 
             const orderRes = await placeOrder({
               items: cartItems.map((item) => {
+                const pricing = getItemPricing(item);
                 const rate = getGSTRate(item);
-                const itemPrice = item.price || item.products?.offer_price || item.products?.price || 0;
-                const itemTotal = itemPrice * item.quantity;
-                const numericRate = (rate === 'included' || rate === 'included-18') ? 0 : rate;
-                const gstAmount = Math.round(itemTotal * numericRate);
+                const numericRate = (rate === 'included' || rate === 'included-18') ? 0 : (rate === 0.18 ? 0.18 : 0.05);
                 return {
                   id: item.product_id,
                   quantity: item.quantity,
-                  price: itemPrice,
+                  price: pricing.unitPrice,
                   lens_id: item.lens_id,
                   selected_color: item.selected_color,
                   selected_size: item.selected_size,
                   prescription_json: getResolvedItemPrescription(item),
                   gst_rate: numericRate,
-                  gst_amount: gstAmount,
+                  gst_amount: pricing.gstAmount,
                 };
               }),
               total_price: totalAmount,

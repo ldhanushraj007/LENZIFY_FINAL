@@ -33,6 +33,8 @@ export function getGSTRate(productOrItem: any): GSTRateResult {
   return 0.05;
 }
 
+import { getItemPricing } from "./pricing";
+
 export const FREE_SHIPPING_THRESHOLD = 2000;
 export const STANDARD_SHIPPING_FEE = 99;
 
@@ -49,24 +51,18 @@ export interface GSTBreakdown {
 }
 
 export function calculateCartGST(items: any[], couponDiscount: number = 0): GSTBreakdown {
-  const subtotal = items.reduce(
-    (acc, item) =>
-      acc + (item.price || item.products?.offer_price || item.products?.price || 0) * (item.quantity || 1),
-    0
-  );
-
-  const discountedSubtotal = Math.max(0, subtotal - (couponDiscount || 0));
-
+  let subtotal = 0;
   let gst5Total = 0;
   let gst18Total = 0;
   let hasContactLens = false;
   let hasSunglasses = false;
 
-  items.forEach((item) => {
-    const rate = getGSTRate(item);
-    const itemPrice = item.price || item.products?.offer_price || item.products?.price || 0;
-    const itemTotal = itemPrice * (item.quantity || 1);
+  (items || []).forEach((item) => {
+    const pricing = getItemPricing(item);
+    const itemTotal = pricing.totalPrice;
+    subtotal += itemTotal;
 
+    const rate = getGSTRate(item);
     if (rate === 'included') {
       hasContactLens = true;
     } else if (rate === 'included-18') {
@@ -78,6 +74,7 @@ export function calculateCartGST(items: any[], couponDiscount: number = 0): GSTB
     }
   });
 
+  const discountedSubtotal = Math.max(0, subtotal - (couponDiscount || 0));
   const totalGST = gst5Total + gst18Total;
   const shippingFee = 0;
   const grandTotal = discountedSubtotal + totalGST;
@@ -94,3 +91,4 @@ export function calculateCartGST(items: any[], couponDiscount: number = 0): GSTB
     grandTotal
   };
 }
+

@@ -215,7 +215,9 @@ export default function ProductDetailsClient({
       return;
     }
 
-    const displayPrice = (product.discount_price || product.price) + (lensData?.lens_price || 0);
+    const framePrice = Number(product.offer_price ?? product.discount_price ?? product.price ?? 0);
+    const lensPrice = Number(lensData?.lens_price || 0);
+    const displayPrice = framePrice + lensPrice;
 
     const cartItemId = `${product.id}-${selectedColor || ''}-${selectedSize || ''}-${lensData?.lens_id || ''}-${customPower ? 'rx' : ''}-${readingPower ? `rp-${readingPower}` : ''}`;
     const cartItem = {
@@ -224,6 +226,8 @@ export default function ProductDetailsClient({
       name: product.name,
       brand: product.brand || "LENZIFY",
       price: displayPrice,
+      frame_price: framePrice,
+      lens_price: lensPrice,
       image: mainImageSrc || "/placeholder.jpg",
       category: isContactLens ? "Contact Lenses" : isReadingGlasses ? "Reading Glasses" : isComputerGlasses ? "Computer Glasses" : "Eyewear",
       product_type: product.product_type || (isReadingGlasses ? "reading-glasses" : isContactLens ? "contact-lens" : "frame"),
@@ -339,11 +343,12 @@ export default function ProductDetailsClient({
   const siteUrl = process.env.NEXT_PUBLIC_SITE_URL || 'https://lenzify.in';
 
   // Price logic
-  const hasDiscount = product.discount_price && product.discount_price < product.price;
-  const displayPrice = product.discount_price || product.price || 0;
-  const originalPrice = product.price || 0;
+  const frameEffectivePrice = Number(product.offer_price ?? product.discount_price ?? product.price ?? 0);
+  const originalPrice = Number(product.price || frameEffectivePrice || 0);
+  const hasDiscount = originalPrice > frameEffectivePrice;
+  const displayPrice = frameEffectivePrice;
   const savingsAmount = hasDiscount ? originalPrice - displayPrice : 0;
-  const savingsPercent = hasDiscount ? Math.round((savingsAmount / originalPrice) * 100) : 0;
+  const savingsPercent = hasDiscount && originalPrice > 0 ? Math.round((savingsAmount / originalPrice) * 100) : 0;
 
   // Average rating
   const avgRating = initialReviews.length > 0

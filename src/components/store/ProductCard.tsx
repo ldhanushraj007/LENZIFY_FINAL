@@ -26,6 +26,7 @@ interface ProductCardProps {
     brand?: string;
     rating?: number;
     slug?: string;
+    offer_price?: number | string;
     discount_price?: number;
     colors?: any[];
     stock?: number;
@@ -97,7 +98,11 @@ export default function ProductCard({ product }: ProductCardProps) {
   };
 
   const rawPrice = Number(product.price) || 0;
-  const rawDiscount = product.discount_price ? Number(product.discount_price) : null;
+  const rawDiscount = product.offer_price !== undefined && product.offer_price !== null && Number(product.offer_price) > 0
+    ? Number(product.offer_price)
+    : product.discount_price !== undefined && product.discount_price !== null && Number(product.discount_price) > 0
+    ? Number(product.discount_price)
+    : null;
 
   const hasValidDiscount = rawDiscount !== null && rawDiscount < rawPrice;
   const displayPrice = hasValidDiscount ? rawDiscount : rawPrice;

@@ -456,11 +456,11 @@ function ReplaceLensesContent() {
       lens_id: activeLensId,
       lens_price: currentPackagePrice + (selectedIndexOption?.price || 0),
       selected_index: selectedIndexOption?.indexValue || "1.56",
-      index_label: selectedIndexOption?.name || "1.56 Standard",
+      index_label: selectedIndexOption?.indexValue || "1.56",
       index_price: selectedIndexOption?.price || 0,
       add_ons: {
         selected_index: selectedIndexOption?.indexValue || "1.56",
-        index_label: selectedIndexOption?.name || "1.56 Standard",
+        index_label: selectedIndexOption?.indexValue || "1.56",
         index_price: selectedIndexOption?.price || 0,
         selected_package: selectedPackage
       },
@@ -1212,7 +1212,7 @@ function ReplaceLensesContent() {
                       <div className="flex justify-between items-center py-2 border-t border-[#ECECEC]">
                         <div>
                           <p className="text-sm font-semibold text-[#111111]">Refractive Index</p>
-                          <p className="text-xs text-[#004AAD]">{selectedIndexOption?.name}</p>
+                          <p className="text-xs text-[#004AAD]">{selectedIndexOption?.indexValue || selectedIndexOption?.name}</p>
                         </div>
                         <span className="text-sm font-semibold text-[#111111]">
                           {selectedIndexOption?.price > 0 ? `+₹${selectedIndexOption.price.toLocaleString('en-IN')}` : "Included"}

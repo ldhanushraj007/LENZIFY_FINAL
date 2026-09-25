@@ -199,7 +199,10 @@ export default function LensSelectionFlow({ product, availableLenses, onClose, o
     const tierKey = selectedTier?.tier?.toLowerCase() || "";
 
     if (typeName.includes("progressive")) {
-      const activeTierPrice = selectedTier?.lens?.price ?? (tierKey === "silver" ? 1799 : (tierKey === "gold" ? 2799 : 4299));
+      const rawTierPrice = Number(selectedTier?.lens?.price);
+      const activeTierPrice = !isNaN(rawTierPrice) && rawTierPrice > 0
+        ? rawTierPrice
+        : (tierKey === "silver" ? 1799 : (tierKey === "gold" ? 2799 : 4299));
       return {
         standard: { price: activeTierPrice, label: "Standard", desc: "All 4 core coatings included" },
         photochromatic: { price: activeTierPrice + 1000, label: "+ Photochromatic", desc: "Light-responsive tint with all coatings" },
@@ -360,16 +363,21 @@ export default function LensSelectionFlow({ product, availableLenses, onClose, o
         ? `${selectedType.name} (${selectedTier.displayName})` 
         : selectedType.name;
 
+      const totalLensPrice = calculateTotalLensPrice();
       onAddToCart({
         lens_id: activeLens.id || selectedType.id,
         lens_name: finalLensName,
-        lens_price: calculateTotalLensPrice(),
+        lens_price: totalLensPrice,
         power_range_extra: calculatePowerRangeExtra(),
         lens_config: {
           type: activeLens,
+          type_name: finalLensName || selectedType?.name || activeLens?.name || "Prescription Lens",
           tier: selectedTier ? selectedTier.tier : null,
           package: selectedPackage,
           package_name: packagePricing[selectedPackage].label,
+          package_price: currentPackagePrice,
+          lens_price: totalLensPrice,
+          total_price: totalLensPrice,
           features: selectedPackage !== "standard" ? [{ name: packagePricing[selectedPackage].label, price: currentPackagePrice }] : [],
           coatings: [
             { name: "UV Block Protection", price: 0 },
@@ -378,9 +386,12 @@ export default function LensSelectionFlow({ product, availableLenses, onClose, o
             { name: "Anti-Reflective Coating", price: 0 },
           ],
           material: selectedMaterial,
-          thickness: selectedThickness,
+          thickness: selectedThickness ? {
+            ...selectedThickness,
+            name: selectedThickness.indexValue || selectedThickness.name || "1.56"
+          } : null,
           selected_index: selectedThickness?.indexValue || "1.56",
-          index_label: selectedThickness?.name || "1.56 Standard",
+          index_label: selectedThickness?.indexValue || "1.56",
           index_price: selectedThickness?.price || 0,
           frame_type: product?.frame_type || "full_rim",
           tint: selectedTint,
@@ -1096,7 +1107,7 @@ export default function LensSelectionFlow({ product, availableLenses, onClose, o
                                  <div className="flex justify-between p-4 bg-brand-background border-l-4 border-secondary rounded-r-xl">
                                     <span className="text-[10px] uppercase font-bold tracking-widest text-brand-navy">Refractive Index</span>
                                     <span className="text-[10px] font-black uppercase tracking-widest text-brand-navy">
-                                      {selectedThickness.name} {selectedThickness.price > 0 ? `(+₹{selectedThickness.price.toLocaleString('en-IN')})` : "(Included)"}
+                                      {selectedThickness.indexValue || selectedThickness.name} {selectedThickness.price > 0 ? `(+₹${selectedThickness.price.toLocaleString('en-IN')})` : "(Included)"}
                                     </span>
                                  </div>
                                )}

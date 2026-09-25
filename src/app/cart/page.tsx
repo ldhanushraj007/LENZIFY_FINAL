@@ -13,6 +13,7 @@ import { useAuth } from "@/components/providers/AuthProvider";
 import { toast } from "react-hot-toast";
 import OrderSummary from "@/components/checkout/OrderSummary";
 import { applyCoupon } from "@/lib/db/coupon_actions";
+import { getItemPricing } from "@/lib/pricing";
 import { ShoppingBag } from "lucide-react";
 import { resolveProductImage } from "@/lib/image_utils";
 
@@ -42,7 +43,7 @@ function CartPageContent() {
     setApplyingCoupon(true);
     const subtotal = items.reduce(
       (acc: number, item: any) =>
-        acc + (item.price || item.products?.offer_price || item.products?.price || 0) * item.quantity,
+        acc + getItemPricing(item).totalPrice,
       0
     );
     const result = await applyCoupon(couponCode.trim(), subtotal);
@@ -118,6 +119,7 @@ function CartPageContent() {
           products: item.products,
           quantity: item.quantity,
           stock: item.products?.stock ?? 99,
+          lens_price: item.lens_price || item.lens_config?.lens_price || item.lens_config?.total_price,
           lens_name: hasActualLens
             ? (item.lens_config?.type?.name || item.lens_config?.lens_name || item.lenses?.name || "Custom Power Lenses")
             : undefined,
@@ -238,13 +240,6 @@ function CartPageContent() {
     return !hasLens;
   };
 
-  const subtotal = items.reduce((acc, item) => acc + (item.price * item.quantity), 0);
-  const taxableSubtotal = items
-    .filter(item => !isContactLensItem(item))
-    .reduce((acc, item) => acc + (item.price * item.quantity), 0);
-  const tax = Math.round(taxableSubtotal * 0.18);
-  const total = subtotal + tax;
-
   const handleRemove = async (dbId: number, productId: string) => {
     // Optimistic update
     removeItem(productId);
@@ -353,39 +348,19 @@ function CartPageContent() {
                   const isAccessory = isAccessoryItem(item);
                   const isComputer = isComputerGlassesItem(item);
                   const isFrameOnly = isFrameOnlyItem(item);
-                  const hasLensConfig = !isReading && !isAccessory && !isComputer && !isFrameOnly && Boolean(
-                    item.lens_config &&
-                    (item.lens_config.type || item.lens_config.package || item.lens_config.package_name || item.lens_config.selected_index || item.lens_config.thickness || (Number(item.lens_price) > 0))
-                  );
 
-                  const baseFramePrice = Number(
-                    item.products?.offer_price ??
-                    item.products?.discount_price ??
-                    item.products?.price ??
-                    item.product?.offer_price ??
-                    item.product?.price ??
-                    0
-                  );
-                  const rawLensPrice = Number(
-                    item.lens_price ||
-                    item.lens_config?.total_price ||
-                    item.lens_config?.lens_price ||
-                    item.lens_config?.price ||
-                    0
-                  );
-                  const indexPrice = Number(item.lens_config?.index_price ?? item.lens_config?.thickness?.price ?? 0);
-                  const packagePrice = Number(
-                    item.lens_config?.package_price ??
-                    (rawLensPrice > indexPrice ? rawLensPrice - indexPrice : (rawLensPrice > 0 ? rawLensPrice : 0))
-                  );
-                  const frameUnitPrice = baseFramePrice > 0 ? baseFramePrice : Math.max(0, (Number(item.price) || 0) - rawLensPrice);
-                  const itemTotal = (frameUnitPrice + packagePrice + indexPrice) * (item.quantity || 1);
-                  const gstAmount = (itemTotal * 0.05).toFixed(2);
+                  const pricing = getItemPricing(item);
+                  const hasLensConfig = pricing.hasLens;
+                  const frameUnitPrice = pricing.frameUnitPrice;
+                  const packagePrice = pricing.packagePrice;
+                  const indexPrice = pricing.indexPrice;
+                  const itemTotal = pricing.totalPrice;
+                  const gstAmount = (pricing.totalPrice * 0.05).toFixed(2);
 
-                  const lensType = item.lens_config?.type?.name || item.lens_name || "Prescription Lens";
-                  const lensPackage = item.lens_config?.package_name || item.lens_config?.package || "Standard";
-                  const indexLabel = item.lens_config?.thickness?.name || item.lens_config?.index_label || (item.lens_config?.selected_index ? `Index ${item.lens_config.selected_index}` : null);
-                  const coatingsCount = Array.isArray(item.lens_config?.coatings) ? item.lens_config.coatings.length : 4;
+                  const lensType = pricing.lensType;
+                  const lensPackage = pricing.lensPackage;
+                  const indexLabel = pricing.indexLabel;
+                  const coatingsCount = pricing.coatingsCount;
 
                   return (
                     <motion.div
@@ -431,7 +406,7 @@ function CartPageContent() {
                             </div>
                             {!hasLensConfig && (
                               <p className="text-xl font-bold text-[#111111] flex-shrink-0">
-                                ₹{((item.price || 0) * (item.quantity || 1)).toLocaleString()}
+                                ₹{pricing.totalPrice.toLocaleString("en-IN")}
                               </p>
                             )}
                           </div>
@@ -455,11 +430,11 @@ function CartPageContent() {
                           )}
                           {item.lens_config && !isReading && !isAccessory && !isComputer && !isFrameOnly && (
                             <>
-                              {(item.lens_config.thickness?.name || item.lens_config.index_label || item.lens_config.selected_index) && (
+                              {(pricing.indexNumber || item.lens_config.thickness || item.lens_config.index_label || item.lens_config.selected_index) && (
                                 <div>
                                   <p className="text-[10px] text-[#666666] uppercase tracking-widest font-medium">Refractive Index</p>
                                   <p className="text-xs text-[#004AAD] font-semibold mt-0.5">
-                                    {item.lens_config.thickness?.name || item.lens_config.index_label || `Index ${item.lens_config.selected_index}`}
+                                    {pricing.indexNumber || item.lens_config.selected_index || item.lens_config.thickness?.indexValue || "1.56"}
                                   </p>
                                 </div>
                               )}
@@ -512,8 +487,10 @@ function CartPageContent() {
                               <span className="font-semibold text-[#111111]">₹{(frameUnitPrice * (item.quantity || 1)).toLocaleString("en-IN")}</span>
                             </div>
                             <div className="flex justify-between text-sm text-[#444444]">
-                              <span>{lensType} · {lensPackage}</span>
-                              <span className="font-semibold text-[#111111]">₹{(packagePrice * (item.quantity || 1)).toLocaleString("en-IN")}</span>
+                              <span>{String(lensType || "Prescription Lens")} · {String(lensPackage || "Standard")}</span>
+                              <span className="font-semibold text-[#111111]">
+                                ₹{((indexPrice > 0 && packagePrice > 0 ? packagePrice : pricing.lensUnitPrice) * (item.quantity || 1)).toLocaleString("en-IN")}
+                              </span>
                             </div>
                             {indexLabel && (
                               <div className="flex justify-between text-sm text-[#444444]">
