@@ -4,6 +4,7 @@ import { useState, useMemo } from "react";
 import { useFormStatus } from "react-dom";
 import { Package, Tag, Maximize2, Info, Camera, Zap, Save, Layers, Loader2, Cpu, Sun, Laptop } from "lucide-react";
 import { updateProductDirect } from "../../actions";
+import { HOUSE_BRANDS } from "@/lib/data/house_brands";
 
 function SubmitButton() {
   const { pending } = useFormStatus();
@@ -41,9 +42,39 @@ export default function EditProductForm({
   productLenses: string[],
   productCategories?: number[]
 }) {
-  const [productType, setProductType] = useState(product.product_type || "frame");
+  const isSunglassesProduct = 
+    product.product_type === "sunglasses" || 
+    product.product_type === "sunglass" ||
+    product.category_id === 5 ||
+    (product.categories && (product.categories.name || "").toLowerCase().includes("sunglass")) ||
+    (productCategories && productCategories.includes(5));
+
+  const [productType, setProductType] = useState(
+    product.product_type === "sunglasses" || isSunglassesProduct
+      ? "sunglasses"
+      : (product.product_type || "frame")
+  );
   const [primaryPreview, setPrimaryPreview] = useState<string | null>(null);
   const [additionalPreviews, setAdditionalPreviews] = useState<string[]>([]);
+
+  const initialBrandId = () => {
+    if (product.brand_id && HOUSE_BRANDS.some((b) => b.id === product.brand_id)) {
+      return product.brand_id;
+    }
+    const match = HOUSE_BRANDS.find(
+      (b) => b.name.toLowerCase() === (product.brand_name || product.brand || "").toLowerCase()
+    );
+    if (match) return match.id;
+    return "custom";
+  };
+  const [selectedBrandId, setSelectedBrandId] = useState<string>(initialBrandId);
+  const [customBrandName, setCustomBrandName] = useState<string>(
+    HOUSE_BRANDS.some(
+      (b) => b.name.toLowerCase() === (product.brand_name || product.brand || "").toLowerCase()
+    )
+      ? ""
+      : (product.brand_name || product.brand || "")
+  );
   // Use direct server action (no useActionState) so FormData file bytes are NOT stripped
 
   const handlePrimaryChange = (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -270,7 +301,60 @@ export default function EditProductForm({
               </div>
               <div className="space-y-2 group">
                  <label className="text-[9px] font-bold uppercase tracking-widest text-brand-text-muted transition-colors group-focus-within:text-secondary italic">Brand Authority</label>
-                 <input name="brand" required defaultValue={product.brand} className="w-full bg-brand-background border border-brand-navy/10 px-6 py-4 text-[11px] font-medium tracking-wider outline-none focus:border-secondary transition-all" />
+                 <select
+                    value={selectedBrandId}
+                    onChange={(e) => setSelectedBrandId(e.target.value)}
+                    className="w-full bg-brand-background border border-brand-navy/10 px-6 py-4 text-[11px] font-medium tracking-wider outline-none focus:border-secondary transition-all"
+                  >
+                    <optgroup label="Lenzify House Brands">
+                      {HOUSE_BRANDS.map((b) => (
+                        <option key={b.id} value={b.id}>
+                          {b.name}
+                        </option>
+                      ))}
+                    </optgroup>
+                    <option value="custom">+ Enter a different brand</option>
+                  </select>
+
+                  {selectedBrandId === "custom" && (
+                    <div className="pt-2">
+                      <label className="text-[9px] font-bold uppercase tracking-widest text-brand-text-muted transition-colors italic block mb-1">
+                        Custom Brand Name
+                      </label>
+                      <input
+                        type="text"
+                        value={customBrandName}
+                        onChange={(e) => setCustomBrandName(e.target.value)}
+                        placeholder="e.g. RAY-BAN LUX"
+                        required={selectedBrandId === "custom"}
+                        className="w-full bg-brand-background border border-brand-navy/10 px-6 py-4 text-[11px] font-medium tracking-wider outline-none focus:border-secondary transition-all"
+                      />
+                    </div>
+                  )}
+
+                  <input
+                    type="hidden"
+                    name="brand_id"
+                    value={selectedBrandId !== "custom" ? selectedBrandId : ""}
+                  />
+                  <input
+                    type="hidden"
+                    name="brand_name"
+                    value={
+                      selectedBrandId !== "custom"
+                        ? (HOUSE_BRANDS.find((b) => b.id === selectedBrandId)?.name || "")
+                        : customBrandName
+                    }
+                  />
+                  <input
+                    type="hidden"
+                    name="brand"
+                    value={
+                      selectedBrandId !== "custom"
+                        ? (HOUSE_BRANDS.find((b) => b.id === selectedBrandId)?.name || "")
+                        : customBrandName
+                    }
+                  />
               </div>
               <div className="space-y-2 group">
                  <label className="text-[9px] font-bold uppercase tracking-widest text-brand-text-muted transition-colors group-focus-within:text-secondary italic">Unit SKU (Unique)</label>
@@ -467,7 +551,7 @@ export default function EditProductForm({
                </div>
 
                {/* SUNGLASSES SPECIFIC: Lens Color, Lens Type, UV Protection & Prescription Toggle */}
-               {productType === "sunglasses" && (
+               {(productType === "sunglasses" || isSunglassesProduct) && (
                  <div className="space-y-6 pt-6 border-t border-brand-navy/10">
                    <div className="flex items-center gap-2">
                      <Sun size={14} className="text-secondary" />
@@ -738,7 +822,7 @@ export default function EditProductForm({
                          <input type="hidden" name="category_ids" value="7" />
                        </div>
                      )}
-                     {productType === "sunglasses" && (
+                     {(productType === "sunglasses" || isSunglassesProduct) && (
                        <div className="p-3 bg-amber-950/60 border border-amber-500/30 rounded text-left space-y-1 mb-2">
                          <span className="text-[8px] font-bold uppercase tracking-widest text-amber-300 block">Auto Sector Assignment</span>
                          <p className="text-[10px] font-bold text-white">Sunglasses (Category #5)</p>

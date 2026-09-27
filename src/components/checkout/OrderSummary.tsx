@@ -560,7 +560,7 @@ export default function OrderSummary({
             <span className="font-bold text-[#111111] text-base">Total</span>
             <p className="text-[10px] text-[#888888]">Inclusive of applicable taxes</p>
           </div>
-          <span className="text-2xl md:text-3xl font-[var(--font-hero)] italic font-bold text-[#111111]">
+          <span className="text-2xl md:text-3xl font-bold text-[#111111] tabular-nums lining-nums tracking-tight">
             ₹{Math.round(grandTotal).toLocaleString("en-IN")}
           </span>
         </div>

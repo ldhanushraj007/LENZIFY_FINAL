@@ -39,6 +39,7 @@ const LoginPromptModal = dynamic(() => import("@/components/auth/LoginPromptModa
   ssr: false,
 });
 import { resolveProductImage } from "@/lib/image_utils";
+import { getBrandLogo } from "@/lib/data/house_brands";
 
 interface ProductDetailsClientProps {
   product: any;
@@ -67,6 +68,9 @@ export default function ProductDetailsClient({
   const [loginModalMessage, setLoginModalMessage] = useState("Please log in to add items to your cart");
 
   const [activeTab, setActiveTab] = useState<"description" | "specs" | "reviews">("description");
+
+  const brandLogo = getBrandLogo(product.brand_name || product.brand);
+  const brandDisplayName = product.brand_name || product.brand || "Lenzify";
 
   const allCategories = useMemo(() => {
     const list: any[] = [];
@@ -144,7 +148,7 @@ export default function ProductDetailsClient({
     );
   }, [product.product_type, allCategories]);
 
-  const parsedContactSpecs = useMemo(() => {
+  const parsedSpecs = useMemo(() => {
     let s = product.specifications;
     if (typeof s === "string") {
       try {
@@ -153,20 +157,26 @@ export default function ProductDetailsClient({
         s = {};
       }
     }
-    return s || {};
+    return (s && typeof s === "object") ? s : {};
   }, [product.specifications]);
 
+  const parsedContactSpecs = parsedSpecs;
+
+  const lensType = parsedSpecs.lens_type || (product as any).lens_type || (product as any).lensType;
+  const uvProtection = parsedSpecs.uv_protection || (product as any).uv_protection || (product as any).uvProtection;
+  const lensColor = parsedSpecs.lens_color || (product as any).lens_color || (product as any).lensColor;
+  const isPolarized = Boolean(
+    lensType &&
+    lensType.toLowerCase().includes("polarized") &&
+    !lensType.toLowerCase().includes("non")
+  );
+
   const prescriptionAvailable = useMemo(() => {
-    let s = product.specifications;
-    if (typeof s === "string") {
-      try {
-        s = JSON.parse(s);
-      } catch {
-        s = {};
-      }
-    }
-    return Boolean(s?.prescription_available === true || s?.prescription_available === "true");
-  }, [product.specifications]);
+    return Boolean(
+      parsedSpecs?.prescription_available === true ||
+      parsedSpecs?.prescription_available === "true"
+    );
+  }, [parsedSpecs]);
 
   const [customPower, setCustomPower] = useState<ContactLensPrescriptionData | null>(null);
   const [readingPower, setReadingPower] = useState<string>("");
@@ -378,19 +388,19 @@ export default function ProductDetailsClient({
     return d.toLocaleDateString("en-IN", { weekday: "long", month: "long", day: "numeric" });
   }, []);
 
-  // Specs for the Specifications tab (Filter out frame specs for contact lenses, display contact lens parameters)
+  // Specs for the Specifications tab
   const specs = isContactLens
     ? [
-        { label: "Pack Size", value: product.pack_size || parsedContactSpecs.pack_size },
-        { label: "Material", value: product.material || parsedContactSpecs.material },
-        { label: "Water Content", value: parsedContactSpecs.water_content || parsedContactSpecs.waterContent },
-        { label: "Base Curve (BC)", value: parsedContactSpecs.base_curve || parsedContactSpecs.baseCurve || parsedContactSpecs.bc },
-        { label: "Diameter (DIA)", value: parsedContactSpecs.diameter || parsedContactSpecs.dia },
-        { label: "Replacement Schedule", value: parsedContactSpecs.replacement_schedule || parsedContactSpecs.usage_schedule || parsedContactSpecs.replacement },
-        { label: "Disposability", value: parsedContactSpecs.disposability },
-        { label: "Packaging", value: parsedContactSpecs.packaging },
-        ...Object.entries(parsedContactSpecs)
-          .filter(([k]) => !["pack_size", "material", "water_content", "waterContent", "base_curve", "baseCurve", "bc", "diameter", "dia", "replacement_schedule", "usage_schedule", "replacement", "disposability", "packaging", "usage_type"].includes(k))
+        { label: "Pack Size", value: product.pack_size || parsedSpecs.pack_size },
+        { label: "Material", value: product.material || parsedSpecs.material },
+        { label: "Water Content", value: parsedSpecs.water_content || parsedSpecs.waterContent },
+        { label: "Base Curve (BC)", value: parsedSpecs.base_curve || parsedSpecs.baseCurve || parsedSpecs.bc },
+        { label: "Diameter (DIA)", value: parsedSpecs.diameter || parsedSpecs.dia },
+        { label: "Replacement Schedule", value: parsedSpecs.replacement_schedule || parsedSpecs.usage_schedule || parsedSpecs.replacement },
+        { label: "Disposability", value: parsedSpecs.disposability },
+        { label: "Packaging", value: parsedSpecs.packaging },
+        ...Object.entries(parsedSpecs)
+          .filter(([k]) => !["pack_size", "material", "water_content", "waterContent", "base_curve", "baseCurve", "bc", "diameter", "dia", "replacement_schedule", "usage_schedule", "replacement", "disposability", "packaging", "usage_type", "lens_type", "uv_protection", "lens_color"].includes(k))
           .map(([k, v]) => ({ label: k.replace(/_/g, " ").replace(/\b\w/g, l => l.toUpperCase()), value: String(v) }))
       ].filter(s => s.value)
     : [
@@ -400,6 +410,17 @@ export default function ProductDetailsClient({
         { label: "Gender", value: product.gender },
         { label: "Color", value: product.color },
         { label: "Size", value: product.size },
+        { label: "Lens Type", value: lensType },
+        { label: "UV Protection", value: uvProtection },
+        { label: "Lens Color", value: lensColor },
+        { label: "Prescription Compatible", value: isSunglasses ? (parsedSpecs.prescription_available ? "Yes (Available)" : "No") : undefined },
+        ...Object.entries(parsedSpecs)
+          .filter(([k]) => ![
+            "lens_type", "uv_protection", "lens_color", "prescription_available", 
+            "custom_notes", "usage_type", "pack_size", "water_content", "base_curve", 
+            "diameter", "replacement_schedule", "material", "waterContent", "baseCurve", "bc", "dia"
+          ].includes(k))
+          .map(([k, v]) => ({ label: k.replace(/_/g, " ").replace(/\b\w/g, l => l.toUpperCase()), value: String(v) }))
       ].filter(s => s.value);
 
   return (
@@ -532,9 +553,29 @@ export default function ProductDetailsClient({
 
             {/* Brand & Frame Type (Hide frame type for contact lenses) */}
             <div className="flex items-center gap-3 flex-wrap">
-              <p className="text-sm font-semibold text-[#004AAD] uppercase tracking-widest">
-                {product.brand || "Lenzify"}
-              </p>
+              {brandLogo ? (
+                <Link
+                  href={`/products?brand=${brandDisplayName.toLowerCase().replace(/[^a-z0-9]/g, "-")}`}
+                  className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-slate-50 border border-slate-200/90 hover:border-[#004AAD] hover:bg-white transition-all shadow-xs group"
+                >
+                  <div className="w-6 h-6 rounded-full overflow-hidden bg-white border border-[#ECECEC] flex items-center justify-center p-0 shadow-2xs">
+                    <Image
+                      src={brandLogo}
+                      alt={brandDisplayName}
+                      width={24}
+                      height={24}
+                      className="w-full h-full object-cover rounded-full"
+                    />
+                  </div>
+                  <span className="text-xs font-bold text-[#004AAD] group-hover:text-[#003882] uppercase tracking-wider">
+                    {brandDisplayName}
+                  </span>
+                </Link>
+              ) : (
+                <p className="text-sm font-semibold text-[#004AAD] uppercase tracking-widest">
+                  {brandDisplayName}
+                </p>
+              )}
               {!isContactLens && product.frame_type && (
                 <span className={cn(
                   "px-2.5 py-0.5 rounded-full text-[10px] font-bold uppercase tracking-wider border",
@@ -543,6 +584,21 @@ export default function ProductDetailsClient({
                     : "bg-[#03173D]/5 text-[#03173D] border-[#03173D]/10"
                 )}>
                   {product.frame_type.replace('_', ' ')}
+                </span>
+              )}
+              {lensType && (
+                <span className={cn(
+                  "px-2.5 py-0.5 rounded-full text-[10px] font-bold uppercase tracking-wider border flex items-center gap-1",
+                  isPolarized
+                    ? "bg-amber-500/10 text-amber-800 border-amber-300 shadow-xs"
+                    : "bg-blue-500/10 text-blue-800 border-blue-200 shadow-xs"
+                )}>
+                  {isPolarized ? "🕶️ Polarized" : lensType}
+                </span>
+              )}
+              {uvProtection && (
+                <span className="px-2.5 py-0.5 rounded-full text-[10px] font-bold uppercase tracking-wider border bg-emerald-500/10 text-emerald-800 border-emerald-200 flex items-center gap-1 shadow-xs">
+                  ☀️ {uvProtection}
                 </span>
               )}
             </div>
@@ -584,16 +640,16 @@ export default function ProductDetailsClient({
             {/* Price */}
             <div>
               <div className="flex items-baseline gap-3 flex-wrap">
+                <span className="text-3xl font-bold text-[#111111] leading-none tabular-nums lining-nums">
+                  ₹{displayPrice.toLocaleString()}
+                </span>
                 {hasDiscount && (
-                  <span className="text-lg text-[#999999] line-through">
+                  <span className="text-lg text-[#999999] line-through leading-none tabular-nums lining-nums">
                     ₹{originalPrice.toLocaleString()}
                   </span>
                 )}
-                <span className="text-3xl font-bold text-[#111111]">
-                  ₹{displayPrice.toLocaleString()}
-                </span>
                 {hasDiscount && savingsPercent > 0 && (
-                  <span className="bg-[#004AAD]/10 text-[#004AAD] text-sm font-semibold rounded-full px-3 py-1">
+                  <span className="bg-[#004AAD]/10 text-[#004AAD] text-sm font-semibold rounded-full px-3 py-1 self-center">
                     {savingsPercent}% off
                   </span>
                 )}
@@ -604,6 +660,42 @@ export default function ProductDetailsClient({
                 </p>
               )}
             </div>
+
+            {/* Sunglasses Optical Highlights (Polarized, UV Protection, Lens Color) */}
+            {isSunglasses && (lensType || uvProtection || lensColor) && (
+              <div className="p-4 bg-[#F8F9FC] border border-[#ECEFF5] rounded-2xl space-y-2.5">
+                <div className="flex items-center justify-between">
+                  <span className="text-[11px] font-bold uppercase tracking-widest text-[#03173D]">
+                    Optical Features
+                  </span>
+                  {isPolarized && (
+                    <span className="text-[10px] font-bold px-2.5 py-0.5 bg-amber-100 text-amber-900 border border-amber-300 rounded-full">
+                      Glare-Cut Polarized
+                    </span>
+                  )}
+                </div>
+                <div className="grid grid-cols-2 sm:grid-cols-3 gap-3 pt-1">
+                  {lensType && (
+                    <div className="bg-white p-2.5 rounded-xl border border-[#ECEFF5]">
+                      <span className="text-[10px] uppercase font-semibold text-[#888888] block">Lens Type</span>
+                      <span className="text-xs font-bold text-[#111111]">{lensType}</span>
+                    </div>
+                  )}
+                  {uvProtection && (
+                    <div className="bg-white p-2.5 rounded-xl border border-[#ECEFF5]">
+                      <span className="text-[10px] uppercase font-semibold text-[#888888] block">UV Protection</span>
+                      <span className="text-xs font-bold text-[#111111]">{uvProtection}</span>
+                    </div>
+                  )}
+                  {lensColor && (
+                    <div className="bg-white p-2.5 rounded-xl border border-[#ECEFF5]">
+                      <span className="text-[10px] uppercase font-semibold text-[#888888] block">Lens Tint</span>
+                      <span className="text-xs font-bold text-[#111111]">{lensColor}</span>
+                    </div>
+                  )}
+                </div>
+              </div>
+            )}
 
             {/* Pack Size Display (Contact Lenses) */}
             {isContactLens && (product.pack_size || parsedContactSpecs.pack_size) && (

@@ -4,6 +4,7 @@ import { useState } from "react";
 import { useFormStatus } from "react-dom";
 import { Package, Tag, Maximize2, Info, Camera, Zap, ChevronRight, Save, Layers, Loader2, Cpu, Sun, Laptop, ShieldCheck } from "lucide-react";
 import { createProduct } from "../actions";
+import { HOUSE_BRANDS } from "@/lib/data/house_brands";
 
 function SubmitButton() {
   const { pending } = useFormStatus();
@@ -30,6 +31,8 @@ export default function NewProductForm({ categories, lenses }: { categories: any
   const [productType, setProductType] = useState("frame");
   const [primaryPreview, setPrimaryPreview] = useState<string | null>(null);
   const [additionalPreviews, setAdditionalPreviews] = useState<string[]>([]);
+  const [selectedBrandId, setSelectedBrandId] = useState<string>(HOUSE_BRANDS[0]?.id || "");
+  const [customBrandName, setCustomBrandName] = useState<string>("");
 
 
   const handlePrimaryChange = (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -212,7 +215,60 @@ export default function NewProductForm({ categories, lenses }: { categories: any
               </div>
               <div className="space-y-2 group">
                  <label className="text-[9px] font-bold uppercase tracking-widest text-brand-text-muted transition-colors group-focus-within:text-secondary italic">Brand Authority</label>
-                 <input name="brand" required placeholder="e.g. RAY-BAN LUX" className="w-full bg-brand-background border border-brand-navy/10 px-6 py-4 text-[11px] font-medium tracking-wider outline-none focus:border-secondary transition-all" suppressHydrationWarning />
+                 <select
+                    value={selectedBrandId}
+                    onChange={(e) => setSelectedBrandId(e.target.value)}
+                    className="w-full bg-brand-background border border-brand-navy/10 px-6 py-4 text-[11px] font-medium tracking-wider outline-none focus:border-secondary transition-all"
+                  >
+                    <optgroup label="Lenzify House Brands">
+                      {HOUSE_BRANDS.map((b) => (
+                        <option key={b.id} value={b.id}>
+                          {b.name}
+                        </option>
+                      ))}
+                    </optgroup>
+                    <option value="custom">+ Enter a different brand</option>
+                  </select>
+
+                  {selectedBrandId === "custom" && (
+                    <div className="pt-2">
+                      <label className="text-[9px] font-bold uppercase tracking-widest text-brand-text-muted transition-colors italic block mb-1">
+                        Custom Brand Name
+                      </label>
+                      <input
+                        type="text"
+                        value={customBrandName}
+                        onChange={(e) => setCustomBrandName(e.target.value)}
+                        placeholder="e.g. RAY-BAN LUX"
+                        required={selectedBrandId === "custom"}
+                        className="w-full bg-brand-background border border-brand-navy/10 px-6 py-4 text-[11px] font-medium tracking-wider outline-none focus:border-secondary transition-all"
+                      />
+                    </div>
+                  )}
+
+                  <input
+                    type="hidden"
+                    name="brand_id"
+                    value={selectedBrandId !== "custom" ? selectedBrandId : ""}
+                  />
+                  <input
+                    type="hidden"
+                    name="brand_name"
+                    value={
+                      selectedBrandId !== "custom"
+                        ? (HOUSE_BRANDS.find((b) => b.id === selectedBrandId)?.name || "")
+                        : customBrandName
+                    }
+                  />
+                  <input
+                    type="hidden"
+                    name="brand"
+                    value={
+                      selectedBrandId !== "custom"
+                        ? (HOUSE_BRANDS.find((b) => b.id === selectedBrandId)?.name || "")
+                        : customBrandName
+                    }
+                  />
               </div>
               <div className="space-y-2 group">
                  <label className="text-[9px] font-bold uppercase tracking-widest text-brand-text-muted transition-colors group-focus-within:text-secondary italic">Unit SKU (Unique)</label>

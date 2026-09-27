@@ -134,6 +134,86 @@ const isReadingGlassesProduct = (p: any): boolean => {
   );
 };
 
+const isSunglassesProduct = (p: any): boolean => {
+  const pt = (p.product_type || "").toLowerCase();
+  const cat = (p.category || "").toLowerCase();
+  const hasSunCat = p.product_categories?.some((pc: any) =>
+    (pc.categories?.name || "").toLowerCase().includes("sunglass")
+  );
+  return (
+    pt === "sunglasses" ||
+    pt === "sunglass" ||
+    cat.includes("sunglass") ||
+    Boolean(hasSunCat)
+  );
+};
+
+const isComputerGlassesProduct = (p: any): boolean => {
+  const pt = (p.product_type || "").toLowerCase();
+  const cat = (p.category || "").toLowerCase();
+  const hasCompCat = p.product_categories?.some((pc: any) =>
+    (pc.categories?.name || "").toLowerCase().includes("computer")
+  );
+  return (
+    pt === "computer-glasses" ||
+    pt === "computer_glasses" ||
+    pt === "computer glasses" ||
+    cat.includes("computer") ||
+    Boolean(hasCompCat)
+  );
+};
+
+const isAccessoryProduct = (p: any): boolean => {
+  const pt = (p.product_type || "").toLowerCase();
+  const cat = (p.category || "").toLowerCase();
+  const hasAccCat = p.product_categories?.some((pc: any) =>
+    (pc.categories?.name || "").toLowerCase().includes("accessor")
+  );
+  return (
+    pt === "accessories" ||
+    pt === "accessory" ||
+    cat.includes("accessor") ||
+    Boolean(hasAccCat)
+  );
+};
+
+const isEyeglassesProduct = (p: any): boolean => {
+  if (isContactLensProduct(p) || isReadingGlassesProduct(p) || isSunglassesProduct(p) || isComputerGlassesProduct(p) || isAccessoryProduct(p)) {
+    return false;
+  }
+  const pt = (p.product_type || "").toLowerCase();
+  const cat = (p.category || "").toLowerCase();
+  const hasEyeCat = p.product_categories?.some((pc: any) => {
+    const n = (pc.categories?.name || "").toLowerCase();
+    return n.includes("eyeglass") || n.includes("spectacle");
+  });
+  return (
+    pt === "eyeglasses" ||
+    pt === "eyeglass" ||
+    pt === "spectacles" ||
+    pt === "frame" ||
+    !pt ||
+    cat.includes("eyeglass") ||
+    cat.includes("spectacle") ||
+    Boolean(hasEyeCat)
+  );
+};
+
+export const normalizeProductType = (raw: string | null | undefined): string | null => {
+  if (!raw) return null;
+  const trimmed = String(raw).trim();
+  const lower = trimmed.toLowerCase();
+  if (lower === "frame") return null;
+  if (lower === "accessory" || lower === "accessories") return "Accessories";
+  if (lower === "computer-glasses" || lower === "computer_glasses" || lower === "computer glasses") return "Computer Glasses";
+  if (lower.includes("contact")) return "Contact Lenses";
+  if (lower.includes("reading")) return "Reading Glasses";
+  if (lower.includes("sunglass")) return "Sunglasses";
+  if (lower.includes("eyeglass") || lower.includes("spectacle")) return "Eyeglasses";
+  if (lower === "smart glasses" || lower === "smart-glasses") return "Smart Glasses";
+  return trimmed.charAt(0).toUpperCase() + trimmed.slice(1);
+};
+
 const parseSizeItem = (val: any): string[] => {
   if (!val) return [];
   let item = val;
@@ -237,13 +317,22 @@ type SortMode = "newest" | "price_asc" | "price_desc" | "popularity";
 interface ProductGridProps {
   initialCategory?: string;
   initialGender?: string;
+  initialBrand?: string;
+  searchBrand?: string;
+  hideBanner?: boolean;
 }
 
 // ---------------------------------------------------------------------------
 // Main Component
 // ---------------------------------------------------------------------------
 
-export default function ProductGrid({ initialCategory, initialGender }: ProductGridProps) {
+export default function ProductGrid({
+  initialCategory,
+  initialGender,
+  initialBrand,
+  searchBrand: searchBrandProp,
+  hideBanner = false,
+}: ProductGridProps) {
   // ---- data state ----
   const [products, setProducts] = useState<any[]>([]);
   const [lenses, setLenses] = useState<any[]>([]);
@@ -282,7 +371,8 @@ export default function ProductGrid({ initialCategory, initialGender }: ProductG
   const searchType = searchParams.get("type") || "";
   const searchLensType = searchParams.get("lens_type") || "";
   const searchCollection = searchParams.get("collection") || "";
-  const searchBrand = searchParams.get("brand") || "";
+  const propBrand = searchBrandProp || initialBrand || "";
+  const searchBrand = searchParams.get("brand") || propBrand;
   const searchMaxPrice = searchParams.get("max_price");
 
   // ---- ui state ----
@@ -298,9 +388,11 @@ export default function ProductGrid({ initialCategory, initialGender }: ProductG
   const [selectedGenders, setSelectedGenders] = useState<string[]>(
     searchGender ? [searchGender] : initialGender ? [initialGender] : []
   );
-  const [selectedTypes, setSelectedTypes] = useState<string[]>(
-    searchType ? [searchType] : initialCategory ? [initialCategory] : []
-  );
+  const [selectedTypes, setSelectedTypes] = useState<string[]>(() => {
+    const raw = searchType || initialCategory || "";
+    const norm = normalizeProductType(raw);
+    return norm ? [norm] : (raw ? [raw] : []);
+  });
   const [selectedBrands, setSelectedBrands] = useState<string[]>(
     searchBrand ? [searchBrand] : []
   );
@@ -365,7 +457,7 @@ export default function ProductGrid({ initialCategory, initialGender }: ProductG
   // ---- url sync effects ----
   useEffect(() => {
     setSelectedBrands(searchBrand ? [searchBrand] : []);
-  }, [searchBrand]);
+  }, [searchBrand, propBrand]);
 
   useEffect(() => {
     setSelectedGenders(
@@ -374,9 +466,9 @@ export default function ProductGrid({ initialCategory, initialGender }: ProductG
   }, [searchGender, initialGender]);
 
   useEffect(() => {
-    setSelectedTypes(
-      searchType ? [searchType] : initialCategory ? [initialCategory] : []
-    );
+    const raw = searchType || initialCategory || "";
+    const norm = normalizeProductType(raw);
+    setSelectedTypes(norm ? [norm] : (raw ? [raw] : []));
   }, [searchType, initialCategory]);
 
   useEffect(() => {
@@ -413,20 +505,25 @@ export default function ProductGrid({ initialCategory, initialGender }: ProductG
   }, [genderCategories, products]);
 
   const dynamicTypes = useMemo(() => {
-    const fromCats = products.flatMap(
-      (p) =>
-        p.product_categories
-          ?.map((pc: any) =>
-            pc.categories?.type === "product" ? pc.categories.name : null
-          )
-          .filter(Boolean) || []
-    );
-    const fromProps = products.flatMap((p) => parseArray(p.product_type));
-    return Array.from(
-      new Set([...productTypeCategories, ...fromCats, ...fromProps])
-    )
-      .filter((t) => Boolean(t) && t.toLowerCase() !== "frame")
-      .sort();
+    const rawList = [
+      ...productTypeCategories,
+      ...products.flatMap(
+        (p) =>
+          p.product_categories
+            ?.map((pc: any) =>
+              pc.categories?.type === "product" ? pc.categories.name : null
+            )
+            .filter(Boolean) || []
+      ),
+      ...products.flatMap((p) => parseArray(p.product_type)),
+      ...products.map((p) => p.category).filter(Boolean),
+    ];
+
+    const normalized = rawList
+      .map(normalizeProductType)
+      .filter((t): t is string => Boolean(t));
+
+    return Array.from(new Set(normalized)).sort();
   }, [productTypeCategories, products]);
 
   const dynamicCollections = useMemo(() => {
@@ -449,14 +546,9 @@ export default function ProductGrid({ initialCategory, initialGender }: ProductG
   const isContactLensPage = useMemo(() => {
     const typeParam = (searchParams.get("type") || "").toLowerCase();
     const catParam = (searchParams.get("category") || "").toLowerCase();
-    const hasContactInTypes = selectedTypes.some((t) => {
-      const lower = (t || "").toLowerCase();
-      return (
-        lower.includes("contact") ||
-        lower === "contact-lens" ||
-        lower === "contact_lens"
-      );
-    });
+    const hasContactInTypes = selectedTypes.some(
+      (t) => normalizeProductType(t) === "Contact Lenses"
+    );
 
     return (
       initialCategory === "contact-lenses" ||
@@ -473,14 +565,9 @@ export default function ProductGrid({ initialCategory, initialGender }: ProductG
   const isReadingGlassesPage = useMemo(() => {
     const typeParam = (searchParams.get("type") || "").toLowerCase();
     const catParam = (searchParams.get("category") || "").toLowerCase();
-    const hasReadingInTypes = selectedTypes.some((t) => {
-      const lower = (t || "").toLowerCase();
-      return (
-        lower.includes("reading") ||
-        lower === "reading-glasses" ||
-        lower === "reading_glasses"
-      );
-    });
+    const hasReadingInTypes = selectedTypes.some(
+      (t) => normalizeProductType(t) === "Reading Glasses"
+    );
 
     return (
       initialCategory === "reading-glasses" ||
@@ -497,7 +584,9 @@ export default function ProductGrid({ initialCategory, initialGender }: ProductG
     const source = isContactLensPage
       ? products.filter(isContactLensProduct)
       : products;
-    return Array.from(new Set(source.map((p) => p.brand).filter(Boolean))).sort();
+    return Array.from(
+      new Set(source.map((p) => p.brand_name || p.brand).filter(Boolean))
+    ).sort();
   }, [products, isContactLensPage]);
 
   const colors = useMemo(() => {
@@ -563,7 +652,7 @@ export default function ProductGrid({ initialCategory, initialGender }: ProductG
     setSelectedGenders([]);
     setSelectedTypes(
       isContactLensPage
-        ? (searchType ? [searchType] : initialCategory ? [initialCategory] : ["contact-lens"])
+        ? ["Contact Lenses"]
         : []
     );
     setSelectedBrands([]);
@@ -652,39 +741,25 @@ export default function ProductGrid({ initialCategory, initialGender }: ProductG
 
     if (selectedTypes.length > 0) {
       result = result.filter((p) => {
-        const pTypes = parseArray(p.product_type).map((t) => t.toLowerCase());
-        const selectedLower = selectedTypes.map((t) => t.toLowerCase());
+        const normSelected = selectedTypes.map(normalizeProductType).filter(Boolean) as string[];
 
-        const matchesType = pTypes.some((t) => {
-          if (selectedLower.includes(t)) return true;
-          if (t === "accessory" && selectedLower.includes("accessories"))
-            return true;
-          if (t === "accessories" && selectedLower.includes("accessory"))
-            return true;
-          if (
-            (t === "contact-lens" || t === "contact_lens" || t.includes("contact")) &&
-            selectedLower.some((s) => s.includes("contact"))
-          )
-            return true;
-          if (
-            (t === "reading-glasses" || t === "reading_glasses" || t.includes("reading")) &&
-            selectedLower.some((s) => s.includes("reading"))
-          )
-            return true;
-          return false;
+        return normSelected.some((type) => {
+          if (type === "Contact Lenses") return isContactLensProduct(p);
+          if (type === "Reading Glasses") return isReadingGlassesProduct(p);
+          if (type === "Sunglasses") return isSunglassesProduct(p);
+          if (type === "Computer Glasses") return isComputerGlassesProduct(p);
+          if (type === "Accessories") return isAccessoryProduct(p);
+          if (type === "Eyeglasses") return isEyeglassesProduct(p);
+
+          // Fallback direct product_type or category match
+          const pTypes = parseArray(p.product_type).map(normalizeProductType);
+          const pCats = (p.product_categories || [])
+            .map((pc: any) => normalizeProductType(pc.categories?.name))
+            .filter(Boolean);
+          if (p.category) pCats.push(normalizeProductType(p.category));
+
+          return pTypes.includes(type) || pCats.includes(type);
         });
-
-        const matchesCategory = p.product_categories?.some(
-          (pc: any) =>
-            pc.categories?.type === "product" &&
-            (selectedLower.includes(pc.categories.name.toLowerCase()) ||
-              (selectedLower.some((s) => s.includes("contact")) &&
-                pc.categories.name.toLowerCase().includes("contact")) ||
-              (selectedLower.some((s) => s.includes("reading")) &&
-                pc.categories.name.toLowerCase().includes("reading")))
-        );
-
-        return matchesType || matchesCategory;
       });
     }
 
@@ -704,11 +779,27 @@ export default function ProductGrid({ initialCategory, initialGender }: ProductG
     }
 
     if (selectedBrands.length > 0) {
-      result = result.filter((p) =>
-        selectedBrands.some(
-          (b) => b.toLowerCase() === (p.brand || "").toLowerCase()
-        )
-      );
+      result = result.filter((p) => {
+        const pBrand = (p.brand || "").toLowerCase().trim();
+        const pBrandName = (p.brand_name || "").toLowerCase().trim();
+        const pBrandSlug = pBrandName.replace(/[^a-z0-9]/g, "-").replace(/-+/g, "-");
+        const pBrandNorm = pBrand.replace(/[^a-z0-9]/g, "");
+        const pBrandNameNorm = pBrandName.replace(/[^a-z0-9]/g, "");
+
+        return selectedBrands.some((b) => {
+          const target = b.toLowerCase().trim();
+          const targetNorm = target.replace(/[^a-z0-9]/g, "");
+          const targetSlug = target.replace(/[^a-z0-9]/g, "-").replace(/-+/g, "-");
+
+          return (
+            target === pBrand ||
+            target === pBrandName ||
+            targetSlug === pBrandSlug ||
+            (targetNorm && (targetNorm === pBrandNorm || targetNorm === pBrandNameNorm)) ||
+            (p.brand_id && p.brand_id === b)
+          );
+        });
+      });
     }
     if (selectedColors.length > 0) {
       result = result.filter((p) => {
@@ -1056,7 +1147,7 @@ export default function ProductGrid({ initialCategory, initialGender }: ProductG
       {/* ------------------------------------------------------------------ */}
       {/* Dynamic Hero Category Banner with Rich Photography                  */}
       {/* ------------------------------------------------------------------ */}
-      {(() => {
+      {!hideBanner && (() => {
         const c = (activeCrumb || "").toLowerCase();
         const t = (pageTitle || "").toLowerCase();
 

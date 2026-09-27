@@ -39,11 +39,14 @@ export async function uploadToSupabase(file: File, bucket: string = "product-ima
 export async function createProduct(formData: FormData) {
   const supabase = await createAdminClient();
 
-  const product_type = formData.get("product_type") as string || "frame";
+  let product_type = (formData.get("product_type") as string) || "frame";
   
   // Extract common fields
   const name = formData.get("name") as string;
-  const brand = formData.get("brand") as string;
+  const rawBrandId = formData.get("brand_id") as string;
+  const brand_id = rawBrandId && rawBrandId.trim() !== "" ? rawBrandId.trim() : null;
+  const brand_name = (formData.get("brand_name") as string) || (formData.get("brand") as string) || "";
+  const brand = brand_name;
   const sku = formData.get("sku") as string;
   const price = parseFloat(formData.get("price") as string);
   const discount_price = formData.get("offer_price") ? parseFloat(formData.get("offer_price") as string) : null;
@@ -53,6 +56,9 @@ export async function createProduct(formData: FormData) {
   if (!category_id) {
     if (product_type === "computer-glasses") category_id = 7;
     if (product_type === "sunglasses") category_id = 5;
+  }
+  if (category_id === 5 && (product_type === "frame" || !product_type)) {
+    product_type = "sunglasses";
   }
   const description = formData.get("description") as string;
   
@@ -145,6 +151,8 @@ export async function createProduct(formData: FormData) {
     discount_price,
     category_id,
     brand,
+    brand_name,
+    brand_id,
     product_type,
     frame_type,
     shape,
@@ -171,7 +179,7 @@ export async function createProduct(formData: FormData) {
       }
     })(),
     specifications: (() => {
-      const sunglassSpecs = product_type === "sunglasses" ? {
+      const sunglassSpecs = (product_type === "sunglasses" || category_id === 5 || Boolean(lens_type) || Boolean(uv_protection)) ? {
         prescription_available,
         ...(uv_protection ? { uv_protection } : {}),
         ...(lens_color ? { lens_color } : {}),
@@ -282,11 +290,14 @@ export async function updateProduct(id: string, _prevState: any, formData: FormD
   const supabase = await createAdminClient();
 
   try {
-    const product_type = formData.get("product_type") as string || "frame";
+    let product_type = (formData.get("product_type") as string) || "frame";
 
     // Extract common fields
     const name = formData.get("name") as string;
-    const brand = formData.get("brand") as string;
+    const rawBrandId = formData.get("brand_id") as string;
+    const brand_id = rawBrandId && rawBrandId.trim() !== "" ? rawBrandId.trim() : null;
+    const brand_name = (formData.get("brand_name") as string) || (formData.get("brand") as string) || "";
+    const brand = brand_name;
     const sku = formData.get("sku") as string;
     const price = parseFloat(formData.get("price") as string);
     const discount_price = formData.get("offer_price") ? parseFloat(formData.get("offer_price") as string) : null;
@@ -296,6 +307,9 @@ export async function updateProduct(id: string, _prevState: any, formData: FormD
     if (!category_id) {
       if (product_type === "computer-glasses") category_id = 7;
       if (product_type === "sunglasses") category_id = 5;
+    }
+    if (category_id === 5 && (product_type === "frame" || !product_type)) {
+      product_type = "sunglasses";
     }
     const description = formData.get("description") as string;
     
@@ -365,6 +379,8 @@ export async function updateProduct(id: string, _prevState: any, formData: FormD
       discount_price,
       category_id,
       brand,
+      brand_name,
+      brand_id,
       product_type,
       frame_type,
       shape,
@@ -390,7 +406,7 @@ export async function updateProduct(id: string, _prevState: any, formData: FormD
         }
       })(),
       specifications: (() => {
-        const sunglassSpecs = product_type === "sunglasses" ? {
+        const sunglassSpecs = (product_type === "sunglasses" || category_id === 5 || Boolean(lens_type) || Boolean(uv_protection)) ? {
           prescription_available,
           ...(uv_protection ? { uv_protection } : {}),
           ...(lens_color ? { lens_color } : {}),

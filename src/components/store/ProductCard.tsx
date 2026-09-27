@@ -12,6 +12,7 @@ import { Heart } from "lucide-react";
 import LoginPromptModal from "@/components/auth/LoginPromptModal";
 
 import { resolveProductImage } from "@/lib/image_utils";
+import { getBrandLogo } from "@/lib/data/house_brands";
 
 interface ProductCardProps {
   product: {
@@ -24,6 +25,8 @@ interface ProductCardProps {
     category?: string;
     categories?: { name: string; slug: string };
     brand?: string;
+    brand_name?: string;
+    brand_id?: string;
     rating?: number;
     slug?: string;
     offer_price?: number | string;
@@ -74,6 +77,9 @@ export default function ProductCard({ product }: ProductCardProps) {
   const parsedColors = (product.colors || [])
     .map(parseColor)
     .filter((c): c is { name: string; hex: string } => c !== null);
+
+  const brandLogo = getBrandLogo(product.brand_name || product.brand);
+  const brandDisplayName = product.brand_name || product.brand || "Lenzify";
 
   const [imgSrc, setImgSrc] = useState(() => resolveProductImage(product));
   const [failedOnce, setFailedOnce] = useState(false);
@@ -210,15 +216,48 @@ export default function ProductCard({ product }: ProductCardProps) {
                 Only {product.stock} left
               </span>
             )}
+            {(() => {
+              let specs = product.specifications;
+              if (typeof specs === "string") {
+                try { specs = JSON.parse(specs); } catch {}
+              }
+              const lt = specs?.lens_type || (product as any).lens_type || "";
+              const isPolarized = lt.toLowerCase().includes("polarized") && !lt.toLowerCase().includes("non");
+              if (isPolarized) {
+                return (
+                  <span className="bg-amber-600 text-white text-[9px] font-bold uppercase tracking-wider px-2.5 py-0.5 rounded-full shadow-xs">
+                    Polarized
+                  </span>
+                );
+              }
+              return null;
+            })()}
           </div>
         </div>
 
         {/* Info Area */}
         <div className="px-4 pb-4 pt-1 space-y-1">
-          <div className="flex items-center justify-between gap-1">
-            <p className="text-xs font-semibold text-[#004AAD] uppercase tracking-wider truncate">
-              {product.brand || "Lenzify"}
-            </p>
+          <div className="flex items-center justify-between gap-1.5 min-h-[22px]">
+            {brandLogo ? (
+              <div className="flex items-center gap-1.5 min-w-0">
+                <div className="w-5 h-5 rounded-full overflow-hidden border border-[#ECECEC] bg-white flex-shrink-0 flex items-center justify-center p-0 shadow-2xs">
+                  <Image
+                    src={brandLogo}
+                    alt={brandDisplayName}
+                    width={20}
+                    height={20}
+                    className="w-full h-full object-cover rounded-full"
+                  />
+                </div>
+                <p className="text-xs font-semibold text-[#004AAD] uppercase tracking-wider truncate">
+                  {brandDisplayName}
+                </p>
+              </div>
+            ) : (
+              <p className="text-xs font-semibold text-[#004AAD] uppercase tracking-wider truncate">
+                {brandDisplayName}
+              </p>
+            )}
             {product.pack_size && (
               <span className="text-[10px] font-bold text-[#004AAD] bg-[#004AAD]/10 px-2 py-0.5 rounded-md flex-shrink-0">
                 {product.pack_size}
@@ -229,15 +268,15 @@ export default function ProductCard({ product }: ProductCardProps) {
             {product.name}
           </h4>
           <div className="flex items-center justify-between pt-1">
-            <div className="flex items-center gap-1.5">
+            <div className="flex items-baseline gap-1.5">
+              <span className="text-base font-bold text-[#111111] leading-none tabular-nums lining-nums">
+                ₹{displayPrice.toLocaleString()}
+              </span>
               {hasDiscount && (
-                <span className="text-xs text-[#666666] line-through">
+                <span className="text-xs text-[#666666] line-through leading-none tabular-nums lining-nums">
                   ₹{originalPrice.toLocaleString()}
                 </span>
               )}
-              <span className="text-base font-bold text-[#111111]">
-                ₹{displayPrice.toLocaleString()}
-              </span>
             </div>
 
             {parsedColors.length > 0 && (

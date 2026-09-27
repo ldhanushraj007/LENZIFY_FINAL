@@ -74,6 +74,8 @@
   --font-headline: var(--font-headline);
   --font-body: var(--font-body);
   --font-label: var(--font-label);
+  --font-serif: var(--font-headline), "Noto Serif", Georgia, serif;
+  --font-hero: var(--font-hero), "Bodoni Moda", serif;
 
   /* === RADIUS === */
   --radius-sm: 8px;
@@ -174,6 +176,21 @@
 
   .font-serif {
     font-family: var(--font-headline);
+  }
+
+  .tabular-nums {
+    font-variant-numeric: tabular-nums;
+  }
+
+  .lining-nums {
+    font-variant-numeric: lining-nums;
+  }
+
+  /* Ensure all price numbers are strictly level on the baseline */
+  .price-num,
+  [data-price] {
+    font-variant-numeric: tabular-nums lining-nums;
+    font-feature-settings: "tnum" 1, "lnum" 1;
   }
 
   .lenzify-card {

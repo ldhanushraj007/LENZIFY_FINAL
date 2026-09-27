@@ -508,7 +508,7 @@ export default function LensSelectionFlow({ product, availableLenses, onClose, o
 
           <div className="border-t-2 border-brand-navy pt-6 shrink-0">
              <p className="text-[9px] uppercase font-black tracking-[0.5em] text-secondary italic mb-1">Total Calibrated Value</p>
-             <div className="text-3xl font-serif italic text-brand-navy">₹{calculateGrandTotal().toLocaleString()}</div>
+             <div className="text-3xl font-serif italic text-brand-navy tabular-nums lining-nums">₹{calculateGrandTotal().toLocaleString()}</div>
           </div>
         </div>
 
@@ -1077,7 +1077,7 @@ export default function LensSelectionFlow({ product, availableLenses, onClose, o
                          </div>
                          <div className="text-center sm:text-right">
                             <p className="text-[10px] font-bold uppercase tracking-widest text-brand-navy opacity-40">Integrated Lens Add-on</p>
-                            <p className="text-3xl font-serif italic text-secondary font-black">₹{calculateTotalLensPrice().toLocaleString()}</p>
+                            <p className="text-3xl font-serif italic text-secondary font-black tabular-nums lining-nums">₹{calculateTotalLensPrice().toLocaleString()}</p>
                          </div>
                       </div>
 

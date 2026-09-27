@@ -16,6 +16,7 @@ import {
   Eye,
   CheckCircle,
 } from "lucide-react";
+import { HOUSE_BRANDS } from "@/lib/data/house_brands";
 
 interface HomeClientProps {
   initialSections: any[];
@@ -500,6 +501,75 @@ function PremiumBrandBanner({ brands }: { brands?: any[] }) {
             Shop All Brands
             <ChevronRight className="w-4 h-4" />
           </Link>
+        </div>
+      </div>
+    </section>
+  );
+}
+
+// ─── Lenzify House Brands Section ─────────────────────────────────────────────
+function LenzifyBrandsSection() {
+  return (
+    <section className="py-16 md:py-24 px-4 sm:px-6 bg-[#FAFBFF] border-b border-[#E8EAF2] relative overflow-hidden">
+      {/* Decorative gradient accents */}
+      <div className="absolute top-0 left-1/4 w-96 h-96 bg-blue-100/40 rounded-full blur-3xl pointer-events-none -translate-y-1/2" />
+      <div className="absolute bottom-0 right-1/4 w-96 h-96 bg-indigo-100/30 rounded-full blur-3xl pointer-events-none translate-y-1/2" />
+
+      <div className="max-w-7xl mx-auto lg:px-6 relative z-10">
+        <motion.div
+          initial={{ opacity: 0, y: 20 }}
+          whileInView={{ opacity: 1, y: 0 }}
+          viewport={{ once: true }}
+          className="text-center mb-12 md:mb-16"
+        >
+          <div className="inline-flex items-center gap-2 px-3.5 py-1 rounded-full bg-[#004AAD]/10 text-[#004AAD] text-xs font-bold uppercase tracking-widest mb-3">
+            <span>Signature Labels</span>
+          </div>
+          <h2 className="font-serif italic text-3xl md:text-4xl lg:text-5xl text-[#111111] mb-4">
+            Lenzify Brands
+          </h2>
+          <p className="text-slate-600 text-sm md:text-base font-medium max-w-xl mx-auto">
+            Discover our exclusive house labels — engineered for precision optics, bespoke craftsmanship, and everyday luxury.
+          </p>
+        </motion.div>
+
+        <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-6 sm:gap-8 justify-items-center">
+          {HOUSE_BRANDS.map((brand, i) => (
+            <motion.div
+              key={brand.id}
+              initial={{ opacity: 0, y: 24 }}
+              whileInView={{ opacity: 1, y: 0 }}
+              viewport={{ once: true }}
+              transition={{ delay: i * 0.08, duration: 0.4 }}
+              className="w-full flex justify-center"
+            >
+              <Link
+                href={`/brands/${brand.slug}`}
+                className="group flex flex-col items-center text-center w-full max-w-[170px]"
+              >
+                {/* Circle Container - Edge-to-edge coverage, zero empty white spaces */}
+                <div className="w-32 h-32 sm:w-36 sm:h-36 md:w-40 md:h-40 rounded-full border-2 border-slate-200/90 shadow-[0_4px_20px_rgba(0,0,0,0.06)] group-hover:border-[#004AAD] group-hover:shadow-[0_12px_28px_rgba(0,74,173,0.18)] group-hover:-translate-y-1.5 transition-all duration-300 relative overflow-hidden flex items-center justify-center p-0 bg-white">
+                  <div className="relative w-full h-full rounded-full overflow-hidden">
+                    <Image
+                      src={brand.logo_url}
+                      alt={brand.name}
+                      fill
+                      sizes="(max-width: 768px) 140px, 160px"
+                      className="object-cover w-full h-full scale-105 group-hover:scale-115 transition-transform duration-300"
+                    />
+                  </div>
+                </div>
+
+                {/* Brand Name */}
+                <span className="mt-3.5 text-sm sm:text-base font-bold text-[#111111] group-hover:text-[#004AAD] tracking-wide transition-colors">
+                  {brand.name}
+                </span>
+                <span className="text-[11px] font-medium text-slate-400 group-hover:text-[#004AAD] transition-colors mt-0.5">
+                  Explore Collection →
+                </span>
+              </Link>
+            </motion.div>
+          ))}
         </div>
       </div>
     </section>
@@ -1017,6 +1087,9 @@ export default function HomeClient({ initialSections, initialProducts, stats, te
 
       {/* 2. Quick Category Strip — white */}
       <TopCategoriesStrip />
+
+      {/* 2b. Lenzify Brands (House Brands circular logo section) */}
+      <LenzifyBrandsSection />
 
       {/* 3. High-Impact Category Banners (Contact Lenses, Eyeglasses, Sunglasses, Screen) */}
       <CategoryBannersSection />

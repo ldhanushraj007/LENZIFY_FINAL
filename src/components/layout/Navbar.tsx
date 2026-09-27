@@ -56,8 +56,18 @@ export default function Navbar() {
   const [mounted, setMounted] = useState(false);
   const { user } = useAuth();
   const [brands, setBrands] = useState<{ name: string; slug: string }[]>([]);
-  const [contactLensBrands, setContactLensBrands] = useState<{ name: string; slug: string }[]>([]);
-  const [lenses, setLenses] = useState<{ name: string; id: string }[]>([]);
+  const [contactLensBrands, setContactLensBrands] = useState<{ name: string; slug: string }[]>([
+    { name: "Acuvue", slug: "acuvue" },
+    { name: "Bausch + Lomb", slug: "bausch-lomb" },
+    { name: "Alcon", slug: "alcon" },
+    { name: "CooperVision", slug: "coopervision" },
+  ]);
+  const [lenses, setLenses] = useState<{ name: string; id: string }[]>([
+    { id: "single-vision", name: "Single Vision" },
+    { id: "zero-power", name: "Zero Power (Blue Cut)" },
+    { id: "bifocal", name: "Bifocal Lenses" },
+    { id: "progressive", name: "Progressive Lenses" },
+  ]);
   const [coatings, setCoatings] = useState<{ name: string; id: string }[]>([]);
 
   const rawTotalItems = useCartStore((state) =>
@@ -220,24 +230,29 @@ export default function Navbar() {
     };
 
     const fetchLenses = async () => {
-      const { data } = await supabase
-        .from("lenses")
-        .select("id, name, tier")
-        .eq("is_active", true)
-        .eq("category", "type")
-        .order("name", { ascending: true });
+      try {
+        const { data } = await supabase
+          .from("lenses")
+          .select("id, name, tier, category, is_active")
+          .order("name", { ascending: true });
 
-      if (data) {
-        // Filter out standalone Blue Cut, individual progressive tiers, and Photochromic (now an upgrade package)
-        const filtered = data.filter((l: any) => {
-          const nameLower = l.name.toLowerCase();
-          if (nameLower === "blue cut") return false;
-          if (nameLower.includes("photochro")) return false;
-          if (l.tier && ["silver", "gold", "platinum"].includes(l.tier.toLowerCase())) return false;
-          if (nameLower.startsWith("progressive ") && (nameLower.includes("silver") || nameLower.includes("gold") || nameLower.includes("platinum"))) return false;
-          return true;
-        });
-        setLenses(filtered);
+        if (data && data.length > 0) {
+          const filtered = data.filter((l: any) => {
+            const nameLower = (l.name || "").toLowerCase();
+            if (l.is_active === false) return false;
+            if (l.category && l.category !== "type" && l.category !== "lens") return false;
+            if (nameLower === "blue cut") return false;
+            if (nameLower.includes("photochro")) return false;
+            if (l.tier && ["silver", "gold", "platinum"].includes(l.tier.toLowerCase())) return false;
+            if (nameLower.startsWith("progressive ") && (nameLower.includes("silver") || nameLower.includes("gold") || nameLower.includes("platinum"))) return false;
+            return true;
+          });
+          if (filtered.length > 0) {
+            setLenses(filtered);
+          }
+        }
+      } catch (err) {
+        console.error("Navbar fetchLenses error:", err);
       }
     };
 
@@ -419,7 +434,7 @@ export default function Navbar() {
           <Link
             href="/"
             className={cn(
-              "font-medium transition-all duration-300 py-1",
+              "font-serif italic text-base xl:text-[17px] font-medium transition-all duration-300 py-1",
               pathname === "/"
                 ? isWhiteMode
                   ? "text-[#004AAD] border-b border-[#004AAD]"
@@ -435,7 +450,7 @@ export default function Navbar() {
             <button
               onClick={() => toggleMenu("shop")}
               className={cn(
-                "font-medium transition-all duration-300 py-1 flex items-center gap-1",
+                "font-serif italic text-base xl:text-[17px] font-medium transition-all duration-300 py-1 flex items-center gap-1",
                 activeMenu === "shop" || (pathname.startsWith("/products") && !pathname.includes("Contact"))
                   ? isWhiteMode
                     ? "text-[#004AAD] border-b border-[#004AAD]"
@@ -456,7 +471,7 @@ export default function Navbar() {
             <button
               onClick={() => toggleMenu("contact-lenses")}
               className={cn(
-                "font-medium transition-all duration-300 py-1 flex items-center gap-1",
+                "font-serif italic text-base xl:text-[17px] font-medium transition-all duration-300 py-1 flex items-center gap-1",
                 activeMenu === "contact-lenses" || pathname.startsWith("/contact-lenses")
                   ? isWhiteMode
                     ? "text-[#004AAD] border-b border-[#004AAD]"
@@ -475,7 +490,7 @@ export default function Navbar() {
             <button
               onClick={() => toggleMenu("lenses")}
               className={cn(
-                "font-medium transition-all duration-300 py-1 flex items-center gap-1",
+                "font-serif italic text-base xl:text-[17px] font-medium transition-all duration-300 py-1 flex items-center gap-1",
                 activeMenu === "lenses"
                   ? isWhiteMode
                     ? "text-[#004AAD] border-b border-[#004AAD]"
@@ -493,7 +508,7 @@ export default function Navbar() {
           <Link
             href="/replace-lenses"
             className={cn(
-              "font-medium transition-all duration-300 py-1",
+              "font-serif italic text-base xl:text-[17px] font-medium transition-all duration-300 py-1",
               pathname === "/replace-lenses"
                 ? isWhiteMode
                   ? "text-[#004AAD] border-b border-[#004AAD]"
@@ -508,7 +523,7 @@ export default function Navbar() {
           <Link
             href="/try-at-home"
             className={cn(
-              "font-medium transition-all duration-300 py-1",
+              "font-serif italic text-base xl:text-[17px] font-medium transition-all duration-300 py-1",
               pathname === "/try-at-home"
                 ? isWhiteMode
                   ? "text-[#004AAD] border-b border-[#004AAD]"
@@ -524,7 +539,7 @@ export default function Navbar() {
             <button
               onClick={() => toggleMenu("offers")}
               className={cn(
-                "font-medium transition-all duration-300 py-1 flex items-center gap-1",
+                "font-serif italic text-base xl:text-[17px] font-medium transition-all duration-300 py-1 flex items-center gap-1",
                 activeMenu === "offers"
                   ? isWhiteMode
                     ? "text-[#004AAD] border-b border-[#004AAD]"
@@ -722,7 +737,7 @@ export default function Navbar() {
           >
             <div className="max-w-screen-2xl mx-auto px-12 py-10 flex gap-20">
               <div className="flex flex-col gap-4">
-                <h3 className="text-xs font-black uppercase tracking-[0.2em] text-[#03173D] mb-2">
+                <h3 className="text-base font-serif italic text-[#03173D] mb-2 font-medium">
                   By Category
                 </h3>
                 {SHOP_CATEGORIES.map((link) => (
@@ -736,7 +751,7 @@ export default function Navbar() {
                 ))}
               </div>
               <div className="flex flex-col gap-4">
-                <h3 className="text-xs font-black uppercase tracking-[0.2em] text-[#03173D] mb-2">
+                <h3 className="text-base font-serif italic text-[#03173D] mb-2 font-medium">
                   By Gender
                 </h3>
                 {SHOP_GENDER.map((link) => (
@@ -750,7 +765,7 @@ export default function Navbar() {
                 ))}
               </div>
               <div className="flex flex-col gap-4">
-                <h3 className="text-xs font-black uppercase tracking-[0.2em] text-[#03173D] mb-2">
+                <h3 className="text-base font-serif italic text-[#03173D] mb-2 font-medium">
                   By Collection
                 </h3>
                 {SHOP_COLLECTION.map((link) => (
@@ -792,7 +807,7 @@ export default function Navbar() {
             className="absolute top-full left-[calc(50%-220px)] bg-white border border-[#E8EAF2] shadow-2xl p-4 flex flex-col gap-2 z-50 rounded-2xl hidden lg:flex min-w-[320px] mt-4"
           >
             <div className="flex items-center justify-between border-b border-[#E8EAF2] pb-2 px-2">
-              <h3 className="text-[10px] font-black uppercase tracking-[0.2em] text-[#03173D]">
+              <h3 className="text-base font-serif italic text-[#03173D] font-medium">
                 Featured Lens Brands
               </h3>
               <span className="text-[9px] font-bold text-[#004AAD] bg-[#004AAD]/10 px-2 py-0.5 rounded">
@@ -839,7 +854,7 @@ export default function Navbar() {
             {activeMenu === "lenses" && (
               <div className="space-y-3 p-2">
                 <div className="flex items-center justify-between border-b border-[#E8EAF2] pb-2 px-3">
-                  <h3 className="text-[10px] font-black uppercase tracking-[0.2em] text-[#03173D]">
+                  <h3 className="text-base font-serif italic text-[#03173D] font-medium">
                     Prescription Lens Types
                   </h3>
                   <span className="text-[9px] font-bold text-emerald-700 bg-emerald-50 px-2 py-0.5 rounded">
@@ -958,7 +973,7 @@ export default function Navbar() {
                   href="/"
                   onClick={() => setIsMobileMenuOpen(false)}
                   className={cn(
-                    "text-xs font-black uppercase tracking-[0.2em] flex items-center gap-3 transition-colors",
+                    "text-xl font-serif italic flex items-center gap-3 transition-colors",
                     pathname === "/"
                       ? "text-[#004AAD]"
                       : "text-[#111111] hover:text-[#004AAD]"
@@ -970,12 +985,12 @@ export default function Navbar() {
 
                 {/* Shop */}
                 <div>
-                  <h3 className="text-xs font-black uppercase tracking-[0.2em] text-[#03173D] mb-4 border-b border-[#E8EAF2] pb-2">
+                  <h3 className="text-xl font-serif italic text-[#03173D] mb-4 border-b border-[#E8EAF2] pb-2">
                     Shop
                   </h3>
                   <div className="space-y-4 pl-2">
                     <div className="space-y-3 pb-2 border-b border-[#F0F2F8]">
-                      <p className="text-[10px] font-bold text-[#03173D] uppercase">
+                      <p className="text-xs font-serif italic text-[#03173D] font-medium">
                         By Category
                       </p>
                       {SHOP_CATEGORIES.map((link) => (
@@ -990,7 +1005,7 @@ export default function Navbar() {
                       ))}
                     </div>
                     <div className="space-y-3 pb-2 border-b border-[#F0F2F8]">
-                      <p className="text-[10px] font-bold text-[#03173D] uppercase">
+                      <p className="text-xs font-serif italic text-[#03173D] font-medium">
                         By Gender
                       </p>
                       {SHOP_GENDER.map((link) => (
@@ -1005,7 +1020,7 @@ export default function Navbar() {
                       ))}
                     </div>
                     <div className="space-y-3">
-                      <p className="text-[10px] font-bold text-[#03173D] uppercase">
+                      <p className="text-xs font-serif italic text-[#03173D] font-medium">
                         By Collection
                       </p>
                       {SHOP_COLLECTION.map((link) => (
@@ -1024,7 +1039,7 @@ export default function Navbar() {
 
                 {/* Contact Lenses Mobile Section */}
                 <div>
-                  <h3 className="text-xs font-black uppercase tracking-[0.2em] text-[#03173D] mb-4 border-b border-[#E8EAF2] pb-2">
+                  <h3 className="text-xl font-serif italic text-[#03173D] mb-4 border-b border-[#E8EAF2] pb-2">
                     Contact Lenses
                   </h3>
                   <div className="space-y-3 pl-2">
@@ -1035,7 +1050,7 @@ export default function Navbar() {
                     >
                       All Contact Lenses →
                     </Link>
-                    <p className="text-[10px] font-bold text-[#03173D] uppercase pt-1">
+                    <p className="text-xs font-serif italic text-[#03173D] font-medium pt-1">
                       By Brand
                     </p>
                     {contactLensBrands.map((brand) => (
@@ -1053,12 +1068,12 @@ export default function Navbar() {
 
                 {/* Lenses */}
                 <div>
-                  <h3 className="text-xs font-black uppercase tracking-[0.2em] text-[#03173D] mb-4 border-b border-[#E8EAF2] pb-2">
+                  <h3 className="text-xl font-serif italic text-[#03173D] mb-4 border-b border-[#E8EAF2] pb-2">
                     Lenses
                   </h3>
                   <div className="space-y-6 pl-2">
                     <div className="space-y-3">
-                      <p className="text-[10px] font-bold text-[#03173D] uppercase">
+                      <p className="text-xs font-serif italic text-[#03173D] font-medium">
                         Lens Types
                       </p>
                       {lenses.map((lens) => (
@@ -1085,7 +1100,7 @@ export default function Navbar() {
 
                 {/* Offers */}
                 <div>
-                  <h3 className="text-xs font-black uppercase tracking-[0.2em] text-[#03173D] mb-4 border-b border-[#E8EAF2] pb-2">
+                  <h3 className="text-xl font-serif italic text-[#03173D] mb-4 border-b border-[#E8EAF2] pb-2">
                     Offers
                   </h3>
                   <div className="space-y-3 pl-2">
@@ -1108,7 +1123,7 @@ export default function Navbar() {
                     href="/try-at-home"
                     onClick={() => setIsMobileMenuOpen(false)}
                     className={cn(
-                      "text-xs font-black uppercase tracking-[0.2em] flex items-center gap-3 transition-colors",
+                      "text-xl font-serif italic flex items-center gap-3 transition-colors",
                       pathname === "/try-at-home"
                         ? "text-[#004AAD]"
                         : "text-[#111111] hover:text-[#004AAD]"

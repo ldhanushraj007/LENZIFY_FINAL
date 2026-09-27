@@ -18,21 +18,46 @@ export default async function LensDetailPage({ params }: { params: Promise<{ id:
     process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
   );
 
-  const [lensRes, allLensesRes] = await Promise.all([
-    supabase.from("lenses").select("*").eq("id", id).single(),
-    supabase.from("lenses").select("*").eq("is_active", true),
-  ]);
+  const isUuid = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(id);
 
-  const lens = lensRes.data;
-  const allLenses = allLensesRes.data || [];
+  let lens: any = null;
+  let allLenses: any[] = [];
 
-  if (lensRes.error && lensRes.error.code !== "PGRST116") {
-    return (
-      <div className="pt-32 text-center">
-        <h1 className="text-2xl font-bold text-red-500">Error loading lens</h1>
-        <p className="text-gray-500 mt-2">{lensRes.error?.message}</p>
-      </div>
+  try {
+    const allLensesRes = await supabase.from("lenses").select("*").eq("is_active", true);
+    allLenses = allLensesRes.data || [];
+
+    if (isUuid) {
+      const lensRes = await supabase.from("lenses").select("*").eq("id", id).maybeSingle();
+      lens = lensRes.data;
+    } else {
+      const cleanSlug = id.toLowerCase().replace(/-/g, " ");
+      lens = allLenses.find((l: any) => {
+        const n = (l.name || "").toLowerCase();
+        return n.includes(cleanSlug) || cleanSlug.includes(n) || l.id === id;
+      }) || null;
+    }
+  } catch (err) {
+    console.error("Lens fetch error:", err);
+  }
+
+  // Editorial fallback from LENS_CONTENT
+  if (!lens) {
+    const editorialEntry = Object.entries(LENS_CONTENT).find(([key]) =>
+      id.toLowerCase().includes(key) || key.includes(id.toLowerCase())
     );
+    if (editorialEntry) {
+      const [key, content] = editorialEntry;
+      lens = {
+        id,
+        name: content.name,
+        description: content.description,
+        price: key === "progressive" ? 1799 : (key === "bifocal" ? 999 : 799),
+        base_price: key === "progressive" ? 1799 : (key === "bifocal" ? 999 : 799),
+        features: content.features,
+        is_active: true,
+      };
+    }
   }
 
   if (!lens) return notFound();

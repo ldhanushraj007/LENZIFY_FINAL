@@ -32,10 +32,12 @@ export default function Footer() {
     {
       title: "Brands",
       links: [
-        { name: "ZEISS", href: "/products?brand=zeiss" },
-        { name: "Ray-Ban", href: "/products?brand=rayban" },
-        { name: "Essilor", href: "/products?brand=essilor" },
-        { name: "Kodak", href: "/products?brand=kodak" },
+        { name: "Brat Emoji", href: "/products?brand=brat-emoji" },
+        { name: "Glenn Parker", href: "/products?brand=glenn-parker" },
+        { name: "Nikos Eleni", href: "/products?brand=nikos-eleni" },
+        { name: "Diana", href: "/products?brand=diana" },
+        { name: "Jacky", href: "/products?brand=jacky" },
+        { name: "Le Lily", href: "/products?brand=le-lily" },
       ],
     },
     {
@@ -55,7 +57,7 @@ export default function Footer() {
         <div className="grid grid-cols-2 md:grid-cols-5 gap-12">
           {/* Brand column */}
           <div className="col-span-2">
-            <div className="text-2xl font-black uppercase tracking-widest text-white mb-3">LENZIFY</div>
+            <div className="text-2xl font-serif italic tracking-tighter text-white mb-3">LENZIFY</div>
             <p className="text-xs font-semibold uppercase tracking-widest mb-6 text-[#00AEEF]">
               The Future of Vision
             </p>
@@ -112,7 +114,7 @@ export default function Footer() {
           {/* Link columns */}
           {cols.map((col) => (
             <div key={col.title}>
-              <h4 className="text-xs font-bold uppercase tracking-widest text-white/30 mb-6">{col.title}</h4>
+              <h4 className="text-base font-serif italic text-white/90 mb-4">{col.title}</h4>
               <ul className="space-y-4">
                 {col.links.map((link) => (
                   <li key={link.name}>
