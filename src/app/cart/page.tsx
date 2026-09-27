@@ -103,7 +103,20 @@ function CartPageContent() {
 
         const hasActualLens = !isReading && !isAccessory && !isComputer && Boolean(
           item.lens_id ||
-          (item.lens_config && (item.lens_config.type || item.lens_config.package || item.lens_config.package_name || item.lens_config.selected_index || (Number(item.lens_price) > 0)))
+          (item.lens_config && (
+            item.lens_config.type ||
+            item.lens_config.package ||
+            item.lens_config.package_name ||
+            item.lens_config.selected_index ||
+            item.lens_config.thickness ||
+            item.lens_config.flow_type === "sunglasses" ||
+            item.lens_config.is_prescription ||
+            item.lens_config.is_sunglasses_rx ||
+            Number(item.lens_config.lens_price) > 0 ||
+            Number(item.lens_config.total_price) > 0 ||
+            Number(item.lens_price) > 0
+          )) ||
+          Boolean(item.prescription_json?.od_sph || item.prescription_json?.is_sunglasses_rx || item.prescription?.od_sph)
         );
 
         return {
@@ -121,10 +134,10 @@ function CartPageContent() {
           stock: item.products?.stock ?? 99,
           lens_price: item.lens_price || item.lens_config?.lens_price || item.lens_config?.total_price,
           lens_name: hasActualLens
-            ? (item.lens_config?.type?.name || item.lens_config?.lens_name || item.lenses?.name || "Custom Power Lenses")
+            ? (item.lens_config?.lens_name || item.lens_config?.type?.name || (item.lens_config?.flow_type === "sunglasses" ? `Prescription Sunglasses Lens (${item.lens_config?.tint_style === "solid" ? "Solid Tint" : "Gradient Tint"})` : item.lenses?.name || "Custom Power Lenses"))
             : undefined,
           lens_config: hasActualLens ? item.lens_config : null,
-          prescription: hasActualLens ? item.prescription_json : null,
+          prescription: hasActualLens ? (item.prescription_json || item.prescription) : null,
           reading_power: item.prescription_json?.reading_power || item.reading_power,
           selected_color: item.selected_color,
           selected_size: item.selected_size,
@@ -150,6 +163,11 @@ function CartPageContent() {
   useEffect(() => {
     let cancelled = false;
 
+    if (!user?.id) {
+      setLoading(false);
+      return;
+    }
+
     if (channelRef.current) {
       supabase.removeChannel(channelRef.current);
       channelRef.current = null;
@@ -157,7 +175,7 @@ function CartPageContent() {
 
     const setupSubscription = async () => {
       await syncCartData();
-      if (cancelled || !user) return;
+      if (cancelled || !user?.id) return;
       // Unique channel name prevents Supabase reusing an already-subscribed
       // channel instance from a previous effect run that was torn down but
       // whose removeChannel hasn't fully resolved yet.
@@ -180,7 +198,7 @@ function CartPageContent() {
         channelRef.current = null;
       }
     };
-  }, [user]);
+  }, [user?.id]);
 
   const isContactLensItem = (item: any) => {
     const pType = item.product_type || item.products?.product_type;
@@ -235,7 +253,20 @@ function CartPageContent() {
     }
     const hasLens = Boolean(
       item.lens_id ||
-      (item.lens_config && (item.lens_config.type || item.lens_config.package || item.lens_config.package_name || item.lens_config.selected_index || (Number(item.lens_price) > 0)))
+      (item.lens_config && (
+        item.lens_config.type ||
+        item.lens_config.package ||
+        item.lens_config.package_name ||
+        item.lens_config.selected_index ||
+        item.lens_config.thickness ||
+        item.lens_config.flow_type === "sunglasses" ||
+        item.lens_config.is_prescription ||
+        item.lens_config.is_sunglasses_rx ||
+        Number(item.lens_config.lens_price) > 0 ||
+        Number(item.lens_config.total_price) > 0 ||
+        Number(item.lens_price) > 0
+      )) ||
+      Boolean(item.prescription_json?.od_sph || item.prescription_json?.is_sunglasses_rx || item.prescription?.od_sph)
     );
     return !hasLens;
   };
@@ -478,9 +509,48 @@ function CartPageContent() {
                               <p className="text-xs text-emerald-600 font-semibold mt-0.5">GST (5%): Included in price</p>
                             </div>
                           )}
+                          {((item.product_type === "sunglasses" || item.category === "Sunglasses") && !item.lens_config?.is_prescription) && (
+                            <div>
+                              <p className="text-[10px] text-[#666666] uppercase tracking-widest font-medium">Taxes</p>
+                              <p className="text-xs text-emerald-600 font-semibold mt-0.5">GST (18%): Included in price</p>
+                            </div>
+                          )}
                         </div>
 
-                        {hasLensConfig && (
+                        {item.lens_config?.flow_type === "sunglasses" ? (
+                          <div className="bg-[#F8F9FC] border border-[#E8EAF2] rounded-2xl p-4 mt-3 space-y-2">
+                            <div className="flex justify-between text-sm text-[#444444]">
+                              <span>Frame (GST 18% incl.)</span>
+                              <span className="font-semibold text-[#111111]">
+                                ₹{(frameUnitPrice * (item.quantity || 1)).toLocaleString("en-IN")}
+                              </span>
+                            </div>
+                            <div className="flex justify-between text-sm text-[#444444]">
+                              <span>Prescription lens</span>
+                              <span className="font-semibold text-[#111111]">
+                                ₹{(Number(item.lens_config.lens_price || pricing.lensUnitPrice) * (item.quantity || 1)).toLocaleString("en-IN")}
+                              </span>
+                            </div>
+                            <div className="flex justify-between text-sm text-[#444444]">
+                              <span>Tint</span>
+                              <span className="font-semibold text-[#111111] capitalize">
+                                {item.lens_config.tint_style === "solid" ? "Solid Tint" : item.lens_config.tint_style === "gradient" ? "Gradient Tint" : String(item.lens_config.tint_style)}
+                              </span>
+                            </div>
+                            <div className="flex justify-between text-sm text-[#444444]">
+                              <span>GST (5% on lens)</span>
+                              <span className="font-semibold text-emerald-700">
+                                ₹{((Number(item.lens_config.gst_amount) || Math.round(Number(item.lens_config.lens_price || pricing.lensUnitPrice) * 0.05)) * (item.quantity || 1)).toLocaleString("en-IN")}
+                              </span>
+                            </div>
+                            <div className="border-t border-[#E8EAF2] pt-2 flex justify-between items-center text-sm font-bold text-[#111111]">
+                              <span>Item Total</span>
+                              <span>
+                                ₹{((frameUnitPrice + Number(item.lens_config.lens_price || pricing.lensUnitPrice) + (Number(item.lens_config.gst_amount) || Math.round(Number(item.lens_config.lens_price || pricing.lensUnitPrice) * 0.05))) * (item.quantity || 1)).toLocaleString("en-IN")}
+                              </span>
+                            </div>
+                          </div>
+                        ) : hasLensConfig ? (
                           <div className="bg-[#F8F9FC] border border-[#E8EAF2] rounded-2xl p-4 mt-3 space-y-2">
                             <div className="flex justify-between text-sm text-[#444444]">
                               <span>Frame</span>
@@ -513,7 +583,7 @@ function CartPageContent() {
                               <span>₹{gstAmount}</span>
                             </div>
                           </div>
-                        )}
+                        ) : null}
                       </div>
 
                       {/* Quantity & Remove */}

@@ -116,13 +116,39 @@ export default function OrderSummary({
     }
     const hasLens = Boolean(
       item.lens_id ||
-      (item.lens_config && (item.lens_config.type || item.lens_config.package || item.lens_config.package_name || item.lens_config.selected_index || item.lens_price))
+      (item.lens_config && (
+        item.lens_config.type ||
+        item.lens_config.package ||
+        item.lens_config.package_name ||
+        item.lens_config.selected_index ||
+        item.lens_config.thickness ||
+        item.lens_config.flow_type === "sunglasses" ||
+        item.lens_config.is_prescription ||
+        item.lens_config.is_sunglasses_rx ||
+        Number(item.lens_config.lens_price) > 0 ||
+        Number(item.lens_config.total_price) > 0 ||
+        Number(item.lens_price) > 0
+      )) ||
+      Boolean(item.prescription_json?.od_sph || item.prescription_json?.is_sunglasses_rx || item.prescription?.od_sph)
     );
     return !hasLens;
   };
 
   const gstBreakdown = calculateCartGST(items, couponDiscount);
-  const { subtotal, discountedSubtotal, gst5Total, gst18Total, hasContactLens, hasSunglasses, shippingFee, grandTotal } = gstBreakdown;
+  const {
+    subtotal,
+    discountedSubtotal,
+    gst5Total,
+    gst18Total,
+    hasContactLens,
+    hasSunglassesWithoutLens,
+    hasSunglassesWithLens,
+    sunglassesLensGstTotal,
+    hasStandardGst5,
+    standardGst5Total,
+    shippingFee,
+    grandTotal
+  } = gstBreakdown;
 
   // Resolve prescription for a specific line item
   const getItemPrescription = (item: any): ItemPrescription | null => {
@@ -279,7 +305,32 @@ export default function OrderSummary({
               </div>
 
               {/* Lens & Frame Separate Lines (Change 2 & Change 5) */}
-              {hasLensConfig ? (
+              {(item.lens_config?.flow_type === "sunglasses" || item.lens_config?.is_sunglasses_rx || item.prescription_json?.is_sunglasses_rx) ? (
+                <div className="bg-[#F8F9FC] border border-[#E8EAF2] rounded-xl p-3 text-xs space-y-1.5 mt-2">
+                  <div className="flex justify-between text-[#555555]">
+                    <span>Frame (GST 18% incl.)</span>
+                    <span className="font-medium text-[#111111]">₹{(frameUnitPrice * item.quantity).toLocaleString("en-IN")}</span>
+                  </div>
+                  <div className="flex justify-between text-[#555555]">
+                    <span>Prescription Lens</span>
+                    <span className="font-medium text-[#111111]">₹{(lensUnitPrice * item.quantity).toLocaleString("en-IN")}</span>
+                  </div>
+                  <div className="flex justify-between text-[#555555]">
+                    <span>Tint</span>
+                    <span className="font-medium text-[#111111] capitalize">
+                      {item.lens_config?.tint_style === "solid" ? "Solid Tint" : item.lens_config?.tint_style === "gradient" ? "Gradient Tint" : String(item.lens_config?.tint_style || "Tinted")}
+                    </span>
+                  </div>
+                  <div className="flex justify-between text-[11px] text-[#666666]">
+                    <span>GST (5% on lens)</span>
+                    <span className="font-semibold text-emerald-700">₹{(gstAmount * item.quantity).toLocaleString("en-IN")}</span>
+                  </div>
+                  <div className="border-t border-[#ECECEC] pt-1.5 flex justify-between font-bold text-[#111111]">
+                    <span>Item Total</span>
+                    <span>₹{((frameUnitPrice + lensUnitPrice + gstAmount) * item.quantity).toLocaleString("en-IN")}</span>
+                  </div>
+                </div>
+              ) : hasLensConfig ? (
                 <div className="bg-[#F8F9FC] border border-[#E8EAF2] rounded-xl p-3 text-xs space-y-1.5 mt-2">
                   <div className="flex justify-between text-[#555555]">
                     <span>Frame</span>
@@ -464,17 +515,17 @@ export default function OrderSummary({
           </div>
         )}
 
-        {gst5Total > 0 ? (
-          <div className="flex justify-between text-sm text-[#666666]">
-            <span>GST (5% — Eyeglasses/Lenses)</span>
-            <span className="font-medium text-[#111111]">₹{gst5Total.toLocaleString("en-IN")}</span>
+        {hasSunglassesWithLens ? (
+          <div className="flex justify-between text-xs sm:text-sm text-emerald-700 font-medium">
+            <span>Sunglasses with Lens</span>
+            <span>Frame GST (18%): Included | Lens GST (5%): ₹{sunglassesLensGstTotal.toLocaleString("en-IN")}</span>
           </div>
         ) : null}
 
-        {gst18Total > 0 ? (
-          <div className="flex justify-between text-sm text-[#666666]">
-            <span>GST (18% — Sunglasses)</span>
-            <span className="font-medium text-[#111111]">₹{gst18Total.toLocaleString("en-IN")}</span>
+        {hasSunglassesWithoutLens ? (
+          <div className="flex justify-between text-sm text-emerald-600 font-medium">
+            <span>Sunglasses</span>
+            <span>GST (18%): Included in price</span>
           </div>
         ) : null}
 
@@ -485,10 +536,17 @@ export default function OrderSummary({
           </div>
         ) : null}
 
-        {hasSunglasses ? (
-          <div className="flex justify-between text-sm text-emerald-600 font-medium">
-            <span>Sunglasses</span>
-            <span>GST (18%): Included in price</span>
+        {standardGst5Total > 0 ? (
+          <div className="flex justify-between text-sm text-[#666666]">
+            <span>GST (5%)</span>
+            <span className="font-medium text-[#111111]">₹{standardGst5Total.toLocaleString("en-IN")}</span>
+          </div>
+        ) : null}
+
+        {gst18Total > 0 ? (
+          <div className="flex justify-between text-sm text-[#666666]">
+            <span>GST (18% — Sunglasses)</span>
+            <span className="font-medium text-[#111111]">₹{gst18Total.toLocaleString("en-IN")}</span>
           </div>
         ) : null}
 

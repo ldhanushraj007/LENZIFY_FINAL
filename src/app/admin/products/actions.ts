@@ -49,14 +49,19 @@ export async function createProduct(formData: FormData) {
   const discount_price = formData.get("offer_price") ? parseFloat(formData.get("offer_price") as string) : null;
   const stock = parseInt(formData.get("stock") as string);
   const categoryIdRaw = formData.get("category_id");
-  const category_id = categoryIdRaw ? parseInt(categoryIdRaw as string) : null;
+  let category_id = categoryIdRaw ? parseInt(categoryIdRaw as string) : null;
+  if (!category_id) {
+    if (product_type === "computer-glasses") category_id = 7;
+    if (product_type === "sunglasses") category_id = 5;
+  }
   const description = formData.get("description") as string;
   
   // Extract Specs
   const frame_type = (formData.get("frame_type") as string) || (formData.getAll("frame_style").join(", ")) || "full_rim";
   const shape = formData.get("shape") as string;
-  const material = formData.getAll("material").join(", ");
-  const gender = formData.getAll("gender"); 
+  const material = (formData.get("material") as string) || formData.getAll("material").join(", ") || "";
+  const genderRaw = formData.getAll("gender"); 
+  const gender = genderRaw.length > 0 ? (genderRaw.length === 1 ? genderRaw[0] : JSON.stringify(genderRaw)) : ((formData.get("gender") as string) || "Unisex");
   const color = formData.get("color") as string;
   const size = formData.get("size") as string;
 
@@ -70,6 +75,10 @@ export async function createProduct(formData: FormData) {
   const lens_diameter = (formData.get("lens_diameter") as string)?.trim() || "";
   const lens_replacement_schedule = (formData.get("lens_replacement_schedule") as string)?.trim() || "";
   const custom_specifications = (formData.get("custom_specifications") as string)?.trim() || "";
+  const prescription_available = formData.get("prescription_available") === "true";
+  const uv_protection = (formData.get("uv_protection") as string)?.trim() || "";
+  const lens_color = (formData.get("lens_color") as string)?.trim() || "";
+  const lens_type = (formData.get("lens_type") as string)?.trim() || "";
   
   const colorsRaw = formData.get("colors") as string;
   const sizesRaw = formData.get("sizes") as string;
@@ -162,6 +171,13 @@ export async function createProduct(formData: FormData) {
       }
     })(),
     specifications: (() => {
+      const sunglassSpecs = product_type === "sunglasses" ? {
+        prescription_available,
+        ...(uv_protection ? { uv_protection } : {}),
+        ...(lens_color ? { lens_color } : {}),
+        ...(lens_type ? { lens_type } : {}),
+      } : {};
+
       try {
         const specs = JSON.parse(formData.get("specifications") as string || "{}");
         return {
@@ -174,6 +190,7 @@ export async function createProduct(formData: FormData) {
           ...(lens_replacement_schedule ? { replacement_schedule: lens_replacement_schedule } : {}),
           ...(custom_specifications ? { custom_notes: custom_specifications } : {}),
           ...(pack_size ? { pack_size } : {}),
+          ...sunglassSpecs,
         };
       } catch (e) {
         console.error("Error parsing specifications:", e);
@@ -186,6 +203,7 @@ export async function createProduct(formData: FormData) {
           ...(lens_replacement_schedule ? { replacement_schedule: lens_replacement_schedule } : {}),
           ...(custom_specifications ? { custom_notes: custom_specifications } : {}),
           ...(pack_size ? { pack_size } : {}),
+          ...sunglassSpecs,
         };
       }
     })(),
@@ -236,6 +254,12 @@ export async function createProduct(formData: FormData) {
 
   // Handle Multi-Sector (Junction Table)
   const categoryIds = formData.getAll("category_ids") as string[];
+  if (product_type === "computer-glasses" && !categoryIds.includes("7")) {
+    categoryIds.push("7");
+  }
+  if (product_type === "sunglasses" && !categoryIds.includes("5")) {
+    categoryIds.push("5");
+  }
   if (categoryIds.length > 0) {
     const sectorLinks = categoryIds.map(catId => ({
       product_id: product.id,
@@ -268,14 +292,19 @@ export async function updateProduct(id: string, _prevState: any, formData: FormD
     const discount_price = formData.get("offer_price") ? parseFloat(formData.get("offer_price") as string) : null;
     const stock = parseInt(formData.get("stock") as string);
     const categoryIdRaw = formData.get("category_id");
-    const category_id = categoryIdRaw ? parseInt(categoryIdRaw as string) : null;
+    let category_id = categoryIdRaw ? parseInt(categoryIdRaw as string) : null;
+    if (!category_id) {
+      if (product_type === "computer-glasses") category_id = 7;
+      if (product_type === "sunglasses") category_id = 5;
+    }
     const description = formData.get("description") as string;
     
     // Extract Specs
     const frame_type = (formData.get("frame_type") as string) || (formData.getAll("frame_style").join(", ")) || "full_rim";
     const shape = formData.get("shape") as string;
-    const material = formData.getAll("material").join(", ");
-    const gender = formData.getAll("gender"); 
+    const material = (formData.get("material") as string) || formData.getAll("material").join(", ") || "";
+    const genderRaw = formData.getAll("gender"); 
+    const gender = genderRaw.length > 0 ? (genderRaw.length === 1 ? genderRaw[0] : JSON.stringify(genderRaw)) : ((formData.get("gender") as string) || "Unisex");
     const color = formData.get("color") as string;
     const size = formData.get("size") as string;
 
@@ -289,6 +318,10 @@ export async function updateProduct(id: string, _prevState: any, formData: FormD
     const lens_diameter = (formData.get("lens_diameter") as string)?.trim() || "";
     const lens_replacement_schedule = (formData.get("lens_replacement_schedule") as string)?.trim() || "";
     const custom_specifications = (formData.get("custom_specifications") as string)?.trim() || "";
+    const prescription_available = formData.get("prescription_available") === "true";
+    const uv_protection = (formData.get("uv_protection") as string)?.trim() || "";
+    const lens_color = (formData.get("lens_color") as string)?.trim() || "";
+    const lens_type = (formData.get("lens_type") as string)?.trim() || "";
     
     const colorsRaw = formData.get("colors") as string;
     const sizesRaw = formData.get("sizes") as string;
@@ -357,6 +390,13 @@ export async function updateProduct(id: string, _prevState: any, formData: FormD
         }
       })(),
       specifications: (() => {
+        const sunglassSpecs = product_type === "sunglasses" ? {
+          prescription_available,
+          ...(uv_protection ? { uv_protection } : {}),
+          ...(lens_color ? { lens_color } : {}),
+          ...(lens_type ? { lens_type } : {}),
+        } : {};
+
         try {
           const specs = JSON.parse(formData.get("specifications") as string || "{}");
           return {
@@ -369,6 +409,7 @@ export async function updateProduct(id: string, _prevState: any, formData: FormD
             ...(lens_replacement_schedule ? { replacement_schedule: lens_replacement_schedule } : {}),
             ...(custom_specifications ? { custom_notes: custom_specifications } : {}),
             ...(pack_size ? { pack_size } : {}),
+            ...sunglassSpecs,
           };
         } catch (e) {
           console.error("Error parsing specifications:", e);
@@ -381,6 +422,7 @@ export async function updateProduct(id: string, _prevState: any, formData: FormD
             ...(lens_replacement_schedule ? { replacement_schedule: lens_replacement_schedule } : {}),
             ...(custom_specifications ? { custom_notes: custom_specifications } : {}),
             ...(pack_size ? { pack_size } : {}),
+            ...sunglassSpecs,
           };
         }
       })(),

@@ -20,7 +20,6 @@ import {
   Upload,
   ArrowRight,
   ShieldCheck,
-  Banknote,
   Copy,
 } from "lucide-react";
 
@@ -58,25 +57,7 @@ export default function CheckoutPage() {
   const [loading, setLoading] = useState(true);
   const [orderProcessing, setOrderProcessing] = useState(false);
   const [activeStep, setActiveStep] = useState(1);
-  const [paymentMethod, setPaymentMethod] = useState<"razorpay" | "cod">("razorpay");
-
-  const allSunglasses = cartItems.length > 0 && cartItems.every((item) => {
-    const cat = (
-      item.product?.category ||
-      item.products?.category ||
-      item.products?.categories?.name ||
-      item.products?.categories?.slug ||
-      item.category ||
-      ""
-    ).toLowerCase();
-    return cat.includes("sunglass");
-  });
-
-  useEffect(() => {
-    if (!allSunglasses && paymentMethod === "cod") {
-      setPaymentMethod("razorpay");
-    }
-  }, [allSunglasses, paymentMethod]);
+  const paymentMethod = "razorpay";
 
   const [addressData, setAddressData] = useState({
     name: "",
@@ -169,7 +150,20 @@ export default function CheckoutPage() {
     if (isAccessoryItem(item)) return false;
     return Boolean(
       item.lens_id ||
-      (item.lens_config && (item.lens_config.type || item.lens_config.package || item.lens_config.package_name || item.lens_config.selected_index || (Number(item.lens_price) > 0)))
+      (item.lens_config && (
+        item.lens_config.type ||
+        item.lens_config.package ||
+        item.lens_config.package_name ||
+        item.lens_config.selected_index ||
+        item.lens_config.thickness ||
+        item.lens_config.flow_type === "sunglasses" ||
+        item.lens_config.is_prescription ||
+        item.lens_config.is_sunglasses_rx ||
+        Number(item.lens_config.lens_price) > 0 ||
+        Number(item.lens_config.total_price) > 0 ||
+        Number(item.lens_price) > 0
+      )) ||
+      Boolean(item.prescription_json?.od_sph || item.prescription_json?.is_sunglasses_rx || item.prescription?.od_sph)
     );
   };
 
@@ -476,54 +470,7 @@ export default function CheckoutPage() {
       return null;
     };
 
-    // 1. CASH ON DELIVERY (COD) FLOW
-    if (paymentMethod === "cod") {
-      try {
-        const codId = `COD-${Date.now()}-${Math.random().toString(36).substring(2, 7).toUpperCase()}`;
-        const orderRes = await placeOrder({
-          items: cartItems.map((item) => {
-            const pricing = getItemPricing(item);
-            const rate = getGSTRate(item);
-            const numericRate = (rate === 'included' || rate === 'included-18') ? 0 : (rate === 0.18 ? 0.18 : 0.05);
-            return {
-              id: item.product_id,
-              quantity: item.quantity,
-              price: pricing.unitPrice,
-              lens_id: item.lens_id,
-              selected_color: item.selected_color,
-              selected_size: item.selected_size,
-              prescription_json: getResolvedItemPrescription(item),
-              gst_rate: numericRate,
-              gst_amount: pricing.gstAmount,
-            };
-          }),
-          total_price: totalAmount,
-          address: addressData,
-          prescription: prescription.left_eye || prescription.file_url ? prescription : undefined,
-          payment: { id: codId, method: "cod" },
-        });
-
-        if (orderRes.success) {
-          if (couponId) await incrementCouponUsage(couponId);
-          // Purge session prescription cache on successful order
-          sessionStorage.removeItem(RX_SESSION_KEY);
-          useCartStore.getState().clearCart();
-          toast.success("Order placed successfully with Cash on Delivery!");
-          router.push(`/orders/success?id=${orderRes.order_id}`);
-        } else {
-          console.error("COD Order Placement Error:", orderRes.error);
-          toast.error(orderRes.error || "Order placement failed. Please try again.");
-          setOrderProcessing(false);
-        }
-      } catch (err: any) {
-        console.error("COD Fulfillment Exception:", err);
-        toast.error(`Order processing failed: ${err.message || "Unknown error"}.`);
-        setOrderProcessing(false);
-      }
-      return;
-    }
-
-    // 2. UPI / Razorpay Flow
+    // 1. UPI / Razorpay Flow
     try {
       const res = await fetch("/api/checkout", {
         method: "POST",
@@ -1067,23 +1014,8 @@ export default function CheckoutPage() {
 
                     <div className="space-y-3">
                       {/* Online Payment Option */}
-                      <div
-                        onClick={() => setPaymentMethod("razorpay")}
-                        className={cn(
-                          "p-5 rounded-2xl flex items-center gap-4 cursor-pointer transition-all border-2",
-                          paymentMethod === "razorpay"
-                            ? "border-[#03173D] bg-[#F0F4FF] shadow-sm"
-                            : "border-[#ECECEC] bg-white hover:border-[#CCCCCC] hover:bg-[#F8F9FC]"
-                        )}
-                      >
-                        <div
-                          className={cn(
-                            "w-10 h-10 rounded-xl flex items-center justify-center shrink-0 transition-colors",
-                            paymentMethod === "razorpay"
-                              ? "bg-[#03173D] text-white"
-                              : "bg-[#F4F6F8] text-[#555555]"
-                          )}
-                        >
+                      <div className="p-5 rounded-2xl flex items-center gap-4 border-2 border-[#03173D] bg-[#F0F4FF] shadow-sm">
+                        <div className="w-10 h-10 rounded-xl flex items-center justify-center shrink-0 bg-[#03173D] text-white">
                           <CreditCard size={20} />
                         </div>
                         <div className="flex-1">
@@ -1097,67 +1029,16 @@ export default function CheckoutPage() {
                             UPI (GPay, PhonePe, Paytm), Credit/Debit Cards & Net Banking
                           </p>
                         </div>
-                        <div
-                          className={cn(
-                            "w-5 h-5 rounded-full flex items-center justify-center shrink-0 border transition-all",
-                            paymentMethod === "razorpay"
-                              ? "bg-[#03173D] border-[#03173D]"
-                              : "border-[#CCCCCC] bg-white"
-                          )}
-                        >
-                          {paymentMethod === "razorpay" && (
-                            <CheckCircle2 size={12} className="text-white" />
-                          )}
+                        <div className="w-5 h-5 rounded-full flex items-center justify-center shrink-0 border border-[#03173D] bg-[#03173D]">
+                          <CheckCircle2 size={12} className="text-white" />
                         </div>
                       </div>
-
-                      {/* Cash on Delivery Option - only for sunglasses-only cart */}
-                      {allSunglasses && (
-                        <div
-                          onClick={() => setPaymentMethod("cod")}
-                          className={cn(
-                            "p-5 rounded-2xl flex items-center gap-4 cursor-pointer transition-all border-2",
-                            paymentMethod === "cod"
-                              ? "border-[#03173D] bg-[#F0F4FF] shadow-sm"
-                              : "border-[#ECECEC] bg-white hover:border-[#CCCCCC] hover:bg-[#F8F9FC]"
-                          )}
-                        >
-                          <div
-                            className={cn(
-                              "w-10 h-10 rounded-xl flex items-center justify-center shrink-0 transition-colors",
-                              paymentMethod === "cod"
-                                ? "bg-[#03173D] text-white"
-                                : "bg-[#F4F6F8] text-[#555555]"
-                            )}
-                          >
-                            <Banknote size={20} />
-                          </div>
-                          <div className="flex-1">
-                            <p className="font-semibold text-[#111111] text-sm">Cash on Delivery (COD)</p>
-                            <p className="text-[#666666] text-xs mt-0.5">
-                              Pay in cash or UPI directly when your package arrives at your doorstep
-                            </p>
-                          </div>
-                          <div
-                            className={cn(
-                              "w-5 h-5 rounded-full flex items-center justify-center shrink-0 border transition-all",
-                              paymentMethod === "cod"
-                                ? "bg-[#03173D] border-[#03173D]"
-                                : "border-[#CCCCCC] bg-white"
-                            )}
-                          >
-                            {paymentMethod === "cod" && <CheckCircle2 size={12} className="text-white" />}
-                          </div>
-                        </div>
-                      )}
                     </div>
 
                     <div className="p-4 rounded-xl bg-[#F8F9FC] border border-[#E8EAF2] flex items-start gap-3">
                       <ShieldCheck size={18} className="text-emerald-600 shrink-0 mt-0.5" />
                       <p className="text-[#666666] text-xs leading-relaxed">
-                        {paymentMethod === "cod"
-                          ? "Cash on Delivery is available across all serviceable pincodes in India. Please keep exact cash or UPI ready upon delivery."
-                          : "Your payment is secured and encrypted via Razorpay. We never store your payment credentials."}
+                        Your payment is secured and encrypted via Razorpay. We never store your payment credentials.
                       </p>
                     </div>
                   </div>
@@ -1177,8 +1058,6 @@ export default function CheckoutPage() {
                     >
                       {orderProcessing
                         ? "Placing Order..."
-                        : paymentMethod === "cod"
-                        ? `Place Order (COD) • ₹${Math.round(grandTotal).toLocaleString("en-IN")}`
                         : `Pay Now • ₹${Math.round(grandTotal).toLocaleString("en-IN")}`}
                       {!orderProcessing && <ArrowRight size={16} />}
                     </button>

@@ -2,7 +2,7 @@
 
 import { useState, useMemo } from "react";
 import { useFormStatus } from "react-dom";
-import { Package, Tag, Maximize2, Info, Camera, Zap, Save, Layers, Loader2, Cpu } from "lucide-react";
+import { Package, Tag, Maximize2, Info, Camera, Zap, Save, Layers, Loader2, Cpu, Sun, Laptop } from "lucide-react";
 import { updateProductDirect } from "../../actions";
 
 function SubmitButton() {
@@ -118,6 +118,19 @@ export default function EditProductForm({
     return s || {};
   }, [product.specifications]);
 
+  const [prescriptionAvailable, setPrescriptionAvailable] = useState<boolean>(() => {
+    return Boolean(initialSpecs.prescription_available);
+  });
+  const [sunglassesLensColor, setSunglassesLensColor] = useState<string>(() => {
+    return initialSpecs.lens_color || "Grey";
+  });
+  const [sunglassesLensType, setSunglassesLensType] = useState<string>(() => {
+    return initialSpecs.lens_type || "Polarized";
+  });
+  const [uvProtection, setUvProtection] = useState<string>(() => {
+    return initialSpecs.uv_protection || "UV400";
+  });
+
   const addColor = () => {
     if (!newColorName.trim()) return;
     if (colors.some(c => c.name.toLowerCase() === newColorName.trim().toLowerCase())) {
@@ -178,20 +191,70 @@ export default function EditProductForm({
          {/* Product Type Selector */}
          <section className="bg-white border border-brand-navy/5 p-8 shadow-sm">
             <h3 className="text-[10px] font-bold uppercase tracking-[0.3em] text-brand-navy mb-4">Product Type Designation</h3>
-            <div className="grid grid-cols-2 sm:grid-cols-4 gap-4">
+            <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-3">
                {[
                  { id: "frame", label: "Frame" },
+                 { id: "computer-glasses", label: "Computer Glasses" },
+                 { id: "sunglasses", label: "Sunglasses" },
                  { id: "reading-glasses", label: "Reading Glasses" },
                  { id: "contact-lens", label: "Contact Lenses" },
                  { id: "accessory", label: "Accessory" }
                ].map(({ id: type, label }) => (
-                 <label key={type} className={`cursor-pointer border-2 p-4 transition-all ${(productType === type || (type === "contact-lens" && productType === "lens")) ? 'border-secondary bg-secondary/5' : 'border-brand-navy/5 hover:border-brand-navy/20'}`}>
+                 <label key={type} className={`cursor-pointer border-2 p-3 transition-all ${(productType === type || (type === "contact-lens" && productType === "lens")) ? 'border-secondary bg-secondary/5' : 'border-brand-navy/5 hover:border-brand-navy/20'}`}>
                     <input type="radio" name="product_type" value={type} className="hidden" checked={productType === type || (type === "contact-lens" && productType === "lens")} onChange={() => setProductType(type)} />
-                    <span className="text-[11px] font-bold uppercase tracking-widest text-brand-navy block text-center">{label}</span>
+                    <span className="text-[10px] font-bold uppercase tracking-wider text-brand-navy block text-center">{label}</span>
                  </label>
                ))}
             </div>
          </section>
+
+         {/* Non-editable note for Computer Glasses */}
+         {productType === "computer-glasses" && (
+           <div className="p-6 bg-blue-50/90 border border-blue-200 rounded-xl space-y-2">
+             <div className="flex items-center justify-between">
+               <div className="flex items-center gap-2.5">
+                 <Laptop size={18} className="text-[#004AAD]" />
+                 <span className="text-[11px] font-bold uppercase tracking-wider text-brand-navy">
+                   Computer Glasses Protocol
+                 </span>
+               </div>
+               <span className="px-3 py-1 bg-[#004AAD] text-white text-[9px] font-bold uppercase tracking-widest rounded-full">
+                 Zero Power (Plano)
+               </span>
+             </div>
+             <p className="text-[12px] font-bold text-brand-navy">
+               Computer Glasses are zero power (Plano). No prescription required.
+             </p>
+             <p className="text-[11px] text-brand-navy/70">
+               GST for Computer Glasses: 5% excluded (added on top of price at checkout).
+             </p>
+             <input type="hidden" name="category_id" value="7" />
+           </div>
+         )}
+
+         {/* Non-editable note for Sunglasses */}
+         {productType === "sunglasses" && (
+           <div className="p-6 bg-amber-50/90 border border-amber-200 rounded-xl space-y-2">
+             <div className="flex items-center justify-between">
+               <div className="flex items-center gap-2.5">
+                 <Sun size={18} className="text-amber-800" />
+                 <span className="text-[11px] font-bold uppercase tracking-wider text-amber-900">
+                   Sunglasses Protocol
+                 </span>
+               </div>
+               <span className="px-3 py-1 bg-amber-800 text-white text-[9px] font-bold uppercase tracking-widest rounded-full">
+                 18% GST Inclusive
+               </span>
+             </div>
+             <p className="text-[12px] font-bold text-amber-950">
+               Sunglasses MRP is GST inclusive at 18%.
+             </p>
+             <p className="text-[11px] text-amber-900/80">
+               Power pricing is fixed system-wide: 0 to -2: ₹800 | -2 to -4: ₹1,200 | -4 to -8: ₹1,600 | -8 to -12: ₹2,500. Admin does not set per-product power price.
+             </p>
+             <input type="hidden" name="category_id" value="5" />
+           </div>
+         )}
 
         {/* General Information */}
         <section className="bg-white border border-brand-navy/5 p-8 lg:p-12 space-y-10 shadow-sm relative overflow-hidden">
@@ -333,21 +396,153 @@ export default function EditProductForm({
                        <option value="shell">Shell</option>
                      </select>
                   </div>
-                 {[
-                   { label: "Geometry", name: "shape", options: ["Round", "Square", "Aviator", "Rectangular", "Cat-Eye"], state: product.shape },
-                   { label: "Chroma Profile", name: "color", options: ["Black", "Gold", "Silver", "Tortoise", "Crystal"], state: product.color },
-                   { label: "Scale Factor", name: "size", options: ["Small", "Medium", "Large"], state: product.size },
-                 ].map((spec) => (
-                   <div key={spec.name} className="space-y-2 group">
-                      <label className="text-[9px] font-bold uppercase tracking-widest text-brand-text-muted italic">{spec.label}</label>
-                      <select name={spec.name} defaultValue={spec.state || ""} className="w-full bg-brand-background border border-brand-navy/10 px-4 py-3 text-[10px] font-bold tracking-widest uppercase outline-none focus:border-secondary transition-all cursor-pointer">
-                        <option value="">N/A</option>
-                        {spec.options.map(opt => <option key={opt} value={opt}>{opt}</option>)}
-                      </select>
+                  <div className="space-y-2 group">
+                     <label className="text-[9px] font-bold uppercase tracking-widest text-brand-text-muted italic">Geometry (Shape)</label>
+                     <select name="shape" defaultValue={product.shape || ""} className="w-full bg-brand-background border border-brand-navy/10 px-4 py-3 text-[10px] font-bold tracking-widest uppercase outline-none focus:border-secondary transition-all cursor-pointer">
+                       <option value="">N/A</option>
+                       <option value="Round">Round</option>
+                       <option value="Square">Square</option>
+                       <option value="Aviator">Aviator</option>
+                       <option value="Rectangular">Rectangular</option>
+                       <option value="Cat-Eye">Cat-Eye</option>
+                       <option value="Geometric">Geometric</option>
+                       <option value="Wayfarer">Wayfarer</option>
+                       <option value="Clubmaster">Clubmaster</option>
+                     </select>
+                  </div>
+                  <div className="space-y-2 group">
+                     <label className="text-[9px] font-bold uppercase tracking-widest text-brand-text-muted italic">Scale Factor (Size)</label>
+                     <select name="size" defaultValue={product.size || ""} className="w-full bg-brand-background border border-brand-navy/10 px-4 py-3 text-[10px] font-bold tracking-widest uppercase outline-none focus:border-secondary transition-all cursor-pointer">
+                       <option value="">N/A</option>
+                       <option value="Small">Small</option>
+                       <option value="Medium">Medium</option>
+                       <option value="Large">Large</option>
+                       <option value="Extra Large">Extra Large</option>
+                     </select>
+                  </div>
+                  <div className="space-y-2 group">
+                     <label className="text-[9px] font-bold uppercase tracking-widest text-brand-text-muted italic">Frame Material</label>
+                     <select name="material" defaultValue={product.material || ""} className="w-full bg-brand-background border border-brand-navy/10 px-4 py-3 text-[10px] font-bold tracking-widest uppercase outline-none focus:border-secondary transition-all cursor-pointer">
+                       <option value="">N/A</option>
+                       <option value="Acetate">Acetate</option>
+                       <option value="Metal">Metal</option>
+                       <option value="TR90">TR90 (Flexible Plastic)</option>
+                       <option value="Titanium">Titanium</option>
+                       <option value="Mixed">Mixed (Metal + Plastic)</option>
+                       <option value="Wood">Wood</option>
+                       <option value="Carbon Fiber">Carbon Fiber</option>
+                     </select>
+                  </div>
+                  <div className="space-y-2 group">
+                     <label className="text-[9px] font-bold uppercase tracking-widest text-brand-text-muted italic">Chroma Profile (Color)</label>
+                     <select name="color" defaultValue={product.color || ""} className="w-full bg-brand-background border border-brand-navy/10 px-4 py-3 text-[10px] font-bold tracking-widest uppercase outline-none focus:border-secondary transition-all cursor-pointer">
+                       <option value="">N/A</option>
+                       <option value="Black">Black</option>
+                       <option value="Gold">Gold</option>
+                       <option value="Silver">Silver</option>
+                       <option value="Gunmetal">Gunmetal</option>
+                       <option value="Tortoise">Tortoise / Havana</option>
+                       <option value="Crystal">Crystal / Transparent</option>
+                       <option value="Blue">Blue</option>
+                       <option value="Brown">Brown</option>
+                     </select>
+                  </div>
+                  <div className="space-y-2 group">
+                     <label className="text-[9px] font-bold uppercase tracking-widest text-brand-text-muted italic">Target Gender</label>
+                     <select name="gender" defaultValue={product.gender || "Unisex"} className="w-full bg-brand-background border border-brand-navy/10 px-4 py-3 text-[10px] font-bold tracking-widest uppercase outline-none focus:border-secondary transition-all cursor-pointer">
+                       <option value="Unisex">Unisex</option>
+                       <option value="Men">Men</option>
+                       <option value="Women">Women</option>
+                       <option value="Kids">Kids</option>
+                     </select>
+                  </div>
+                  <div className="space-y-2 group">
+                     <label className="text-[9px] font-bold uppercase tracking-widest text-brand-text-muted italic">Collection (Optional)</label>
+                     <input name="collection" defaultValue={product.collection || ""} placeholder="e.g. Classic, Eco" className="w-full bg-brand-background border border-brand-navy/10 px-4 py-3 text-[10px] font-bold tracking-widest uppercase outline-none focus:border-secondary transition-all" />
+                  </div>
+                  <div className="space-y-2 group">
+                     <label className="text-[9px] font-bold uppercase tracking-widest text-brand-text-muted italic">Tags (Comma-separated)</label>
+                     <input name="tags" defaultValue={Array.isArray(product.tags) ? product.tags.join(', ') : (product.tags || '')} placeholder="e.g. premium, lightweight" className="w-full bg-brand-background border border-brand-navy/10 px-4 py-3 text-[10px] font-bold tracking-widest uppercase outline-none focus:border-secondary transition-all" />
+                  </div>
+               </div>
+
+               {/* SUNGLASSES SPECIFIC: Lens Color, Lens Type, UV Protection & Prescription Toggle */}
+               {productType === "sunglasses" && (
+                 <div className="space-y-6 pt-6 border-t border-brand-navy/10">
+                   <div className="flex items-center gap-2">
+                     <Sun size={14} className="text-secondary" />
+                     <h4 className="text-[10px] font-bold uppercase tracking-[0.2em] text-brand-navy">Sunglasses Optical Characteristics</h4>
                    </div>
-                 ))}
-              </div>
-              {/* Color & Size Variant Management UI */}
+                   <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+                     <div className="space-y-2 group">
+                       <label className="text-[9px] font-bold uppercase tracking-widest text-brand-text-muted italic">Lens Color / Tint Color *</label>
+                       <select name="lens_color" value={sunglassesLensColor} onChange={e => setSunglassesLensColor(e.target.value)} className="w-full bg-brand-background border border-brand-navy/10 px-4 py-3 text-[10px] font-bold tracking-widest uppercase outline-none focus:border-secondary transition-all cursor-pointer">
+                         <option value="Grey">Grey / Smoke</option>
+                         <option value="Black">Dark Black</option>
+                         <option value="Brown">Brown / Amber</option>
+                         <option value="Green">Green / G15</option>
+                         <option value="Blue">Blue Mirrored</option>
+                         <option value="Silver">Silver Mirrored</option>
+                         <option value="Gradient Grey">Gradient Grey</option>
+                         <option value="Gradient Brown">Gradient Brown</option>
+                       </select>
+                     </div>
+                     <div className="space-y-2 group">
+                       <label className="text-[9px] font-bold uppercase tracking-widest text-brand-text-muted italic">Lens Type *</label>
+                       <select name="lens_type" value={sunglassesLensType} onChange={e => setSunglassesLensType(e.target.value)} className="w-full bg-brand-background border border-brand-navy/10 px-4 py-3 text-[10px] font-bold tracking-widest uppercase outline-none focus:border-secondary transition-all cursor-pointer">
+                         <option value="Polarized">Polarized</option>
+                         <option value="Non-polarized">Non-polarized</option>
+                       </select>
+                     </div>
+                     <div className="space-y-2 group">
+                       <label className="text-[9px] font-bold uppercase tracking-widest text-brand-text-muted italic">UV Protection *</label>
+                       <select name="uv_protection" value={uvProtection} onChange={e => setUvProtection(e.target.value)} className="w-full bg-brand-background border border-brand-navy/10 px-4 py-3 text-[10px] font-bold tracking-widest uppercase outline-none focus:border-secondary transition-all cursor-pointer">
+                         <option value="UV400">UV400 (100% Protection)</option>
+                         <option value="UV380">UV380</option>
+                         <option value="None">None</option>
+                       </select>
+                     </div>
+                   </div>
+
+                   {/* POWER AVAILABILITY TOGGLE */}
+                   <div className="p-6 bg-brand-background border border-brand-navy/10 rounded-xl space-y-4">
+                     <div className="flex items-center justify-between">
+                       <div>
+                         <h4 className="text-[10px] font-bold uppercase tracking-[0.2em] text-brand-navy">
+                           Available with Prescription Power
+                         </h4>
+                         <p className="text-[9px] text-brand-text-muted mt-0.5">
+                           Allow customers to order this sunglasses model with prescription lenses
+                         </p>
+                       </div>
+                       <label className="flex items-center gap-3 cursor-pointer select-none">
+                         <span className="text-[10px] font-bold uppercase tracking-wider text-brand-navy">
+                           {prescriptionAvailable ? "Yes (Available)" : "No (Non-Power Only)"}
+                         </span>
+                         <input
+                           type="checkbox"
+                           checked={prescriptionAvailable}
+                           onChange={e => setPrescriptionAvailable(e.target.checked)}
+                           className="w-5 h-5 accent-secondary cursor-pointer"
+                         />
+                       </label>
+                     </div>
+                     <input type="hidden" name="prescription_available" value={prescriptionAvailable ? "true" : "false"} />
+                     <div className="p-4 bg-white border border-brand-navy/10 rounded-lg">
+                       <span className="text-[9px] font-bold uppercase tracking-widest text-secondary block mb-1">
+                         Fixed System Power Pricing Notice:
+                       </span>
+                       <p className="text-[11px] font-medium text-brand-navy">
+                         Power pricing is fixed: 0 to -2: ₹800 | -2 to -4: ₹1,200 | -4 to -8: ₹1,600 | -8 to -12: ₹2,500
+                       </p>
+                       <p className="text-[10px] text-brand-text-muted mt-1">
+                         Power price is system-wide flat and automatically added when customer selects prescription lenses in storefront.
+                       </p>
+                     </div>
+                   </div>
+                 </div>
+               )}
+               {/* Color & Size Variant Management UI */}
               <div className="space-y-8 pt-4 border-t border-brand-navy/10">
                  {/* Colors Section */}
                  <div className="space-y-4">
@@ -534,6 +729,23 @@ export default function EditProductForm({
               <div>
                  <h4 className="text-[9px] font-bold uppercase tracking-widest text-white/40 mb-4">Target Categories</h4>
                  <div className="space-y-4 max-h-80 overflow-y-auto pr-2 custom-scrollbar">
+                     {/* Auto-Assigned Category Notice */}
+                     {productType === "computer-glasses" && (
+                       <div className="p-3 bg-blue-950/60 border border-blue-500/30 rounded text-left space-y-1 mb-2">
+                         <span className="text-[8px] font-bold uppercase tracking-widest text-blue-300 block">Auto Sector Assignment</span>
+                         <p className="text-[10px] font-bold text-white">Computer Glasses (Category #7)</p>
+                         <p className="text-[9px] text-blue-200/70">Automatically linked to Sector 7 upon save.</p>
+                         <input type="hidden" name="category_ids" value="7" />
+                       </div>
+                     )}
+                     {productType === "sunglasses" && (
+                       <div className="p-3 bg-amber-950/60 border border-amber-500/30 rounded text-left space-y-1 mb-2">
+                         <span className="text-[8px] font-bold uppercase tracking-widest text-amber-300 block">Auto Sector Assignment</span>
+                         <p className="text-[10px] font-bold text-white">Sunglasses (Category #5)</p>
+                         <p className="text-[9px] text-amber-200/70">Automatically linked to Sector 5 upon save.</p>
+                         <input type="hidden" name="category_ids" value="5" />
+                       </div>
+                     )}
                     {(() => {
                        const getTypes = () => {
                           if (productType === "frame") {

@@ -119,10 +119,14 @@ export function isItemWithPrescriptionLens(item: any): boolean {
       item.lens_config.package_name ||
       item.lens_config.selected_index ||
       item.lens_config.thickness ||
+      item.lens_config.flow_type === "sunglasses" ||
+      item.lens_config.is_prescription ||
+      item.lens_config.is_sunglasses_rx ||
       Number(item.lens_config.lens_price) > 0 ||
       Number(item.lens_config.total_price) > 0 ||
       Number(item.lens_price) > 0
-    ))
+    )) ||
+    Boolean(item.prescription_json?.od_sph || item.prescription_json?.is_sunglasses_rx || item.prescription?.od_sph)
   );
 }
 
@@ -237,9 +241,17 @@ export function getItemPricing(item: any): ItemPricingBreakdown {
 
   // GST Calculation
   const rateResult = getGSTRate(item);
-  const isGstIncluded = rateResult === "included" || rateResult === "included-18";
-  const numericGstRate = isGstIncluded ? 0 : (rateResult === 0.18 ? 0.18 : 0.05);
-  const gstAmount = isGstIncluded ? 0 : Math.round(totalPrice * numericGstRate);
+  const isGstIncluded = rateResult === "included" || rateResult === "included-5" || rateResult === "included-18";
+  let numericGstRate = 0;
+  let gstAmount = 0;
+
+  if (rateResult === "split") {
+    numericGstRate = 0.05;
+    gstAmount = Number(item.lens_config?.gst_amount) || Math.round(lensUnitPrice * quantity * 0.05);
+  } else if (!isGstIncluded) {
+    numericGstRate = rateResult === 0.18 ? 0.18 : 0.05;
+    gstAmount = Math.round(totalPrice * numericGstRate);
+  }
 
   // Labels
   const lensCfg = item.lens_config || {};
@@ -320,10 +332,16 @@ export function calculateUnifiedCartTotals(items: any[], couponDiscount: number 
     subtotal += pricing.totalPrice;
 
     const rate = getGSTRate(item);
-    if (rate === "included") {
+    if (rate === "included" || rate === "included-5") {
       hasContactLens = true;
     } else if (rate === "included-18") {
       hasSunglasses = true;
+    } else if (rate === "split") {
+      hasSunglasses = true;
+      const lensUnitPrice = Number(item.lens_config?.lens_price || pricing.lensUnitPrice || 0);
+      const qty = Math.max(1, Number(item.quantity) || 1);
+      const itemLensGst = Number(item.lens_config?.gst_amount) || Math.round(lensUnitPrice * qty * 0.05);
+      gst5Total += itemLensGst;
     } else if (rate === 0.18) {
       gst18Total += Math.round(pricing.totalPrice * 0.18);
     } else if (rate === 0.05) {

@@ -25,6 +25,9 @@ const Product360Viewer = dynamic(() => import("./Product360Viewer"), {
 const LensSelectionFlow = dynamic(() => import("@/components/store/LensSelectionFlow"), {
   ssr: false,
 });
+const SunglassesLensFlow = dynamic(() => import("@/components/product/SunglassesLensFlow"), {
+  ssr: false,
+});
 const ReviewForm = dynamic(() => import("@/components/shop/ReviewForm"), {
   ssr: false,
 });
@@ -153,6 +156,18 @@ export default function ProductDetailsClient({
     return s || {};
   }, [product.specifications]);
 
+  const prescriptionAvailable = useMemo(() => {
+    let s = product.specifications;
+    if (typeof s === "string") {
+      try {
+        s = JSON.parse(s);
+      } catch {
+        s = {};
+      }
+    }
+    return Boolean(s?.prescription_available === true || s?.prescription_available === "true");
+  }, [product.specifications]);
+
   const [customPower, setCustomPower] = useState<ContactLensPrescriptionData | null>(null);
   const [readingPower, setReadingPower] = useState<string>("");
   const parsedColors = useMemo(() => {
@@ -203,6 +218,7 @@ export default function ProductDetailsClient({
   }, [parsedSizes, selectedSize]);
   const [viewMode, setViewMode] = useState<"static" | "360">("static");
   const [showLensFlow, setShowLensFlow] = useState(false);
+  const [showSunglassesLensFlow, setShowSunglassesLensFlow] = useState(false);
 
   const initialPrimaryImage = resolveProductImage(product);
   const [mainImageSrc, setMainImageSrc] = useState(initialPrimaryImage);
@@ -666,8 +682,20 @@ export default function ProductDetailsClient({
             )}
 
 
+            {/* SunglassesLensFlow modal */}
+            {showSunglassesLensFlow && isSunglasses && (
+              <SunglassesLensFlow
+                product={product}
+                onClose={() => setShowSunglassesLensFlow(false)}
+                onAddToCart={(lensData) => {
+                  setShowSunglassesLensFlow(false);
+                  handleAddToCart(lensData, false);
+                }}
+              />
+            )}
+
             {/* LensSelectionFlow modal */}
-            {showLensFlow && !isReadingGlasses && !isComputerGlasses && (
+            {showLensFlow && !isSunglasses && !isReadingGlasses && !isComputerGlasses && (
               <LensSelectionFlow
                 product={product}
                 availableLenses={availableLenses}
@@ -678,7 +706,35 @@ export default function ProductDetailsClient({
 
             {/* Action buttons */}
             <div className="space-y-3">
-              {(hasEyeglassesCategory || product.product_type === "frame" || isSunglasses) && !isReadingGlasses && !isComputerGlasses ? (
+              {isSunglasses ? (
+                <>
+                  <button
+                    onClick={() => {
+                      const activeUser = currentUser || user;
+                      if (!activeUser) {
+                        setLoginModalMessage("Please log in to customize lenses and proceed with your order");
+                        setShowLoginModal(true);
+                        return;
+                      }
+                      setShowSunglassesLensFlow(true);
+                    }}
+                    disabled={product.stock <= 0}
+                    suppressHydrationWarning
+                    className="w-full bg-[#03173D] text-white rounded-full py-4 font-semibold flex items-center justify-center gap-2 hover:bg-[#004AAD] transition-all disabled:opacity-40 disabled:pointer-events-none cursor-pointer"
+                  >
+                    <ShoppingBag size={18} />
+                    Buy with Lens
+                  </button>
+                  <button
+                    onClick={() => handleAddToCart(undefined, false)}
+                    disabled={product.stock <= 0}
+                    suppressHydrationWarning
+                    className="w-full border border-[#03173D] text-[#03173D] rounded-full py-4 font-semibold hover:bg-[#03173D] hover:text-white transition-all disabled:opacity-40 disabled:pointer-events-none cursor-pointer"
+                  >
+                    {product.stock > 0 ? "Add Sunglasses Only" : "Out of Stock"}
+                  </button>
+                </>
+              ) : (hasEyeglassesCategory || product.product_type === "frame") && !isReadingGlasses && !isComputerGlasses ? (
                 <>
                   <button
                     onClick={handleOpenLensFlow}
@@ -695,7 +751,7 @@ export default function ProductDetailsClient({
                     suppressHydrationWarning
                     className="w-full border border-[#03173D] text-[#03173D] rounded-full py-4 font-semibold hover:bg-[#03173D] hover:text-white transition-all disabled:opacity-40 disabled:pointer-events-none"
                   >
-                    {product.stock > 0 ? (isSunglasses ? "Add Sunglasses to Cart" : "Add Frame Only") : "Out of Stock"}
+                    {product.stock > 0 ? "Add Frame Only" : "Out of Stock"}
                   </button>
                 </>
               ) : (

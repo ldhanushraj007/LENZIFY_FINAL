@@ -1239,35 +1239,16 @@ function ReplaceLensesContent() {
               {/* STEP 6: PAYMENT */}
               {currentStep === 6 && (
                 <motion.div key="s6" initial={{ opacity: 0, x: 20 }} animate={{ opacity: 1, x: 0 }} exit={{ opacity: 0, x: -20 }} className="space-y-8">
-                  <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
+                  <div className="max-w-md">
                     <button
+                      type="button"
                       onClick={() => setFormData({ ...formData, payment_method: "online" })}
-                      className={cn(
-                        "p-8 border rounded-2xl transition-all text-left space-y-4",
-                        formData.payment_method === "online"
-                          ? "bg-[#004AAD]/10 border-[#004AAD] text-[#004AAD]"
-                          : "bg-[#F8F9FC] border-[#E8EAF2] text-[#111111] hover:border-[#004AAD]/50"
-                      )}
+                      className="w-full p-8 border rounded-2xl transition-all text-left space-y-4 bg-[#004AAD]/10 border-[#004AAD] text-[#004AAD]"
                     >
-                      <Wallet size={24} className={formData.payment_method === "online" ? "text-[#004AAD]" : "text-[#CCCCCC]"} />
+                      <Wallet size={24} className="text-[#004AAD]" />
                       <div>
                         <h3 className="text-sm font-semibold mb-1">Pay Online</h3>
                         <p className="text-xs text-[#666666]">UPI, Cards, NetBanking</p>
-                      </div>
-                    </button>
-                    <button
-                      onClick={() => setFormData({ ...formData, payment_method: "cod" })}
-                      className={cn(
-                        "p-8 border rounded-2xl transition-all text-left space-y-4",
-                        formData.payment_method === "cod"
-                          ? "bg-[#004AAD]/10 border-[#004AAD] text-[#004AAD]"
-                          : "bg-[#F8F9FC] border-[#E8EAF2] text-[#111111] hover:border-[#004AAD]/50"
-                      )}
-                    >
-                      <CreditCard size={24} className={formData.payment_method === "cod" ? "text-[#004AAD]" : "text-[#CCCCCC]"} />
-                      <div>
-                        <h3 className="text-sm font-semibold mb-1">Pay on Pickup/Delivery</h3>
-                        <p className="text-xs text-[#666666]">Cash on Delivery</p>
                       </div>
                     </button>
                   </div>
