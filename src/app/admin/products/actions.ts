@@ -36,6 +36,82 @@ export async function uploadToSupabase(file: File, bucket: string = "product-ima
   return publicUrl;
 }
 
+/**
+ * Resiliently inserts a product, automatically catching and stripping any columns
+ * (such as brand_id or brand_name) that are not yet recognized by the Supabase schema cache.
+ */
+async function safeInsertProduct(supabase: any, initialPayload: Record<string, any>) {
+  const payload = { ...initialPayload };
+  for (let attempt = 0; attempt < 5; attempt++) {
+    const { data, error } = await supabase.from("products").insert(payload).select("id").single();
+    if (!error) {
+      return { data, error: null };
+    }
+
+    const missingColMatch = error.message?.match(/Could not find the '([^']+)' column of 'products'/i);
+    const missingCol = missingColMatch ? missingColMatch[1] : null;
+
+    if (missingCol && missingCol in payload) {
+      console.warn(`[safeInsertProduct] Column '${missingCol}' missing in Supabase schema cache. Removing from payload and retrying...`);
+      delete payload[missingCol];
+      continue;
+    }
+
+    if (error.message?.includes("brand_id") && "brand_id" in payload) {
+      console.warn("[safeInsertProduct] Missing brand_id in schema cache. Removing and retrying...");
+      delete payload.brand_id;
+      continue;
+    }
+
+    if (error.message?.includes("brand_name") && "brand_name" in payload) {
+      console.warn("[safeInsertProduct] Missing brand_name in schema cache. Removing and retrying...");
+      delete payload.brand_name;
+      continue;
+    }
+
+    return { data: null, error };
+  }
+  return { data: null, error: new Error("Failed to insert product after schema retries.") };
+}
+
+/**
+ * Resiliently updates a product, automatically catching and stripping any columns
+ * (such as brand_id or brand_name) that are not yet recognized by the Supabase schema cache.
+ */
+async function safeUpdateProduct(supabase: any, id: string, initialPayload: Record<string, any>) {
+  const payload = { ...initialPayload };
+  for (let attempt = 0; attempt < 5; attempt++) {
+    const { data, error } = await supabase.from("products").update(payload).eq("id", id).select().single();
+    if (!error) {
+      return { data, error: null };
+    }
+
+    const missingColMatch = error.message?.match(/Could not find the '([^']+)' column of 'products'/i);
+    const missingCol = missingColMatch ? missingColMatch[1] : null;
+
+    if (missingCol && missingCol in payload) {
+      console.warn(`[safeUpdateProduct] Column '${missingCol}' missing in Supabase schema cache. Removing from payload and retrying...`);
+      delete payload[missingCol];
+      continue;
+    }
+
+    if (error.message?.includes("brand_id") && "brand_id" in payload) {
+      console.warn("[safeUpdateProduct] Missing brand_id in schema cache. Removing and retrying...");
+      delete payload.brand_id;
+      continue;
+    }
+
+    if (error.message?.includes("brand_name") && "brand_name" in payload) {
+      console.warn("[safeUpdateProduct] Missing brand_name in schema cache. Removing and retrying...");
+      delete payload.brand_name;
+      continue;
+    }
+
+    return { data: null, error };
+  }
+  return { data: null, error: new Error("Failed to update product after schema retries.") };
+}
+
 export async function createProduct(formData: FormData) {
   const supabase = await createAdminClient();
 
@@ -143,7 +219,7 @@ export async function createProduct(formData: FormData) {
     primary_image_url = "/placeholder.jpg";
   }
 
-  const { data: product, error: productError } = await supabase.from("products").insert({
+  const { data: product, error: productError } = await safeInsertProduct(supabase, {
     name,
     sku,
     description,
@@ -224,7 +300,7 @@ export async function createProduct(formData: FormData) {
         return [];
       }
     })()
-  }).select("id").single();
+  });
 
   if (productError) {
     console.error("Error creating product:", productError);
@@ -470,7 +546,7 @@ export async function updateProduct(id: string, _prevState: any, formData: FormD
     console.log("Updating product ID:", id);
     console.log("Update Payload:", JSON.stringify(updatePayload, null, 2));
 
-    const { data: product, error: productError } = await supabase.from("products").update(updatePayload).eq("id", id).select().single();
+    const { data: product, error: productError } = await safeUpdateProduct(supabase, id, updatePayload);
     
     if (productError) {
       console.error("Supabase Update Error:", productError);
