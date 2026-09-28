@@ -89,6 +89,7 @@ import GoogleAnalytics from "@/components/seo/GoogleAnalytics";
 import CookieConsent from "@/components/layout/CookieConsent";
 import { OrganizationJsonLd } from "@/components/seo/JsonLd";
 import { createClient } from "@/lib/supabase/server";
+import FloatingWidgets from "@/components/FloatingWidgets";
 
 export default async function RootLayout({
   children,
@@ -133,6 +134,7 @@ export default async function RootLayout({
                {children}
             </DynamicThemeProvider>
           </ConditionalWrapper>
+          <FloatingWidgets />
           <CookieConsent />
         </AuthProvider>
       </body>
