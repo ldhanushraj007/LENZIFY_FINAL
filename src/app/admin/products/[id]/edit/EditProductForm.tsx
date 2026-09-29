@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useMemo } from "react";
+import { useState, useMemo, useRef } from "react";
 import { useFormStatus } from "react-dom";
 import { Package, Tag, Maximize2, Info, Camera, Zap, Save, Layers, Loader2, Cpu, Sun, Laptop } from "lucide-react";
 import { updateProductDirect } from "../../actions";
@@ -132,10 +132,14 @@ export default function EditProductForm({
   const [hasSizeVariants, setHasSizeVariants] = useState(sizes.length > 0);
   const [newColorName, setNewColorName] = useState("");
   const [newColorHex, setNewColorHex] = useState("#000000");
+  const [colorError, setColorError] = useState<string | null>(null);
+  const colorInputRef = useRef<HTMLInputElement>(null);
 
   const [newSizeLabel, setNewSizeLabel] = useState("");
   const [newSizeStock, setNewSizeStock] = useState(10);
   const [newSizeInStock, setNewSizeInStock] = useState(true);
+  const [sizeError, setSizeError] = useState<string | null>(null);
+  const sizeInputRef = useRef<HTMLInputElement>(null);
 
   const initialSpecs = useMemo(() => {
     let s = product.specifications;
@@ -163,12 +167,19 @@ export default function EditProductForm({
   });
 
   const addColor = () => {
-    if (!newColorName.trim()) return;
-    if (colors.some(c => c.name.toLowerCase() === newColorName.trim().toLowerCase())) {
-      alert("Color name must be unique.");
+    const trimmed = newColorName.trim();
+    if (!trimmed) {
+      setColorError("Please type a color name (e.g. Matte Black, Tortoise, etc.)");
+      colorInputRef.current?.focus();
       return;
     }
-    setColors([...colors, { name: newColorName.trim(), hex: newColorHex, image: null }]);
+    if (colors.some(c => c.name.toLowerCase() === trimmed.toLowerCase())) {
+      setColorError(`Color "${trimmed}" is already added.`);
+      colorInputRef.current?.focus();
+      return;
+    }
+    setColorError(null);
+    setColors([...colors, { name: trimmed, hex: newColorHex, image: null }]);
     setNewColorName("");
     setNewColorHex("#000000");
   };
@@ -194,12 +205,19 @@ export default function EditProductForm({
   };
 
   const addSize = () => {
-    if (!newSizeLabel.trim()) return;
-    if (sizes.some(s => s.label.toLowerCase() === newSizeLabel.trim().toLowerCase())) {
-      alert("Size label must be unique.");
+    const trimmed = newSizeLabel.trim();
+    if (!trimmed) {
+      setSizeError("Please enter a size label (e.g. Medium, 48, etc.)");
+      sizeInputRef.current?.focus();
       return;
     }
-    setSizes([...sizes, { label: newSizeLabel.trim(), inStock: newSizeInStock, stockQty: newSizeStock }]);
+    if (sizes.some(s => s.label.toLowerCase() === trimmed.toLowerCase())) {
+      setSizeError(`Size "${trimmed}" is already added.`);
+      sizeInputRef.current?.focus();
+      return;
+    }
+    setSizeError(null);
+    setSizes([...sizes, { label: trimmed, inStock: newSizeInStock, stockQty: Number(newSizeStock) || 0 }]);
     setNewSizeLabel("");
     setNewSizeStock(10);
     setNewSizeInStock(true);
@@ -637,9 +655,11 @@ export default function EditProductForm({
                           <input 
                              type="text" 
                              value={newColorName} 
-                             onChange={(e) => setNewColorName(e.target.value)} 
-                             placeholder="e.g. Matte Black" 
-                             className="w-full bg-white border border-brand-navy/10 px-3 py-2 text-[10px] outline-none" 
+                             ref={colorInputRef}
+                             onKeyDown={(e) => { if (e.key === "Enter") { e.preventDefault(); addColor(); } }}
+                             onChange={(e) => { setNewColorName(e.target.value); if (colorError) setColorError(null); }}
+                             placeholder="Type color name here, e.g. Matte Black" 
+                             className={`w-full bg-white border ${colorError ? 'border-red-500 ring-1 ring-red-400' : 'border-brand-navy/15'} px-3 py-2 text-xs font-sans not-italic text-brand-navy outline-none placeholder:italic placeholder:text-brand-text-muted/60 focus:border-brand-navy`} 
                           />
                        </div>
                        <div className="space-y-1">
@@ -655,6 +675,7 @@ export default function EditProductForm({
                                 type="text" 
                                 value={newColorHex} 
                                 onChange={(e) => setNewColorHex(e.target.value)} 
+                                onKeyDown={(e) => { if (e.key === "Enter") { e.preventDefault(); addColor(); } }}
                                 className="w-20 bg-white border border-brand-navy/10 px-2 py-2 text-[10px] text-center font-mono outline-none" 
                              />
                           </div>

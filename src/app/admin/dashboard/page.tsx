@@ -62,6 +62,13 @@ export default async function AdminDashboardPage() {
         totalCustomers: statsData.totalCustomers,
         lowStockCount: statsData.lowStockCount,
         abandonedCarts: statsData.abandonedCarts,
+        pendingOrders: statsData.pendingOrders,
+        codOrders: statsData.codOrders,
+        todayRevenue: statsData.todayRevenue,
+        todayOrders: statsData.todayOrders,
+        revenueTrend: statsData.revenueTrend,
+        ordersTrend: statsData.ordersTrend,
+        customersTrend: statsData.customersTrend,
       }} />
 
       {/* Quick Actions */}
@@ -86,7 +93,7 @@ export default async function AdminDashboardPage() {
       </div>
 
       {/* Charts */}
-      <DashboardCharts data={statsData.chartData} />
+      <DashboardCharts data7Days={statsData.chartData} data30Days={statsData.chartData30Days} />
 
       {/* Bottom Grid: Recent Orders + Side Panel */}
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
@@ -128,7 +135,7 @@ export default async function AdminDashboardPage() {
                         </p>
                       </td>
                       <td className="px-6 py-3.5 text-sm text-[#333333]">
-                        {(order.users as any)?.name || "Customer"}
+                        {order.customerName || (order.users as any)?.name || "Customer"}
                       </td>
                       <td className="px-6 py-3.5 text-sm font-semibold text-[#111111] text-right">
                         ₹{Number(order.total_price).toLocaleString("en-IN")}

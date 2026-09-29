@@ -160,168 +160,191 @@ export async function updateHomepageSection(key: string, content: any, isActive:
 export async function getDashboardStats() {
   const supabase = await createAdminClient();
 
-  const last7DaysDate = new Date(Date.now() - 7 * 24 * 60 * 60 * 1000).toISOString();
-
-  // Wrap queries individually to prevent missing tables/columns from crashing the dashboard
-  const fetchSalesData = async () => {
-    try {
-      const { data, error } = await supabase.from("orders").select("total_price").eq("payment_status", "paid");
-      if (error) throw error;
-      return data || [];
-    } catch (e: any) {
-      console.error("Error fetching sales data:", e?.message || e);
-      return [];
-    }
-  };
-
-  const fetchTotalOrders = async () => {
-    try {
-      const { count, error } = await supabase.from("orders").select("*", { count: "exact", head: true });
-      if (error) throw error;
-      return count || 0;
-    } catch (e: any) {
-      console.error("Error fetching total orders:", e?.message || e);
-      return 0;
-    }
-  };
-
-  const fetchTotalCustomers = async () => {
-    try {
-      // First check profiles table where user profiles and roles are stored
-      const { count, error } = await supabase.from("profiles").select("*", { count: "exact", head: true });
-      if (!error && count !== null) return count;
-
-      // Fallback to users table
-      const usersRes = await supabase.from("users").select("*", { count: "exact", head: true });
-      if (!usersRes.error && usersRes.count !== null) return usersRes.count;
-
-      return 0;
-    } catch (e: any) {
-      console.error("Error fetching total customers:", e?.message || e);
-      return 0;
-    }
-  };
-
-  const fetchLowStock = async () => {
-    try {
-      const { data, count, error } = await supabase.from("products").select("id, name, stock, brand", { count: "exact" }).lte("stock", 5).limit(5);
-      if (error) throw error;
-      return { data: data || [], count: count || 0 };
-    } catch (e: any) {
-      console.error("Error fetching low stock:", e?.message || e);
-      return { data: [], count: 0 };
-    }
-  };
-
-  const fetchCartUsers = async () => {
-    try {
-      const { data, error } = await supabase.from("cart").select("user_id");
-      if (error) throw error;
-      return data || [];
-    } catch (e: any) {
-      console.error("Error fetching cart users:", e?.message || e);
-      return [];
-    }
-  };
-
-  const fetchRecentOrders = async () => {
-    try {
-      const { data, error } = await supabase.from("orders").select("*, users(name)").order("created_at", { ascending: false }).limit(5);
-      if (error) throw error;
-      return data || [];
-    } catch (e: any) {
-      console.error("Error fetching recent orders:", e?.message || e);
-      return [];
-    }
-  };
-
-  const fetchTopSellingData = async () => {
-    try {
-      const { data, error } = await supabase.from("order_items").select("product_id, quantity, products(name, brand)").limit(10);
-      if (error) throw error;
-      return data || [];
-    } catch (e: any) {
-      console.error("Error fetching top selling data:", e?.message || e);
-      return [];
-    }
-  };
-
-  const fetchTrendOrders = async () => {
-    try {
-      const { data, error } = await supabase.from("orders").select("created_at, total_price, payment_status").gte("created_at", last7DaysDate);
-      if (error) throw error;
-      return data || [];
-    } catch (e: any) {
-      console.error("Error fetching trend orders:", e?.message || e);
-      return [];
-    }
-  };
-
-  const [
-    salesData,
-    totalOrders,
-    totalCustomers,
-    lowStock,
-    cartUsers,
-    recentOrders,
-    topSellingData,
-    trendOrders
-  ] = await Promise.all([
-    fetchSalesData(),
-    fetchTotalOrders(),
-    fetchTotalCustomers(),
-    fetchLowStock(),
-    fetchCartUsers(),
-    fetchRecentOrders(),
-    fetchTopSellingData(),
-    fetchTrendOrders()
-  ]);
-
-  const totalSales = salesData.reduce((acc, curr) => acc + Number(curr.total_price), 0) || 0;
-  
-  const lowStockProducts = lowStock.data;
-  const lowStockCount = lowStock.count;
-  
-  const uniqueCartUsers = new Set(cartUsers.map(c => c.user_id)).size;
-
-  interface ProductSale {
-    name: string;
-    brand: string;
-    sales: number;
+  // 1. Fetch all orders with essential columns using admin client (bypasses RLS)
+  let allOrders: any[] = [];
+  try {
+    const { data, error } = await supabase
+      .from("orders")
+      .select("id, total_price, status, payment_status, payment_method, created_at, user_id")
+      .order("created_at", { ascending: false });
+    if (!error && data) allOrders = data;
+  } catch (e: any) {
+    console.error("Error fetching all orders for dashboard:", e?.message || e);
   }
-  
-  const productSales: Record<string, ProductSale> = {};
-  topSellingData.forEach(item => {
-    const id = item.product_id;
-    if (!productSales[id]) {
-      productSales[id] = { 
-        name: (item.products as any)?.name || "Unknown", 
-        brand: (item.products as any)?.brand || "Lenzify", 
-        sales: 0 
-      };
-    }
-    productSales[id].sales += item.quantity || 0;
-  });
-  
-  const topProducts: ProductSale[] = Object.values(productSales)
-    .sort((a, b) => b.sales - a.sales)
-    .slice(0, 5);
 
-  // 8. Revenue & Order Trends (Last 7 days)
+  // 2. Fetch users map (from auth.admin.listUsers() and fallback to users/profiles)
+  const userMap = new Map<string, { name: string; email: string }>();
+  let totalCustomers = 0;
+  try {
+    const { data: usersData } = await supabase.auth.admin.listUsers();
+    if (usersData?.users) {
+      totalCustomers = usersData.users.length;
+      for (const u of usersData.users) {
+        userMap.set(u.id, {
+          name: u.user_metadata?.full_name || u.user_metadata?.name || u.email?.split("@")[0] || "Customer",
+          email: u.email || "",
+        });
+      }
+    }
+  } catch (e) {
+    const { data: profileUsers, count } = await supabase.from("profiles").select("id, full_name, email", { count: "exact" });
+    if (profileUsers) {
+      totalCustomers = count || profileUsers.length;
+      profileUsers.forEach((p: any) => {
+        userMap.set(p.id, { name: p.full_name || "Customer", email: p.email || "" });
+      });
+    }
+  }
+
+  // 3. Low stock products (stock <= 5)
+  let lowStockProducts: any[] = [];
+  let lowStockCount = 0;
+  try {
+    const { data, count } = await supabase
+      .from("products")
+      .select("id, name, stock, brand", { count: "exact" })
+      .lte("stock", 5)
+      .order("stock", { ascending: true })
+      .limit(5);
+    lowStockProducts = data || [];
+    lowStockCount = count || 0;
+  } catch (e: any) {
+    console.error("Error fetching low stock:", e?.message || e);
+  }
+
+  // 4. Cart Abandonment (active cart sessions)
+  let uniqueCartUsers = 0;
+  try {
+    const { data } = await supabase.from("cart").select("user_id");
+    if (data) {
+      uniqueCartUsers = new Set(data.map((c: any) => c.user_id)).size;
+    }
+  } catch (e) {}
+
+  // 5. Top selling items from order_items
+  let topProducts: { name: string; brand: string; sales: number }[] = [];
+  try {
+    const { data: orderItems } = await supabase
+      .from("order_items")
+      .select("product_id, quantity, products(name, brand)")
+      .limit(50);
+    
+    if (orderItems && orderItems.length > 0) {
+      const salesMap: Record<string, { name: string; brand: string; sales: number }> = {};
+      orderItems.forEach((item: any) => {
+        const pid = item.product_id;
+        if (!salesMap[pid]) {
+          salesMap[pid] = {
+            name: (item.products as any)?.name || "Eyewear Model",
+            brand: (item.products as any)?.brand || "Lenzify",
+            sales: 0
+          };
+        }
+        salesMap[pid].sales += item.quantity || 1;
+      });
+      topProducts = Object.values(salesMap).sort((a, b) => b.sales - a.sales).slice(0, 5);
+    }
+  } catch (e: any) {
+    console.error("Error fetching top products:", e?.message || e);
+  }
+
+  // 6. Metrics aggregation
+  // Real sales: All valid non-cancelled orders (paid online OR active COD orders)
+  const validOrders = allOrders.filter(o => o.status !== "cancelled" && o.status !== "refunded");
+  const totalSales = validOrders.reduce((sum, o) => sum + (Number(o.total_price) || 0), 0);
+  const totalOrders = allOrders.length;
+
+  const pendingOrders = allOrders.filter(o => o.status === "pending" || (o.payment_method === "cod" && o.status === "pending")).length;
+  const codOrders = allOrders.filter(o => o.payment_method === "cod").length;
+
+  // Today's metrics
+  const now = new Date();
+  const todayISO = now.toISOString().split("T")[0];
+  const todayOrdersList = allOrders.filter(o => o.created_at?.startsWith(todayISO));
+  const todayRevenue = todayOrdersList
+    .filter(o => o.status !== "cancelled" && o.status !== "refunded")
+    .reduce((sum, o) => sum + (Number(o.total_price) || 0), 0);
+  const todayOrders = todayOrdersList.length;
+
+  // Real Trends (Last 7 days vs previous 7 days)
+  const msInDay = 24 * 60 * 60 * 1000;
+  const sevenDaysAgo = new Date(now.getTime() - 7 * msInDay);
+  const fourteenDaysAgo = new Date(now.getTime() - 14 * msInDay);
+
+  const last7DaysOrders = validOrders.filter(o => new Date(o.created_at) >= sevenDaysAgo);
+  const prev7DaysOrders = validOrders.filter(o => {
+    const d = new Date(o.created_at);
+    return d >= fourteenDaysAgo && d < sevenDaysAgo;
+  });
+
+  const last7Revenue = last7DaysOrders.reduce((s, o) => s + (Number(o.total_price) || 0), 0);
+  const prev7Revenue = prev7DaysOrders.reduce((s, o) => s + (Number(o.total_price) || 0), 0);
+
+  let revenueTrend = "+0%";
+  if (prev7Revenue > 0) {
+    const pct = Math.round(((last7Revenue - prev7Revenue) / prev7Revenue) * 100);
+    revenueTrend = `${pct >= 0 ? "+" : ""}${pct}%`;
+  } else if (last7Revenue > 0) {
+    revenueTrend = "+100%";
+  } else if (totalSales > 0) {
+    revenueTrend = "Active";
+  } else {
+    revenueTrend = "₹0 this week";
+  }
+
+  let ordersTrend = "+0%";
+  if (prev7DaysOrders.length > 0) {
+    const pct = Math.round(((last7DaysOrders.length - prev7DaysOrders.length) / prev7DaysOrders.length) * 100);
+    ordersTrend = `${pct >= 0 ? "+" : ""}${pct}%`;
+  } else if (last7DaysOrders.length > 0) {
+    ordersTrend = `+${last7DaysOrders.length} this week`;
+  } else if (totalOrders > 0) {
+    ordersTrend = `${totalOrders} all-time`;
+  } else {
+    ordersTrend = "Active";
+  }
+
+  // 7. Recent Orders with real customer names attached
+  const recentOrders = allOrders.slice(0, 5).map(o => {
+    const cust = userMap.get(o.user_id);
+    return {
+      ...o,
+      customerName: cust?.name || (o.users as any)?.name || "Customer",
+      customerEmail: cust?.email || ""
+    };
+  });
+
+  // 8. 7-Day Chart Data
   const last7Days = Array.from({ length: 7 }, (_, i) => {
-    const d = new Date();
-    d.setDate(d.getDate() - i);
-    return d.toISOString().split('T')[0];
-  }).reverse();
+    const d = new Date(now.getTime() - (6 - i) * msInDay);
+    return d.toISOString().split("T")[0];
+  });
 
   const chartData = last7Days.map(date => {
-    const dayOrders = trendOrders.filter(o => o.created_at?.startsWith(date)) || [];
-    const revenue = dayOrders
-      .filter(o => o.payment_status === 'paid')
-      .reduce((acc, curr) => acc + Number(curr.total_price), 0);
-    
+    const dayOrders = allOrders.filter(o => o.created_at?.startsWith(date) && o.status !== "cancelled");
+    const revenue = dayOrders.reduce((acc, curr) => acc + (Number(curr.total_price) || 0), 0);
+    const dateObj = new Date(`${date}T00:00:00`);
     return {
-      date: new Date(date).toLocaleDateString('en-US', { weekday: 'short' }),
+      date: dateObj.toLocaleDateString("en-IN", { weekday: "short" }),
+      fullDate: date,
+      revenue,
+      orders: dayOrders.length
+    };
+  });
+
+  // 9. 30-Day Chart Data (so admin can view longer real timeline)
+  const last30Days = Array.from({ length: 30 }, (_, i) => {
+    const d = new Date(now.getTime() - (29 - i) * msInDay);
+    return d.toISOString().split("T")[0];
+  });
+
+  const chartData30Days = last30Days.map(date => {
+    const dayOrders = allOrders.filter(o => o.created_at?.startsWith(date) && o.status !== "cancelled");
+    const revenue = dayOrders.reduce((acc, curr) => acc + (Number(curr.total_price) || 0), 0);
+    const dateObj = new Date(`${date}T00:00:00`);
+    return {
+      date: dateObj.toLocaleDateString("en-IN", { day: "numeric", month: "short" }),
+      fullDate: date,
       revenue,
       orders: dayOrders.length
     };
@@ -329,14 +352,22 @@ export async function getDashboardStats() {
 
   return {
     totalSales,
-    totalOrders: totalOrders || 0,
-    totalCustomers: totalCustomers || 0,
-    lowStockCount: lowStockCount || 0,
-    abandonedCarts: uniqueCartUsers || 0,
-    lowStockProducts: lowStockProducts || [],
-    recentOrders: recentOrders || [],
+    totalOrders,
+    totalCustomers,
+    lowStockCount,
+    abandonedCarts: uniqueCartUsers,
+    lowStockProducts,
+    recentOrders,
     topProducts,
-    chartData
+    pendingOrders,
+    codOrders,
+    todayRevenue,
+    todayOrders,
+    revenueTrend,
+    ordersTrend,
+    customersTrend: totalCustomers > 0 ? `${totalCustomers} accounts` : "Verified",
+    chartData,
+    chartData30Days
   };
 }
 

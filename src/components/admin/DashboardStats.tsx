@@ -27,6 +27,9 @@ interface StatsProps {
     pendingOrders?: number;
     codOrders?: number;
     onlineOrders?: number;
+    revenueTrend?: string;
+    ordersTrend?: string;
+    customersTrend?: string;
   };
 }
 
@@ -91,18 +94,18 @@ export default function DashboardStats({ initialStats }: StatsProps) {
     {
       label: "Total Revenue",
       value: `₹${(stats.totalSales || 0).toLocaleString("en-IN")}`,
-      subtext: `₹${(stats.todayRevenue || 0).toLocaleString("en-IN")} today`,
+      subtext: stats.todayRevenue ? `₹${stats.todayRevenue.toLocaleString("en-IN")} today` : "All valid orders",
       icon: TrendingUp,
-      trend: "+12.5%",
-      positive: true,
+      trend: stats.revenueTrend || "+0%",
+      positive: !stats.revenueTrend?.startsWith("-"),
       color: "bg-blue-50 text-blue-600",
     },
     {
       label: "Total Orders",
       value: (stats.totalOrders || 0).toString(),
-      subtext: `${stats.todayOrders || 0} orders today`,
+      subtext: stats.todayOrders ? `${stats.todayOrders} orders today` : "Lifetime orders",
       icon: ShoppingCart,
-      trend: "+3.2%",
+      trend: stats.ordersTrend || "Active",
       positive: true,
       color: "bg-emerald-50 text-emerald-600",
     },
@@ -111,17 +114,17 @@ export default function DashboardStats({ initialStats }: StatsProps) {
       value: (stats.totalCustomers || 0).toString(),
       subtext: "Registered accounts",
       icon: Users,
-      trend: "+8.1%",
+      trend: stats.customersTrend || "Verified",
       positive: true,
       color: "bg-purple-50 text-purple-600",
     },
     {
       label: "Pending Orders",
       value: (stats.pendingOrders || 0).toString(),
-      subtext: "Awaiting processing",
+      subtext: "Awaiting fulfillment",
       icon: Package,
-      trend: stats.pendingOrders && stats.pendingOrders > 5 ? "Needs attention" : "On track",
-      positive: !stats.pendingOrders || stats.pendingOrders <= 5,
+      trend: (stats.pendingOrders || 0) > 0 ? "Action needed" : "All clear",
+      positive: !stats.pendingOrders || stats.pendingOrders === 0,
       color: "bg-orange-50 text-orange-600",
     },
     {
@@ -129,7 +132,7 @@ export default function DashboardStats({ initialStats }: StatsProps) {
       value: (stats.codOrders || 0).toString(),
       subtext: "Cash on delivery",
       icon: CreditCard,
-      trend: "Active",
+      trend: (stats.codOrders || 0) > 0 ? `${stats.codOrders} active` : "0 orders",
       positive: true,
       color: "bg-sky-50 text-sky-600",
     },
@@ -138,7 +141,7 @@ export default function DashboardStats({ initialStats }: StatsProps) {
       value: (stats.lowStockCount || 0).toString(),
       subtext: "Products ≤ 5 units",
       icon: AlertTriangle,
-      trend: stats.lowStockCount > 0 ? "Restock needed" : "All stocked",
+      trend: stats.lowStockCount > 0 ? "Restock needed" : "Healthy",
       positive: stats.lowStockCount === 0,
       color: "bg-red-50 text-red-600",
     },
