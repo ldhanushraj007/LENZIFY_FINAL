@@ -91,6 +91,7 @@ export default function CheckoutPage() {
   const [couponApplied, setCouponApplied] = useState("");
   const [couponId, setCouponId] = useState<number | null>(null);
   const [applyingCoupon, setApplyingCoupon] = useState(false);
+  const [isCouponDismissed, setIsCouponDismissed] = useState(false);
 
   const supabase = createClient();
   const router = useRouter();
@@ -323,8 +324,75 @@ export default function CheckoutPage() {
     }
   };
 
-  const handleApplyCoupon = async () => {
-    if (!couponCode.trim()) {
+  const getQualifiedCoupon = (subtotal: number) => {
+    if (subtotal >= 2999) return {
+      code: 'LENZ999',
+      discount: 999,
+      message: 'You qualify for ₹999 off!'
+    };
+    if (subtotal >= 1999) return {
+      code: 'LENZ599', 
+      discount: 599,
+      message: 'You qualify for ₹599 off!'
+    };
+    if (subtotal >= 999) return {
+      code: 'LENZ299',
+      discount: 299,
+      message: 'You qualify for ₹299 off!'
+    };
+    return null;
+  };
+
+  const getNextTierNudge = (subtotal: number) => {
+    if (subtotal < 999) {
+      const diff = 999 - subtotal;
+      return {
+        amountNeeded: diff,
+        discount: 299,
+        code: 'LENZ299',
+        message: `Add ₹${diff.toLocaleString("en-IN")} more to unlock ₹299 off with LENZ299`,
+      };
+    }
+    if (subtotal < 1999) {
+      const diff = 1999 - subtotal;
+      return {
+        amountNeeded: diff,
+        discount: 599,
+        code: 'LENZ599',
+        message: `Add ₹${diff.toLocaleString("en-IN")} more to unlock ₹599 off with LENZ599`,
+      };
+    }
+    if (subtotal < 2999) {
+      const diff = 2999 - subtotal;
+      return {
+        amountNeeded: diff,
+        discount: 999,
+        code: 'LENZ999',
+        message: `Add ₹${diff.toLocaleString("en-IN")} more to unlock ₹999 off with LENZ999`,
+      };
+    }
+    return null;
+  };
+
+  const cartSubtotal = useMemo(() => {
+    return cartItems.reduce(
+      (acc: number, item: any) =>
+        acc + getItemPricing(item).totalPrice,
+      0
+    );
+  }, [cartItems]);
+
+  const qualifiedCoupon = useMemo(() => {
+    return getQualifiedCoupon(cartSubtotal);
+  }, [cartSubtotal]);
+
+  const nextTierNudge = useMemo(() => {
+    return getNextTierNudge(cartSubtotal);
+  }, [cartSubtotal]);
+
+  const handleApplyCoupon = async (codeOverride?: string) => {
+    const code = (typeof codeOverride === "string" ? codeOverride : couponCode).trim();
+    if (!code) {
       toast.error("Enter a coupon code.");
       return;
     }
@@ -334,15 +402,20 @@ export default function CheckoutPage() {
         acc + getItemPricing(item).totalPrice,
       0
     );
-    const result = await applyCoupon(couponCode.trim(), subtotal);
+    const result = await applyCoupon(code, subtotal);
     setApplyingCoupon(false);
     if (result.error) {
-      toast.error(result.error);
+      if (typeof codeOverride === "string") {
+        toast.error("This code is currently unavailable. Please try again later.");
+      } else {
+        toast.error(result.error);
+      }
     } else if (result.success) {
+      setCouponCode(code);
       setCouponDiscount(result.discount!);
-      setCouponApplied(result.description!);
+      setCouponApplied(`${code} applied — ₹${result.discount} saved!`);
       setCouponId(result.coupon_id ?? null);
-      toast.success(`Coupon applied! ${result.description}`);
+      toast.success(`${code} applied — ₹${result.discount} saved!`);
     }
   };
 
@@ -1074,7 +1147,9 @@ export default function CheckoutPage() {
               itemPrescriptions={itemPrescriptions}
               checkoutPrescription={prescription}
               couponCode={couponCode}
-              onCouponCodeChange={setCouponCode}
+              onCouponCodeChange={(val) => {
+                setCouponCode(val);
+              }}
               onApplyCoupon={handleApplyCoupon}
               onRemoveCoupon={() => {
                 setCouponDiscount(0);
@@ -1086,6 +1161,11 @@ export default function CheckoutPage() {
               couponDiscount={couponDiscount}
               applyingCoupon={applyingCoupon}
               showCoupon={true}
+              qualifiedCoupon={qualifiedCoupon}
+              onApplyQualifiedCoupon={(code) => handleApplyCoupon(code)}
+              isCouponDismissed={isCouponDismissed}
+              onDismissCoupon={() => setIsCouponDismissed(true)}
+              nextTierNudge={nextTierNudge}
             />
           </div>
         </div>

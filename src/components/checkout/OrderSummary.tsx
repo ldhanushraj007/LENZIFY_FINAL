@@ -25,13 +25,26 @@ export interface ItemPrescription {
   is_contact_lens?: boolean;
 }
 
+export interface QualifiedCoupon {
+  code: string;
+  discount: number;
+  message: string;
+}
+
+export interface NextTierNudge {
+  amountNeeded: number;
+  discount: number;
+  code: string;
+  message: string;
+}
+
 export interface OrderSummaryProps {
   items: any[];
   itemPrescriptions?: Record<string, ItemPrescription>;
   checkoutPrescription?: ItemPrescription;
   couponCode?: string;
   onCouponCodeChange?: (code: string) => void;
-  onApplyCoupon?: () => void;
+  onApplyCoupon?: (codeToApply?: string) => void;
   onRemoveCoupon?: () => void;
   couponApplied?: string;
   couponDiscount?: number;
@@ -40,6 +53,11 @@ export interface OrderSummaryProps {
   actionButton?: React.ReactNode;
   footerNote?: React.ReactNode;
   className?: string;
+  qualifiedCoupon?: QualifiedCoupon | null;
+  onApplyQualifiedCoupon?: (code: string) => void;
+  isCouponDismissed?: boolean;
+  onDismissCoupon?: () => void;
+  nextTierNudge?: NextTierNudge | null;
 }
 
 export default function OrderSummary({
@@ -57,6 +75,11 @@ export default function OrderSummary({
   actionButton,
   footerNote,
   className,
+  qualifiedCoupon,
+  onApplyQualifiedCoupon,
+  isCouponDismissed = false,
+  onDismissCoupon,
+  nextTierNudge,
 }: OrderSummaryProps) {
   const isContactLensItem = (item: any) => {
     const pType = item.product_type || item.products?.product_type;
@@ -461,7 +484,60 @@ export default function OrderSummary({
 
       {/* Coupon Field */}
       {showCoupon && (
-        <div className="border-t border-[#ECECEC] pt-4 space-y-2.5">
+        <div className="border-t border-[#ECECEC] pt-4 space-y-3">
+          {/* Auto-suggested Qualification Banner */}
+          {!couponApplied && !isCouponDismissed && qualifiedCoupon && (
+            <div className="bg-[#F0FDF4] border-l-4 border-emerald-600 rounded-2xl p-4 shadow-sm space-y-3 transition-all">
+              <div className="flex items-start justify-between gap-2">
+                <div className="space-y-0.5">
+                  <div className="flex items-center gap-1.5 text-emerald-800 font-bold text-sm">
+                    <span>🎉</span>
+                    <span>{qualifiedCoupon.message}</span>
+                  </div>
+                  <p className="text-xs text-emerald-900/80">
+                    Use code <span className="font-mono font-bold text-emerald-950 bg-emerald-100/90 px-1.5 py-0.5 rounded border border-emerald-300/70">{qualifiedCoupon.code}</span> at checkout
+                  </p>
+                </div>
+                {onDismissCoupon && (
+                  <button
+                    type="button"
+                    onClick={onDismissCoupon}
+                    className="text-emerald-700/60 hover:text-emerald-950 p-1 rounded-lg hover:bg-emerald-100/60 transition-colors cursor-pointer"
+                    aria-label="Dismiss coupon banner"
+                  >
+                    <X size={15} />
+                  </button>
+                )}
+              </div>
+              <div className="flex items-center justify-between pt-0.5">
+                <button
+                  type="button"
+                  onClick={() => {
+                    if (onApplyQualifiedCoupon) {
+                      onApplyQualifiedCoupon(qualifiedCoupon.code);
+                    } else if (onApplyCoupon) {
+                      if (onCouponCodeChange) onCouponCodeChange(qualifiedCoupon.code);
+                      onApplyCoupon(qualifiedCoupon.code);
+                    }
+                  }}
+                  disabled={applyingCoupon}
+                  className="bg-[#03173D] hover:bg-[#004AAD] text-white text-xs font-semibold px-4 py-2 rounded-xl transition-all flex items-center gap-1.5 shadow-sm hover:shadow cursor-pointer disabled:opacity-50"
+                >
+                  <span>Apply {qualifiedCoupon.code} →</span>
+                </button>
+                {onDismissCoupon && (
+                  <button
+                    type="button"
+                    onClick={onDismissCoupon}
+                    className="text-xs text-emerald-800/70 hover:text-emerald-950 font-medium px-2 py-1 rounded hover:bg-emerald-100/60 transition-colors cursor-pointer"
+                  >
+                    ✕ Dismiss
+                  </button>
+                )}
+              </div>
+            </div>
+          )}
+
           <p className="text-xs font-semibold uppercase tracking-widest text-[#666666]">
             Discount Coupon
           </p>
@@ -484,7 +560,7 @@ export default function OrderSummary({
             ) : (
               <button
                 type="button"
-                onClick={onApplyCoupon}
+                onClick={() => onApplyCoupon && onApplyCoupon()}
                 disabled={applyingCoupon || !couponCode.trim() || !onApplyCoupon}
                 className="px-4 py-2.5 bg-[#03173D] text-white text-xs font-semibold rounded-xl hover:bg-[#004AAD] transition-all disabled:opacity-40 cursor-pointer"
               >
@@ -493,8 +569,8 @@ export default function OrderSummary({
             )}
           </div>
           {couponApplied && (
-            <div className="flex items-center gap-1.5 text-emerald-600 text-xs font-semibold bg-emerald-50 border border-emerald-200/80 px-2.5 py-1.5 rounded-lg">
-              <Tag size={12} /> {couponApplied} applied
+            <div className="flex items-center gap-1.5 text-emerald-700 text-xs font-semibold bg-emerald-50 border border-emerald-200/80 px-2.5 py-1.5 rounded-lg">
+              <Tag size={12} /> {couponCode ? `${couponCode} applied — ₹${couponDiscount} saved!` : `${couponApplied} applied`}
             </div>
           )}
         </div>
@@ -549,6 +625,14 @@ export default function OrderSummary({
             <span className="font-medium text-[#111111]">₹{gst18Total.toLocaleString("en-IN")}</span>
           </div>
         ) : null}
+
+        {/* Next Tier Incentive Nudge */}
+        {nextTierNudge && (
+          <div className="bg-amber-50/80 border border-amber-200/70 rounded-xl px-3 py-2 text-xs font-medium text-amber-800 flex items-center gap-2">
+            <span className="shrink-0 text-sm">✨</span>
+            <span>{nextTierNudge.message}</span>
+          </div>
+        )}
 
         <div className="flex justify-between text-sm font-semibold">
           <span className="text-[#004AAD]">Delivery</span>
