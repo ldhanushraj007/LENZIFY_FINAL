@@ -13,6 +13,7 @@ import NotificationBell from "./NotificationBell";
 import { useAuth } from "@/components/providers/AuthProvider";
 import { getCart, getWishlist } from "@/lib/db/customer_actions";
 import { resolveProductImage } from "@/lib/image_utils";
+import AnnouncementStrip from "./AnnouncementStrip";
 
 // Mega Menu Content
 const SHOP_CATEGORIES = [
@@ -374,14 +375,18 @@ export default function Navbar() {
     <header
       ref={navRef}
       style={{ maxWidth: "100vw" }}
-      className={cn(
-        "fixed top-0 w-full z-50 transition-all duration-500 print:hidden",
-        isWhiteMode
-          ? "bg-white shadow-[0_2px_20px_rgba(0,0,0,0.08)] py-2.5 md:py-4"
-          : "bg-transparent py-3 md:py-6"
-      )}
+      className="fixed top-0 w-full z-50 transition-all duration-500 print:hidden"
     >
-      <nav className="flex justify-between items-center px-3 sm:px-6 lg:px-12 max-w-screen-2xl mx-auto">
+      <AnnouncementStrip />
+      <div
+        className={cn(
+          "w-full transition-all duration-500",
+          isWhiteMode
+            ? "bg-white shadow-[0_2px_20px_rgba(0,0,0,0.08)] py-2.5 md:py-4"
+            : "bg-transparent py-3 md:py-6"
+        )}
+      >
+        <nav className="flex justify-between items-center px-3 sm:px-6 lg:px-12 max-w-screen-2xl mx-auto">
         <div className="flex items-center gap-4">
           {/* Back Button (Conditional) */}
           {pathname !== "/" && (
@@ -724,6 +729,7 @@ export default function Navbar() {
           </div>
         </div>
       </nav>
+    </div>
 
       {/* Mega Menu Dropdowns (Desktop) */}
       <AnimatePresence>

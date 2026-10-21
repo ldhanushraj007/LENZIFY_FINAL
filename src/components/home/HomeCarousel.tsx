@@ -11,6 +11,7 @@ import {
   AnimatePresence,
 } from "framer-motion";
 import { ChevronDown } from "lucide-react";
+import { createClient } from "@/lib/supabase/client";
 
 // ─── Images ───────────────────────────────────────────────────────────────────
 const FRAMES = [
@@ -440,6 +441,181 @@ function SpectacleBackground() {
   );
 }
 
+// ─── Hero Background Carousel ────────────────────────────────────────────────
+const HERO_BG_IMAGES = [
+  "https://images.unsplash.com/photo-1574258495973-f010dfbb5371?w=1920&q=80",
+  "https://images.unsplash.com/photo-1508296695146-257a814070b4?w=1920&q=80",
+  "https://images.unsplash.com/photo-1494735777773-f0aa8a9d7cd0?w=1920&q=80",
+  "https://images.unsplash.com/photo-1591076482161-42ce6da69f67?w=1920&q=80",
+  "https://images.unsplash.com/photo-1511499767150-a48a237f0083?w=1920&q=80",
+];
+
+function HeroBackgroundCarousel() {
+  const [currentIdx, setCurrentIdx] = useState(0);
+
+  useEffect(() => {
+    const timer = setInterval(() => {
+      setCurrentIdx((prev) => (prev + 1) % HERO_BG_IMAGES.length);
+    }, 3500);
+    return () => clearInterval(timer);
+  }, []);
+
+  return (
+    <div className="absolute inset-0 z-0 overflow-hidden pointer-events-none select-none">
+      <AnimatePresence initial={false}>
+        <motion.div
+          key={currentIdx}
+          initial={{ opacity: 0 }}
+          animate={{ opacity: 1 }}
+          exit={{ opacity: 0 }}
+          transition={{ duration: 0.6, ease: [0.4, 0, 0.2, 1] }}
+          className="absolute inset-0 w-full h-full"
+        >
+          <Image
+            src={HERO_BG_IMAGES[currentIdx]}
+            alt="Lenzify eyewear editorial background"
+            fill
+            priority={currentIdx === 0}
+            loading={currentIdx === 0 ? undefined : "lazy"}
+            className="object-cover object-center transform scale-105"
+            sizes="100vw"
+          />
+        </motion.div>
+      </AnimatePresence>
+
+      {/* Dark gradient overlay for readability across mobile & desktop */}
+      <div
+        className="absolute inset-0 z-10 bg-gradient-to-b from-black/75 via-black/55 to-black/85 md:from-black/65 md:via-black/40 md:to-black/75"
+      />
+    </div>
+  );
+}
+
+// ─── Floating Hero Offer Cards (Glassmorphism) ───────────────────────────────
+interface HeroCoupon {
+  id: string;
+  code: string;
+  title?: string | null;
+  description?: string | null;
+  discount_type: string;
+  discount_value: number;
+  minimum_order_value?: number | null;
+  min_order?: number | null;
+}
+
+function HeroOfferCards() {
+  const [coupons, setCoupons] = useState<HeroCoupon[]>([]);
+  const [copiedCode, setCopiedCode] = useState<string | null>(null);
+
+  useEffect(() => {
+    async function loadActiveCoupons() {
+      try {
+        const supabase = createClient();
+        const now = new Date().toISOString();
+        const { data, error } = await supabase
+          .from("coupons")
+          .select("id, code, title, description, discount_type, discount_value, minimum_order_value, min_order")
+          .eq("is_active", true)
+          .eq("show_on_offers_page", true)
+          .or(`valid_until.is.null,valid_until.gt.${now}`)
+          .order("discount_value", { ascending: false })
+          .limit(3);
+
+        if (!error && data && data.length > 0) {
+          setCoupons(data);
+        } else {
+          setCoupons([]);
+        }
+      } catch {
+        setCoupons([]);
+      }
+    }
+
+    loadActiveCoupons();
+  }, []);
+
+  // Disappear completely if no active coupons exist
+  if (coupons.length === 0) {
+    return null;
+  }
+
+  const handleCopy = (code: string) => {
+    if (typeof navigator !== "undefined" && navigator.clipboard) {
+      navigator.clipboard.writeText(code);
+      setCopiedCode(code);
+      setTimeout(() => setCopiedCode(null), 2000);
+    }
+  };
+
+  return (
+    <div className="w-full max-w-5xl mx-auto px-4 mt-8 md:mt-12 z-20">
+      <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-3 md:gap-4">
+        {coupons.map((coupon, idx) => {
+          const min = coupon.minimum_order_value ?? coupon.min_order ?? 0;
+          const discountLabel =
+            coupon.discount_type === "percentage"
+              ? `${coupon.discount_value}% OFF`
+              : `₹${coupon.discount_value} OFF`;
+
+          return (
+            <motion.div
+              key={coupon.id || coupon.code}
+              initial={{ opacity: 0, y: 20 }}
+              animate={{ opacity: 1, y: 0 }}
+              transition={{
+                duration: 0.5,
+                delay: 0.2 + idx * 0.2,
+                ease: [0.22, 1, 0.36, 1],
+              }}
+              whileHover={{ y: -4, transition: { duration: 0.2 } }}
+              className="relative rounded-[16px] p-4 sm:p-5 flex flex-col justify-between transition-shadow duration-300 border border-white/20 shadow-[0_8px_32px_rgba(0,0,0,0.25)]"
+              style={{
+                background: "rgba(255, 255, 255, 0.12)",
+                backdropFilter: "blur(12px)",
+                WebkitBackdropFilter: "blur(12px)",
+              }}
+            >
+              <div>
+                <div className="flex items-center justify-between gap-2 mb-2">
+                  <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-[10px] font-black tracking-wider uppercase bg-amber-400/20 text-amber-300 border border-amber-400/30">
+                    {coupon.code}
+                  </span>
+                  <button
+                    onClick={() => handleCopy(coupon.code)}
+                    className="text-[10px] font-bold text-white/60 hover:text-white transition-colors cursor-pointer"
+                  >
+                    {copiedCode === coupon.code ? "COPIED!" : "COPY"}
+                  </button>
+                </div>
+
+                <h4 className="text-white text-lg sm:text-xl font-bold tracking-tight">
+                  {coupon.title || discountLabel}
+                </h4>
+
+                <p className="text-white/70 text-xs mt-1 line-clamp-1">
+                  {coupon.description || (min > 0 ? `On orders above ₹${min.toLocaleString("en-IN")}` : "No minimum order")}
+                </p>
+              </div>
+
+              <div className="mt-4 pt-3 border-t border-white/10 flex items-center justify-between">
+                <span className="text-[10px] text-white/50 uppercase tracking-wider font-semibold">
+                  Active Offer
+                </span>
+                <Link
+                  href="/products"
+                  className="px-3 py-1.5 rounded-full text-[10px] font-bold uppercase tracking-wider text-white border border-white/30 hover:bg-white hover:text-black transition-all duration-200"
+                >
+                  Shop Now →
+                </Link>
+              </div>
+            </motion.div>
+          );
+        })}
+      </div>
+    </div>
+  );
+}
+
 // ─── Main Hero ────────────────────────────────────────────────────────────────
 export default function HomeHero() {
   const [mounted, setMounted] = useState(false);
@@ -448,24 +624,27 @@ export default function HomeHero() {
   return (
     <section
       className="relative w-full overflow-hidden"
-      style={{ background: "#FFFFFF" }}
+      style={{ background: "#050B18" }}
     >
+      {/* Background Photography Carousel */}
+      <HeroBackgroundCarousel />
+
       {/* Ambient radial glow */}
       <div
-        className="absolute inset-0 pointer-events-none"
+        className="absolute inset-0 pointer-events-none z-[1]"
         style={{
           background:
-            "radial-gradient(ellipse 70% 50% at 50% 60%, rgba(0,130,255,0.055) 0%, transparent 100%)",
+            "radial-gradient(ellipse 70% 50% at 50% 60%, rgba(0,130,255,0.08) 0%, transparent 100%)",
         }}
       />
 
       {/* Spectacle silhouette background — desktop only */}
-      <div className="hidden md:block">
+      <div className="hidden md:block relative z-[1] pointer-events-none">
         <SpectacleBackground />
       </div>
 
       {/* Content — no flex-1, no min-h-screen: height is always content-driven */}
-      <div className="relative z-10 flex flex-col items-center pt-20 pb-10 md:pt-28 md:pb-16 px-4 sm:px-6">
+      <div className="relative z-10 flex flex-col items-center pt-24 pb-10 md:pt-32 md:pb-16 px-4 sm:px-6">
 
         {/* Typography block */}
         <div className="text-center mb-6 md:mb-12">
@@ -487,16 +666,16 @@ export default function HomeHero() {
               fontSize: "clamp(38px, 7vw, 100px)",
             }}
           >
-            <LetterReveal text="See The"     delay={0.3}  style={{ color: "#111111" }} />
+            <LetterReveal text="See The"     delay={0.3}  style={{ color: "#FFFFFF" }} />
             <LetterReveal text="World"       delay={0.55} style={{ color: "#00AEEF" }} />
-            <LetterReveal text="Differently" delay={0.82} style={{ color: "#111111" }} />
+            <LetterReveal text="Differently" delay={0.82} style={{ color: "#FFFFFF" }} />
           </h1>
 
           <motion.p
             initial={{ opacity: 0 }}
             animate={{ opacity: 1 }}
             transition={{ duration: 1, delay: 1.4 }}
-            className="text-[#666666] text-sm leading-relaxed max-w-xs sm:max-w-md mx-auto mb-6 md:mb-8 font-medium"
+            className="text-white/80 text-sm leading-relaxed max-w-xs sm:max-w-md mx-auto mb-6 md:mb-8 font-medium"
           >
             Premium eyewear crafted for vision, style, and everyday comfort.
           </motion.p>
@@ -510,9 +689,9 @@ export default function HomeHero() {
               href="/products"
               className="inline-block px-8 py-3.5 text-[11px] font-black uppercase tracking-[0.3em] rounded-full transition-all duration-300 hover:scale-105 text-center whitespace-nowrap"
               style={{
-                background: "#111111",
-                color: "#FFFFFF",
-                boxShadow: "0 8px 24px rgba(0,0,0,0.14)",
+                background: "#FFFFFF",
+                color: "#111111",
+                boxShadow: "0 8px 24px rgba(255,255,255,0.22)",
               }}
             >
               Shop Collection
@@ -530,6 +709,9 @@ export default function HomeHero() {
           {mounted && <SolitaireStack />}
         </motion.div>
 
+        {/* Floating Offer Cards (conditional on active coupons in DB) */}
+        {mounted && <HeroOfferCards />}
+
         {/* Scroll indicator — always inline, never absolute */}
         <motion.button
           suppressHydrationWarning
@@ -539,7 +721,7 @@ export default function HomeHero() {
           animate={{ opacity: 1 }}
           transition={{ delay: 2.4 }}
         >
-          <span className="text-[9px] font-black uppercase tracking-[0.45em]" style={{ color: "rgba(0,0,0,0.22)" }}>
+          <span className="text-[9px] font-black uppercase tracking-[0.45em]" style={{ color: "rgba(255,255,255,0.5)" }}>
             Scroll
           </span>
           <motion.div animate={{ y: [0, 7, 0] }} transition={{ duration: 1.4, repeat: Infinity }}>
