@@ -29,14 +29,63 @@ function CartPageContent() {
   const buyNow = searchParams.get("buyNow");
 
   // Coupon state
+  const { appliedCoupon, setAppliedCoupon, removeAppliedCoupon } = useCartStore();
   const [couponCode, setCouponCode] = useState("");
   const [couponDiscount, setCouponDiscount] = useState(0);
   const [couponApplied, setCouponApplied] = useState("");
   const [couponId, setCouponId] = useState<number | null>(null);
   const [applyingCoupon, setApplyingCoupon] = useState(false);
 
-  const handleApplyCoupon = async () => {
-    if (!couponCode.trim()) {
+  // Auto-apply or restore coupon from cartStore / sessionStorage
+  useEffect(() => {
+    if (items.length === 0) return;
+
+    const subtotal = items.reduce(
+      (acc: number, item: any) => acc + getItemPricing(item).totalPrice,
+      0
+    );
+
+    const pendingCode =
+      sessionStorage.getItem("lenzify_pending_coupon") ||
+      appliedCoupon?.code;
+
+    if (pendingCode && !couponApplied) {
+      applyCoupon(pendingCode, subtotal, items).then((result) => {
+        if (result.success) {
+          setCouponCode(pendingCode);
+          setCouponDiscount(result.discount!);
+          setCouponApplied(result.message || `${pendingCode} applied — ₹${result.discount} saved! ✓`);
+          setCouponId(result.coupon_id ?? null);
+          setAppliedCoupon({
+            code: pendingCode,
+            discount: result.discount!,
+            coupon_id: result.coupon_id,
+            description: result.description,
+            message: result.message,
+          });
+          toast.success(result.message || `${pendingCode} applied — ₹${result.discount} saved!`);
+        }
+      });
+    } else if (appliedCoupon && couponApplied) {
+      // Re-verify subtotal or category
+      applyCoupon(appliedCoupon.code, subtotal, items).then((res) => {
+        if (!res.success) {
+          toast.error(res.error || "Coupon no longer qualifies for this cart.");
+          removeAppliedCoupon();
+          setCouponDiscount(0);
+          setCouponApplied("");
+          setCouponCode("");
+          setCouponId(null);
+        } else {
+          setCouponDiscount(res.discount!);
+        }
+      });
+    }
+  }, [items]);
+
+  const handleApplyCoupon = async (codeOverride?: string) => {
+    const code = (typeof codeOverride === "string" ? codeOverride : couponCode).trim();
+    if (!code) {
       toast.error("Enter a coupon code.");
       return;
     }
@@ -46,15 +95,23 @@ function CartPageContent() {
         acc + getItemPricing(item).totalPrice,
       0
     );
-    const result = await applyCoupon(couponCode.trim(), subtotal);
+    const result = await applyCoupon(code, subtotal, items);
     setApplyingCoupon(false);
     if (result.error) {
       toast.error(result.error);
     } else if (result.success) {
+      setCouponCode(code.toUpperCase());
       setCouponDiscount(result.discount!);
-      setCouponApplied(result.description!);
+      setCouponApplied(result.message || `${result.code} applied — ₹${result.discount} saved! ✓`);
       setCouponId(result.coupon_id ?? null);
-      toast.success(`Coupon applied! ${result.description}`);
+      setAppliedCoupon({
+        code: result.code!,
+        discount: result.discount!,
+        coupon_id: result.coupon_id,
+        description: result.description,
+        message: result.message,
+      });
+      toast.success(result.message || `${result.code} applied!`);
     }
   };
 
@@ -656,6 +713,7 @@ function CartPageContent() {
                 onCouponCodeChange={setCouponCode}
                 onApplyCoupon={handleApplyCoupon}
                 onRemoveCoupon={() => {
+                  removeAppliedCoupon();
                   setCouponDiscount(0);
                   setCouponApplied("");
                   setCouponCode("");

@@ -264,6 +264,37 @@ export default function CheckoutPage() {
           setSelectedItemTab(String(firstRxItem.database_id || firstRxItem.id || firstRxItem.product_id));
         }
 
+        // Restore applied coupon from cart / session
+        const currentSubtotal = cart.reduce(
+          (acc: number, item: any) => acc + getItemPricing(item).totalPrice,
+          0
+        );
+        const storeCoupon = useCartStore.getState().appliedCoupon;
+        const sessionCouponRaw = sessionStorage.getItem("lenzify_applied_coupon");
+        let initialCode = storeCoupon?.code || "";
+        if (!initialCode && sessionCouponRaw) {
+          try {
+            const p = JSON.parse(sessionCouponRaw);
+            initialCode = p.code || "";
+          } catch {
+            initialCode = sessionCouponRaw;
+          }
+        }
+        if (!initialCode) {
+          initialCode = sessionStorage.getItem("lenzify_pending_coupon") || "";
+        }
+
+        if (initialCode) {
+          applyCoupon(initialCode, currentSubtotal, cart).then((res) => {
+            if (res.success) {
+              setCouponCode(initialCode);
+              setCouponDiscount(res.discount!);
+              setCouponApplied(res.message || `${initialCode} applied — ₹${res.discount} saved!`);
+              setCouponId(res.coupon_id ?? null);
+            }
+          });
+        }
+
         setLoading(false);
       };
       init();
@@ -402,20 +433,23 @@ export default function CheckoutPage() {
         acc + getItemPricing(item).totalPrice,
       0
     );
-    const result = await applyCoupon(code, subtotal);
+    const result = await applyCoupon(code, subtotal, cartItems);
     setApplyingCoupon(false);
     if (result.error) {
-      if (typeof codeOverride === "string") {
-        toast.error("This code is currently unavailable. Please try again later.");
-      } else {
-        toast.error(result.error);
-      }
+      toast.error(result.error);
     } else if (result.success) {
-      setCouponCode(code);
+      setCouponCode(result.code!);
       setCouponDiscount(result.discount!);
-      setCouponApplied(`${code} applied — ₹${result.discount} saved!`);
+      setCouponApplied(result.message || `${result.code} applied — ₹${result.discount} saved!`);
       setCouponId(result.coupon_id ?? null);
-      toast.success(`${code} applied — ₹${result.discount} saved!`);
+      useCartStore.getState().setAppliedCoupon({
+        code: result.code!,
+        discount: result.discount!,
+        coupon_id: result.coupon_id,
+        description: result.description,
+        message: result.message,
+      });
+      toast.success(result.message || `${result.code} applied — ₹${result.discount} saved!`);
     }
   };
 
@@ -489,7 +523,30 @@ export default function CheckoutPage() {
     }
     setOrderProcessing(true);
 
-    const gstBreakdown = calculateCartGST(cartItems, couponDiscount);
+    // Re-validate coupon at order placement time
+    let finalDiscount = couponDiscount;
+    let finalCode = couponApplied ? couponCode : undefined;
+    if (couponApplied && couponCode) {
+      const subtotal = cartItems.reduce(
+        (acc: number, item: any) => acc + getItemPricing(item).totalPrice,
+        0
+      );
+      const reval = await applyCoupon(couponCode, subtotal, cartItems);
+      if (!reval.success) {
+        toast.error(reval.error || "The applied coupon is no longer valid. It has been removed.");
+        setCouponDiscount(0);
+        setCouponApplied("");
+        setCouponCode("");
+        setCouponId(null);
+        useCartStore.getState().removeAppliedCoupon();
+        setOrderProcessing(false);
+        return;
+      }
+      finalDiscount = reval.discount!;
+      finalCode = reval.code;
+    }
+
+    const gstBreakdown = calculateCartGST(cartItems, finalDiscount);
     const totalAmount = gstBreakdown.grandTotal;
 
     // Helper to resolve prescription payload per item
@@ -618,12 +675,15 @@ export default function CheckoutPage() {
               address: addressData,
               prescription: prescription.left_eye || prescription.file_url ? prescription : undefined,
               payment: { id: response.razorpay_payment_id, method: "razorpay" },
+              coupon_code: finalCode,
+              discount_amount: finalDiscount,
             });
 
             if (orderRes.success) {
-              if (couponId) await incrementCouponUsage(couponId);
-              // Purge session prescription cache on successful payment
+              // Purge session prescription & coupon caches
               sessionStorage.removeItem(RX_SESSION_KEY);
+              sessionStorage.removeItem("lenzify_applied_coupon");
+              sessionStorage.removeItem("lenzify_pending_coupon");
               useCartStore.getState().clearCart();
               router.push(`/orders/success?id=${orderRes.order_id}`);
             } else {
@@ -1156,6 +1216,7 @@ export default function CheckoutPage() {
                 setCouponApplied("");
                 setCouponCode("");
                 setCouponId(null);
+                useCartStore.getState().removeAppliedCoupon();
               }}
               couponApplied={couponApplied}
               couponDiscount={couponDiscount}

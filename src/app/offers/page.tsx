@@ -1,11 +1,11 @@
 "use client";
 
 import { useEffect, useState, Suspense } from "react";
-import { useSearchParams } from "next/navigation";
+import { useSearchParams, useRouter } from "next/navigation";
 import { getOffersData } from "./actions";
 import ProductCard from "@/components/store/ProductCard";
 import { motion, AnimatePresence } from "framer-motion";
-import { Copy, Ticket, Percent, ShoppingBag, Tag, Zap, Lock } from "lucide-react";
+import { Copy, Check, ArrowRight, Tag, Zap, Lock, Sparkles } from "lucide-react";
 import { toast } from "react-hot-toast";
 import { cn } from "@/lib/utils";
 import Link from "next/link";
@@ -16,13 +16,26 @@ const FILTER_TABS = [
   { value: "seasonal-sales", label: "Seasonal Sales" },
 ];
 
+const APPLIES_TO_MAP: Record<string, string> = {
+  all: "All Products",
+  eyeglasses: "Eyeglasses",
+  sunglasses: "Sunglasses",
+  "contact-lens": "Contact Lenses",
+  "computer-glasses": "Computer Glasses",
+  "reading-glasses": "Reading Glasses",
+  lenses: "Prescription Lenses",
+  accessories: "Accessories",
+};
+
 function OffersContent() {
   const searchParams = useSearchParams();
+  const router = useRouter();
   const type = searchParams.get("type") || "discounts";
 
   const [items, setItems] = useState<any[]>([]);
   const [isAuthenticated, setIsAuthenticated] = useState<boolean | null>(null);
   const [loading, setLoading] = useState(true);
+  const [copiedCode, setCopiedCode] = useState<string | null>(null);
 
   useEffect(() => {
     async function fetchData() {
@@ -37,10 +50,21 @@ function OffersContent() {
 
   const copyToClipboard = (code: string) => {
     navigator.clipboard.writeText(code);
-    toast.success(`Copied: ${code}`);
+    setCopiedCode(code);
+    toast.success(`Coupon code ${code} copied!`);
+    setTimeout(() => {
+      setCopiedCode((current) => (current === code ? null : current));
+    }, 2000);
   };
 
-  const activeTab = FILTER_TABS.find(t => t.value === type) || FILTER_TABS[0];
+  const handleApplyToCart = (code: string) => {
+    sessionStorage.setItem("lenzify_pending_coupon", code);
+    sessionStorage.setItem("lenzify_applied_coupon", code);
+    toast.success(`${code} selected! Redirecting to shop...`);
+    router.push("/products");
+  };
+
+  const activeTab = FILTER_TABS.find((t) => t.value === type) || FILTER_TABS[0];
 
   return (
     <div className="bg-[#F8F9FC] min-h-screen">
@@ -49,7 +73,9 @@ function OffersContent() {
         <div className="max-w-6xl mx-auto text-center">
           <div className="inline-flex items-center gap-2 bg-white/10 rounded-full px-4 py-1.5 mb-6">
             <Zap size={14} className="text-yellow-300" />
-            <span className="text-xs font-semibold uppercase tracking-widest text-white/80">Limited Time</span>
+            <span className="text-xs font-semibold uppercase tracking-widest text-white/80">
+              Limited Time
+            </span>
           </div>
           <h1 className="text-5xl md:text-6xl font-[var(--font-hero)] italic text-white mb-4">
             Exclusive Offers
@@ -62,35 +88,41 @@ function OffersContent() {
 
       <div className="max-w-6xl mx-auto px-6 lg:px-12 py-10">
         {/* Filter Tabs */}
-        <div className="bg-[#F8F9FC] border border-[#ECECEC] rounded-2xl p-1.5 inline-flex gap-1 mb-10">
-          {FILTER_TABS.map(tab => (
-            <Link
-              key={tab.value}
-              href={`/offers?type=${tab.value}`}
-              className={cn(
-                "px-5 py-2.5 rounded-xl text-sm font-semibold transition-all",
-                type === tab.value
-                  ? "bg-white border border-[#ECECEC] text-[#111111] shadow-sm"
-                  : "text-[#666666] hover:text-[#111111]"
-              )}
-            >
-              {tab.label}
-            </Link>
-          ))}
+        <div className="w-full overflow-x-auto no-scrollbar pb-2 mb-8">
+          <div className="bg-[#F8F9FC] border border-[#ECECEC] rounded-2xl p-1.5 inline-flex gap-1 shrink-0">
+            {FILTER_TABS.map((tab) => (
+              <Link
+                key={tab.value}
+                href={`/offers?type=${tab.value}`}
+                className={cn(
+                  "px-4 sm:px-5 py-2.5 rounded-xl text-xs sm:text-sm font-semibold whitespace-nowrap transition-all",
+                  type === tab.value
+                    ? "bg-white border border-[#ECECEC] text-[#111111] shadow-sm"
+                    : "text-[#666666] hover:text-[#111111]"
+                )}
+              >
+                {tab.label}
+              </Link>
+            ))}
+          </div>
         </div>
 
         {/* Section label */}
-        <div className="mb-6">
+        <div className="mb-8">
           <p className="text-xs font-semibold uppercase tracking-widest text-[#004AAD] mb-1">
             {activeTab.label}
           </p>
           <h2 className="text-3xl font-[var(--font-hero)] italic text-[#111111]">
-            {type === "coupons" ? "Active Coupon Codes" : type === "discounts" ? "On-Sale Products" : "Seasonal Deals"}
+            {type === "coupons"
+              ? "Active Coupon Codes"
+              : type === "discounts"
+              ? "On-Sale Products"
+              : "Seasonal Deals"}
           </h2>
         </div>
 
         {/* Loading / Auth Check */}
-        {!loading && isAuthenticated === false ? (
+        {!loading && isAuthenticated === false && type !== "coupons" ? (
           <div className="bg-white rounded-3xl border border-[#ECECEC] shadow-[0_10px_30px_rgba(0,0,0,0.05)] p-12 sm:p-16 text-center max-w-lg mx-auto my-8">
             <div className="w-16 h-16 bg-[#004AAD]/10 rounded-full flex items-center justify-center mx-auto mb-5 border border-[#004AAD]/20">
               <Lock size={26} className="text-[#004AAD]" />
@@ -102,7 +134,7 @@ function OffersContent() {
               Sign In to Unlock Offers
             </h3>
             <p className="text-[#666666] text-sm mb-8 leading-relaxed">
-              Coupon codes, special promotional pricing, and seasonal discounts are reserved exclusively for registered Lenzify members.
+              Special promotional pricing and seasonal discounts are reserved exclusively for registered Lenzify members.
             </p>
             <Link
               href="/auth/login?redirect=/offers"
@@ -112,19 +144,30 @@ function OffersContent() {
             </Link>
           </div>
         ) : loading ? (
-          <div className={cn(
-            "grid gap-6",
-            type === "coupons" ? "grid-cols-1 md:grid-cols-2 lg:grid-cols-3" : "grid-cols-2 md:grid-cols-3 lg:grid-cols-4"
-          )}>
+          <div
+            className={cn(
+              "grid gap-6",
+              type === "coupons"
+                ? "grid-cols-1 md:grid-cols-2 lg:grid-cols-3"
+                : "grid-cols-2 md:grid-cols-3 lg:grid-cols-4"
+            )}
+          >
             {Array.from({ length: type === "coupons" ? 3 : 8 }).map((_, i) => (
-              <div key={i} className="bg-white rounded-3xl border border-[#ECECEC] animate-pulse h-48" />
+              <div
+                key={i}
+                className="bg-white rounded-3xl border border-[#ECECEC] animate-pulse h-56"
+              />
             ))}
           </div>
         ) : items.length > 0 ? (
-          <div className={cn(
-            "grid gap-6",
-            type === "coupons" ? "grid-cols-1 md:grid-cols-2 lg:grid-cols-3" : "grid-cols-2 md:grid-cols-3 lg:grid-cols-4"
-          )}>
+          <div
+            className={cn(
+              "grid gap-6",
+              type === "coupons"
+                ? "grid-cols-1 md:grid-cols-2 lg:grid-cols-3"
+                : "grid-cols-2 md:grid-cols-3 lg:grid-cols-4"
+            )}
+          >
             <AnimatePresence mode="popLayout">
               {items.map((item, i) => (
                 <motion.div
@@ -132,50 +175,99 @@ function OffersContent() {
                   initial={{ opacity: 0, y: 20 }}
                   animate={{ opacity: 1, y: 0 }}
                   transition={{ delay: i * 0.05 }}
+                  className="h-full"
                 >
                   {type === "coupons" ? (
-                    /* Coupon Card */
-                    <div className="bg-white rounded-3xl border border-[#ECECEC] shadow-[0_10px_30px_rgba(0,0,0,0.05)] p-6 flex flex-col h-full hover:-translate-y-1 hover:shadow-[0_20px_50px_rgba(0,0,0,0.10)] transition-all duration-300">
-                      <div className="flex items-start justify-between mb-4">
-                        <div className="w-10 h-10 bg-[#004AAD]/10 rounded-xl flex items-center justify-center">
-                          <Percent size={18} className="text-[#004AAD]" />
-                        </div>
-                        <span className="bg-[#004AAD]/10 text-[#004AAD] text-xs font-bold uppercase rounded-full px-3 py-1">
-                          Valid
-                        </span>
-                      </div>
+                    /* Customer Coupon Card matching exact specification */
+                    <div className="bg-white rounded-3xl border border-[#ECECEC] shadow-[0_10px_30px_rgba(0,0,0,0.05)] p-6 sm:p-7 flex flex-col justify-between h-full hover:-translate-y-1 hover:shadow-[0_20px_50px_rgba(0,0,0,0.10)] transition-all duration-300 relative overflow-hidden group">
+                      {/* Top Row: Code & Copy Code */}
+                      <div>
+                        <div className="flex items-center justify-between gap-3 mb-4">
+                          <div className="flex items-center gap-2">
+                            <span className="font-mono text-xl sm:text-2xl font-black text-[#03173D] tracking-wider uppercase">
+                              {item.code}
+                            </span>
+                          </div>
 
-                      <div className="flex-1">
-                        <p className="text-4xl font-bold text-[#03173D] mb-2">
-                          {item.discount_type === "flat"
-                            ? `₹${item.discount_value} OFF`
-                            : `${item.discount_value}% OFF`}
-                        </p>
-                        <p className="text-[#666666] text-sm leading-relaxed">
-                          {item.description || `Valid on orders above ₹${item.min_order_value || 0}`}
-                        </p>
-                        {item.expiry_date && (
-                          <p className="text-xs text-[#666666] mt-2">
-                            Valid till{" "}
-                            {new Date(item.expiry_date).toLocaleDateString("en-IN", {
-                              day: "numeric",
-                              month: "short",
-                              year: "numeric",
-                            })}
+                          <button
+                            type="button"
+                            onClick={() => copyToClipboard(item.code)}
+                            className={cn(
+                              "inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full text-xs font-bold transition-all cursor-pointer border",
+                              copiedCode === item.code
+                                ? "bg-emerald-50 text-emerald-700 border-emerald-300"
+                                : "bg-[#F8F9FC] text-[#03173D] border-[#ECECEC] hover:bg-[#03173D] hover:text-white"
+                            )}
+                          >
+                            {copiedCode === item.code ? (
+                              <>
+                                <Check size={13} className="text-emerald-600" />
+                                <span>Copied!</span>
+                              </>
+                            ) : (
+                              <>
+                                <Copy size={13} />
+                                <span>Copy Code</span>
+                              </>
+                            )}
+                          </button>
+                        </div>
+
+                        {/* Title / Description / Savings */}
+                        <div className="space-y-1.5 mb-5">
+                          <p className="font-bold text-base text-[#111111] leading-snug">
+                            {item.title ||
+                              (item.discount_type === "percentage"
+                                ? `Save ${item.discount_value}% on orders above ₹${item.minimum_order_value || item.min_order || 0}`
+                                : `Save ₹${item.discount_value} on orders above ₹${item.minimum_order_value || item.min_order || 0}`)}
                           </p>
-                        )}
+                          {item.description && (
+                            <p className="text-xs text-[#666666] leading-relaxed">
+                              {item.description}
+                            </p>
+                          )}
+                        </div>
+
+                        {/* Meta info: Valid till & Applies to */}
+                        <div className="space-y-1.5 text-xs text-[#555555] mb-6 pt-3 border-t border-[#F0F0F0]">
+                          <div className="flex items-center justify-between">
+                            <span className="text-[#888888]">Valid till:</span>
+                            <span className="font-medium text-[#111111]">
+                              {item.valid_until || item.expiry
+                                ? new Date(item.valid_until || item.expiry).toLocaleDateString(
+                                    "en-IN",
+                                    {
+                                      day: "2-digit",
+                                      month: "short",
+                                      year: "numeric",
+                                    }
+                                  )
+                                : "No expiry"}
+                            </span>
+                          </div>
+                          <div className="flex items-center justify-between">
+                            <span className="text-[#888888]">Applies to:</span>
+                            <span className="font-medium text-[#111111]">
+                              {APPLIES_TO_MAP[item.applicable_to] ||
+                                item.applicable_to ||
+                                "All Products"}
+                            </span>
+                          </div>
+                        </div>
                       </div>
 
-                      <div className="mt-5 pt-5 border-t border-[#ECECEC]">
-                        <div className="flex items-center justify-between mb-3">
-                          <span className="text-xs font-semibold text-[#666666] uppercase tracking-widest">Code</span>
-                          <span className="font-mono font-bold text-[#111111] text-sm">{item.code}</span>
-                        </div>
+                      {/* Bottom Button: Apply to Cart -> */}
+                      <div className="pt-4 border-t border-[#ECECEC]">
                         <button
-                          onClick={() => copyToClipboard(item.code)}
-                          className="w-full bg-[#03173D] text-white rounded-full py-2.5 text-sm font-semibold hover:bg-[#004AAD] transition-all flex items-center justify-center gap-2"
+                          type="button"
+                          onClick={() => handleApplyToCart(item.code)}
+                          className="w-full bg-[#03173D] text-white hover:bg-[#004AAD] rounded-full py-3 px-5 text-xs sm:text-sm font-bold tracking-wide transition-all shadow-md flex items-center justify-center gap-2 cursor-pointer group-hover:shadow-lg"
                         >
-                          <Copy size={14} /> Copy Code
+                          <span>Apply to Cart</span>
+                          <ArrowRight
+                            size={15}
+                            className="transition-transform group-hover:translate-x-1"
+                          />
                         </button>
                       </div>
                     </div>
@@ -192,7 +284,9 @@ function OffersContent() {
             <div className="w-16 h-16 bg-[#F8F9FC] rounded-full flex items-center justify-center mx-auto mb-5 border border-[#ECECEC]">
               <Tag size={24} className="text-[#004AAD]/30" />
             </div>
-            <h3 className="text-xl font-[var(--font-hero)] italic text-[#111111] mb-2">No offers right now</h3>
+            <h3 className="text-xl font-[var(--font-hero)] italic text-[#111111] mb-2">
+              No offers right now
+            </h3>
             <p className="text-[#666666] text-sm mb-6">
               Check back soon — new deals are added regularly.
             </p>

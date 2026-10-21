@@ -547,13 +547,13 @@ export default function OrderSummary({
               onChange={(e) => onCouponCodeChange && onCouponCodeChange(e.target.value.toUpperCase())}
               placeholder="ENTER PROMO CODE"
               disabled={!!couponApplied || !onCouponCodeChange}
-              className="flex-1 bg-[#F8F9FC] border border-[#E8EAF2] rounded-xl px-3.5 py-2.5 text-[#111111] text-xs font-semibold uppercase tracking-wider focus:border-[#004AAD] focus:ring-2 focus:ring-[#004AAD]/10 outline-none disabled:opacity-60 transition-all"
+              className="flex-1 min-w-0 bg-[#F8F9FC] border border-[#E8EAF2] rounded-xl px-3.5 py-2.5 text-[#111111] text-xs font-semibold uppercase tracking-wider focus:border-[#004AAD] focus:ring-2 focus:ring-[#004AAD]/10 outline-none disabled:opacity-60 transition-all"
             />
             {couponApplied ? (
               <button
                 type="button"
                 onClick={onRemoveCoupon}
-                className="px-3 py-2.5 bg-red-50 text-red-500 text-xs font-semibold border border-red-200 rounded-xl hover:bg-red-100 transition-all flex items-center gap-1 cursor-pointer"
+                className="shrink-0 px-3 py-2.5 bg-red-50 text-red-500 text-xs font-semibold border border-red-200 rounded-xl hover:bg-red-100 transition-all flex items-center gap-1 cursor-pointer min-h-[40px]"
               >
                 <X size={12} /> Remove
               </button>
@@ -562,7 +562,7 @@ export default function OrderSummary({
                 type="button"
                 onClick={() => onApplyCoupon && onApplyCoupon()}
                 disabled={applyingCoupon || !couponCode.trim() || !onApplyCoupon}
-                className="px-4 py-2.5 bg-[#03173D] text-white text-xs font-semibold rounded-xl hover:bg-[#004AAD] transition-all disabled:opacity-40 cursor-pointer"
+                className="shrink-0 px-4 py-2.5 bg-[#03173D] text-white text-xs font-semibold rounded-xl hover:bg-[#004AAD] transition-all disabled:opacity-40 cursor-pointer min-h-[40px]"
               >
                 {applyingCoupon ? "..." : "Apply"}
               </button>

@@ -14,6 +14,8 @@ export async function placeOrder(data: {
   address: any;
   prescription?: any;
   payment: { id: string; method: string };
+  coupon_code?: string;
+  discount_amount?: number;
 }) {
   const supabase = await createClient();
   const { data: { user } } = await supabase.auth.getUser();
@@ -48,12 +50,34 @@ export async function placeOrder(data: {
       status: 'confirmed',
       payment_status: data.payment.method === 'cod' ? 'pending' : 'paid',
       payment_method: data.payment.method,
-      address_id: address.id
+      address_id: address.id,
+      coupon_code: data.coupon_code || null,
+      discount_amount: data.discount_amount || 0,
     })
     .select("id")
     .single();
 
   if (orderError) return { error: "Order initialization failure: " + orderError.message };
+
+  // Increment coupon usage count
+  if (data.coupon_code) {
+    try {
+      const codeClean = data.coupon_code.trim().toUpperCase();
+      const { data: c } = await adminSupabase
+        .from("coupons")
+        .select("id, usage_count")
+        .eq("code", codeClean)
+        .single();
+      if (c) {
+        await adminSupabase
+          .from("coupons")
+          .update({ usage_count: (c.usage_count || 0) + 1 })
+          .eq("id", c.id);
+      }
+    } catch (couponErr) {
+      console.error("[ORDER] Coupon usage increment failure:", couponErr);
+    }
+  }
 
   // 3. Create Order Items
   const orderItems = data.items.map(item => ({
