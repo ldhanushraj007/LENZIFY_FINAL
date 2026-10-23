@@ -118,7 +118,13 @@ export default function CouponManager({ initialCoupons }: CouponManagerProps) {
     setDescription(coupon.description || "");
     setDiscountType(coupon.discount_type || "flat");
     setDiscountValue(String(coupon.discount_value ?? ""));
-    setMinOrder(String(coupon.minimum_order_value ?? coupon.min_order ?? 0));
+    setMinOrder(
+      String(
+        coupon.minimum_order_value && coupon.minimum_order_value > 0
+          ? coupon.minimum_order_value
+          : coupon.min_order || 0
+      )
+    );
     setAppliesTo(coupon.applicable_to || "all");
 
     if (coupon.valid_from) {
@@ -715,7 +721,11 @@ export default function CouponManager({ initialCoupons }: CouponManagerProps) {
                         Min. Order
                       </span>
                       <span className="font-mono font-bold text-brand-navy text-xs">
-                        ₹{(c.minimum_order_value ?? c.min_order ?? 0).toLocaleString("en-IN")}
+                        ₹{(
+                          c.minimum_order_value && c.minimum_order_value > 0
+                            ? c.minimum_order_value
+                            : c.min_order || 0
+                        ).toLocaleString("en-IN")}
                       </span>
                     </div>
 
@@ -909,7 +919,11 @@ export default function CouponManager({ initialCoupons }: CouponManagerProps) {
 
                         {/* Min Order */}
                         <td className="py-4 px-4 whitespace-nowrap font-mono text-brand-navy/80">
-                          ₹{(c.minimum_order_value ?? c.min_order ?? 0).toLocaleString("en-IN")}
+                          ₹{(
+                            c.minimum_order_value && c.minimum_order_value > 0
+                              ? c.minimum_order_value
+                              : c.min_order || 0
+                          ).toLocaleString("en-IN")}
                         </td>
 
                         {/* Applies To */}

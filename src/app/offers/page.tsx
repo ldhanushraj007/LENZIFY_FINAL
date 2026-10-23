@@ -216,10 +216,21 @@ function OffersContent() {
                         {/* Title / Description / Savings */}
                         <div className="space-y-1.5 mb-5">
                           <p className="font-bold text-base text-[#111111] leading-snug">
-                            {item.title ||
-                              (item.discount_type === "percentage"
-                                ? `Save ${item.discount_value}% on orders above ₹${item.minimum_order_value || item.min_order || 0}`
-                                : `Save ₹${item.discount_value} on orders above ₹${item.minimum_order_value || item.min_order || 0}`)}
+                            {(() => {
+                              if (item.title) return item.title;
+                              const minVal = Number(
+                                item.minimum_order_value && item.minimum_order_value > 0
+                                  ? item.minimum_order_value
+                                  : item.min_order || 0
+                              );
+                              const discountLabel =
+                                item.discount_type === "percentage"
+                                  ? `${item.discount_value}%`
+                                  : `₹${item.discount_value}`;
+                              return minVal > 0
+                                ? `Save ${discountLabel} on orders above ₹${minVal.toLocaleString("en-IN")}`
+                                : `Save ${discountLabel} on all orders`;
+                            })()}
                           </p>
                           {item.description && (
                             <p className="text-xs text-[#666666] leading-relaxed">

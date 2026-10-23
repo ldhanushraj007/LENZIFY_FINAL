@@ -143,7 +143,11 @@ export async function applyCoupon(code: string, subtotal: number, items: any[] =
   }
 
   // Check minimum order value
-  const minOrder = Number(coupon.minimum_order_value ?? coupon.min_order ?? 0);
+  const minOrder = Number(
+    coupon.minimum_order_value && Number(coupon.minimum_order_value) > 0
+      ? coupon.minimum_order_value
+      : coupon.min_order || 0
+  );
   if (minOrder > 0 && subtotal < minOrder) {
     return {
       error: `Minimum order of ₹${minOrder.toLocaleString("en-IN")} required for this coupon.`,

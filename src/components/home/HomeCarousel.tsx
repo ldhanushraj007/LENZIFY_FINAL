@@ -551,7 +551,11 @@ function HeroOfferCards() {
     <div className="w-full max-w-5xl mx-auto px-4 mt-8 md:mt-12 z-20">
       <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-3 md:gap-4">
         {coupons.map((coupon, idx) => {
-          const min = coupon.minimum_order_value ?? coupon.min_order ?? 0;
+          const min = Number(
+            coupon.minimum_order_value && coupon.minimum_order_value > 0
+              ? coupon.minimum_order_value
+              : coupon.min_order || 0
+          );
           const discountLabel =
             coupon.discount_type === "percentage"
               ? `${coupon.discount_value}% OFF`

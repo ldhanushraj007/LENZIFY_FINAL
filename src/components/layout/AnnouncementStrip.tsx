@@ -43,14 +43,24 @@ export default function AnnouncementStrip() {
   const announcementParts: string[] = [];
   if (coupons.length > 0) {
     coupons.forEach((c) => {
-      const min = c.minimum_order_value ?? c.min_order ?? 0;
+      const min = Number(
+        c.minimum_order_value && c.minimum_order_value > 0
+          ? c.minimum_order_value
+          : c.min_order || 0
+      );
       const discountText =
         c.discount_type === "percentage"
           ? `${c.discount_value}%`
           : `₹${c.discount_value}`;
-      announcementParts.push(
-        `🎉 Save ${discountText} on orders above ₹${min.toLocaleString("en-IN")} — Use ${c.code}`
-      );
+      if (min > 0) {
+        announcementParts.push(
+          `🎉 Save ${discountText} on orders above ₹${min.toLocaleString("en-IN")} — Use ${c.code}`
+        );
+      } else {
+        announcementParts.push(
+          `🎉 Save ${discountText} on all orders — Use ${c.code}`
+        );
+      }
     });
     announcementParts.push("Free delivery on all orders");
     announcementParts.push("Premium eyewear starting ₹799");
