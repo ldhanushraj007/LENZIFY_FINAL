@@ -384,55 +384,11 @@ export async function updateOrderStatus(
   return { success: true };
 }
 
-/** Customer: cancel an order (only pending/confirmed) */
-export async function cancelOrder(orderId: string, reason?: string) {
-  const supabase = await createClient();
-  const { data: { user } } = await supabase.auth.getUser();
-  if (!user) return { error: "Not authenticated" };
-
-  const { data: order } = await supabase
-    .from("orders")
-    .select("*, order_items(*)")
-    .eq("id", orderId)
-    .eq("user_id", user.id)
-    .single();
-
-  if (!order) return { error: "Order not found" };
-  if (!["pending", "confirmed"].includes(order.status)) {
-    return { error: "This order can no longer be cancelled. Please contact support." };
-  }
-
-  // Restore stock
-  for (const item of order.order_items) {
-    try {
-      await supabase.rpc("increment_stock", {
-        p_id: item.product_id,
-        p_qty: item.quantity,
-      });
-    } catch {}
-  }
-
-  const { error } = await supabase.from("orders").update({
-    status: "cancelled",
-    cancelled_at: new Date().toISOString(),
-    cancel_reason: reason || "Cancelled by customer",
-    updated_at: new Date().toISOString(),
-  }).eq("id", orderId);
-
-  if (error) return { error: error.message };
-
-  try {
-    await supabase.from("order_status_history").insert({
-      order_id: orderId,
-      status: "cancelled",
-      note: reason || "Cancelled by customer",
-      updated_by: "customer",
-    });
-  } catch {}
-
-  revalidatePath(`/orders/${orderId}`);
-  revalidatePath("/orders");
-  return { success: true };
+/** Customer: cancel an order */
+export async function cancelOrder(_orderId: string, _reason?: string) {
+  return {
+    error: "Confirmed orders cannot be cancelled directly. Please contact our support team on WhatsApp at +91 9886266611.",
+  };
 }
 
 /** Customer: request return (only if delivered) */

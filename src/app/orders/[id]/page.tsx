@@ -1,11 +1,11 @@
 import { createClient } from "@/lib/supabase/server";
 import {
   Package, Truck, CheckCircle2, ChevronLeft, AlertCircle,
-  MapPin, CreditCard, Clock, RotateCcw, X, Calendar, FileText, Download,
+  MapPin, CreditCard, Clock, RotateCcw, X, Calendar, FileText, Download, MessageCircle,
 } from "lucide-react";
 import Link from "next/link";
 import { cn } from "@/lib/utils";
-import { cancelOrder, requestReturn } from "@/lib/db/order_actions";
+import { requestReturn } from "@/lib/db/order_actions";
 import { redirect } from "next/navigation";
 import InvoiceDownloadButton from "@/components/orders/InvoiceDownloadButton";
 
@@ -113,7 +113,6 @@ export default async function OrderTrackingPage({ params }: { params: Promise<{ 
   const currentPipelineIdx = PIPELINE.findIndex(s => s.key === currentStatus);
 
   const isCancelled = ["cancelled", "returned", "refunded"].includes(currentStatus);
-  const canCancel = ["pending", "confirmed"].includes(currentStatus);
   const canReturn = currentStatus === "delivered";
   const hasReturnRequest = !!displayOrder.return_requested_at;
 
@@ -528,21 +527,18 @@ export default async function OrderTrackingPage({ params }: { params: Promise<{ 
           <p className="text-xs font-semibold uppercase tracking-widest text-[#004AAD] mb-4">Actions</p>
           <div className="flex flex-wrap gap-3">
 
-            {/* Cancel order */}
-            {canCancel && (
-              <form action={async () => {
-                "use server";
-                await cancelOrder(id, "Cancelled by customer");
-              }}>
-                <button
-                  type="submit"
-                  className="flex items-center gap-2 px-5 py-2.5 rounded-full border border-red-200 text-red-600 text-sm font-semibold hover:bg-red-50 transition-colors"
-                >
-                  <X size={14} />
-                  Cancel Order
-                </button>
-              </form>
-            )}
+            {/* WhatsApp Support / Cancellation */}
+            <a
+              href={`https://wa.me/919886266611?text=${encodeURIComponent(
+                `Hi Lenzify Support, I need help / have a question regarding my order #${displayOrder.id.slice(0, 12).toUpperCase()}`
+              )}`}
+              target="_blank"
+              rel="noopener noreferrer"
+              className="flex items-center gap-2 px-5 py-2.5 rounded-full border border-emerald-500/20 bg-emerald-50 text-emerald-700 hover:bg-emerald-100 text-sm font-semibold transition-colors"
+            >
+              <MessageCircle size={15} className="text-emerald-600" />
+              WhatsApp Support (9886266611)
+            </a>
 
             {/* Return request */}
             {canReturn && !hasReturnRequest && (
@@ -595,6 +591,28 @@ export default async function OrderTrackingPage({ params }: { params: Promise<{ 
               Contact Support
             </Link>
           </div>
+
+          {!isCancelled && (
+            <div className="mt-4 pt-4 border-t border-[#ECECEC] flex items-start gap-2.5 text-xs text-[#666666]">
+              <div className="w-4 h-4 rounded-full bg-blue-50 text-[#004AAD] flex items-center justify-center flex-shrink-0 mt-0.5 font-bold text-[10px]">
+                i
+              </div>
+              <p className="leading-relaxed">
+                Once an order is confirmed, custom lens precision-cutting and frame preparation begin immediately. If you need to cancel or modify your order, please text our support team directly on WhatsApp at{" "}
+                <a
+                  href={`https://wa.me/919886266611?text=${encodeURIComponent(
+                    `Hi Lenzify Support, I would like to request cancellation for my order #${displayOrder.id.slice(0, 12).toUpperCase()}`
+                  )}`}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="font-bold text-emerald-700 underline hover:text-emerald-800"
+                >
+                  9886266611
+                </a>
+                .
+              </p>
+            </div>
+          )}
         </div>
 
       </div>

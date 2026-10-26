@@ -1,5 +1,5 @@
 import { createClient } from "@/lib/supabase/server";
-import { Package, ShoppingBag, RefreshCcw, ChevronRight } from "lucide-react";
+import { Package, ShoppingBag, RefreshCcw, ChevronRight, MessageCircle } from "lucide-react";
 import Link from "next/link";
 import { cn } from "@/lib/utils";
 
@@ -167,9 +167,16 @@ export default async function OrdersPage() {
                   >
                     View Details <ChevronRight size={14} />
                   </Link>
-                  <button className="flex items-center gap-1.5 text-[#666666] text-sm hover:text-[#111111] transition-colors">
-                    <RefreshCcw size={13} /> Request Support
-                  </button>
+                  <a
+                    href={`https://wa.me/919886266611?text=${encodeURIComponent(
+                      `Hi Lenzify Support, I need help with my order #${order.id.slice(0, 12).toUpperCase()}`
+                    )}`}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="flex items-center gap-1.5 text-[#666666] text-sm hover:text-emerald-700 transition-colors"
+                  >
+                    <MessageCircle size={13} className="text-emerald-600" /> WhatsApp Support
+                  </a>
                 </div>
               </div>
             ))}
