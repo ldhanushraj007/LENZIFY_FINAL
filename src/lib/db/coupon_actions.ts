@@ -2,97 +2,57 @@
 
 import { createAdminClient, createClient } from "@/lib/supabase/server";
 import { rateLimitAction } from "@/lib/rateLimit";
+import { getItemPricing, isContactLensItem } from "@/lib/pricing";
 
-const APPLIES_TO_NAMES: Record<string, string> = {
-  all: "All Products",
-  eyeglasses: "Eyeglasses",
-  sunglasses: "Sunglasses",
-  "contact-lens": "Contact Lenses",
-  "computer-glasses": "Computer Glasses",
-  "reading-glasses": "Reading Glasses",
-  lenses: "Prescription Lenses",
-  accessories: "Accessories",
+import {
+  APPLIES_TO_NAMES,
+  getCategoryLabel,
+  checkItemMatchesApplicable,
+} from "@/lib/offers";
+
+// Built-in standard offers metadata
+const STANDARD_OFFERS: Record<string, any> = {
+  LENZ999: {
+    code: "LENZ999",
+    title: "Save ₹999 on orders above ₹2999",
+    description: "Valid for Spectacles, Sunglasses & Accessories only (Excludes Contact Lenses)",
+    discount_type: "flat",
+    discount_value: 999,
+    minimum_order_value: 2999,
+    applicable_to: "eyeglasses,sunglasses,accessories,lenses,computer-glasses,reading-glasses",
+    is_active: true,
+  },
+  LENZ599: {
+    code: "LENZ599",
+    title: "Save ₹599 on orders above ₹1999",
+    description: "Valid for Spectacles, Sunglasses & Accessories only (Excludes Contact Lenses)",
+    discount_type: "flat",
+    discount_value: 599,
+    minimum_order_value: 1999,
+    applicable_to: "eyeglasses,sunglasses,accessories,lenses,computer-glasses,reading-glasses",
+    is_active: true,
+  },
+  LENZ299: {
+    code: "LENZ299",
+    title: "Save ₹299 on orders above ₹999",
+    description: "Valid for Spectacles, Sunglasses & Accessories only (Excludes Contact Lenses)",
+    discount_type: "flat",
+    discount_value: 299,
+    minimum_order_value: 999,
+    applicable_to: "eyeglasses,sunglasses,accessories,lenses,computer-glasses,reading-glasses",
+    is_active: true,
+  },
+  CL200: {
+    code: "CL200",
+    title: "Save ₹200 on Contact Lenses",
+    description: "Flat ₹200 off on Contact Lenses only",
+    discount_type: "flat",
+    discount_value: 200,
+    minimum_order_value: 0,
+    applicable_to: "contact-lens",
+    is_active: true,
+  },
 };
-
-function checkItemMatchesApplicable(item: any, applicableTo: string): boolean {
-  if (!applicableTo || applicableTo === "all") return true;
-
-  const pType = (item.product_type || item.products?.product_type || "").toLowerCase();
-  const cat = (
-    item.category ||
-    item.products?.category ||
-    item.products?.categories?.name ||
-    item.products?.categories?.slug ||
-    ""
-  ).toLowerCase();
-  const name = (item.name || item.products?.name || "").toLowerCase();
-  const hasLens = Boolean(
-    item.lens_id ||
-    (item.lens_price && Number(item.lens_price) > 0) ||
-    item.lens_config?.type ||
-    item.lens_config?.package ||
-    item.lens_config?.package_name ||
-    (item.lens_config?.lens_price && Number(item.lens_config?.lens_price) > 0) ||
-    (item.lens_config?.total_price && Number(item.lens_config?.total_price) > 0)
-  );
-
-  switch (applicableTo) {
-    case "eyeglasses":
-      return (
-        pType === "eyeglasses" ||
-        pType === "eyewear" ||
-        pType === "frame" ||
-        cat.includes("eyeglass") ||
-        cat.includes("eyeglasses") ||
-        cat.includes("frames") ||
-        (!cat.includes("sunglass") &&
-          !cat.includes("contact") &&
-          !cat.includes("reading") &&
-          !cat.includes("computer") &&
-          !cat.includes("accessor"))
-      );
-    case "sunglasses":
-      return (
-        pType === "sunglasses" ||
-        pType === "sunglass" ||
-        cat.includes("sunglass") ||
-        name.includes("sunglass")
-      );
-    case "contact-lens":
-      return (
-        pType === "contact-lens" ||
-        pType === "contact_lens" ||
-        cat.includes("contact") ||
-        name.includes("contact")
-      );
-    case "computer-glasses":
-      return (
-        pType === "computer-glasses" ||
-        cat.includes("computer") ||
-        name.includes("computer")
-      );
-    case "reading-glasses":
-      return (
-        pType === "reading-glasses" ||
-        pType === "reading_glasses" ||
-        cat.includes("reading") ||
-        name.includes("reading")
-      );
-    case "lenses":
-      return hasLens || cat.includes("lens") || pType === "lens";
-    case "accessories":
-      return (
-        pType === "accessory" ||
-        pType === "accessories" ||
-        cat.includes("accessor") ||
-        name.includes("cleaning kit") ||
-        name.includes("case") ||
-        name.includes("chain")
-      );
-    default:
-      return true;
-  }
-}
 
 /**
  * Validate and apply a coupon code
@@ -110,14 +70,30 @@ export async function applyCoupon(code: string, subtotal: number, items: any[] =
   // Use Admin client for resilient query
   const supabase = await createAdminClient();
 
-  const { data: coupon, error } = await supabase
+  const { data: dbCoupon } = await supabase
     .from("coupons")
     .select("*")
     .eq("code", cleanCode)
     .single();
 
-  if (error || !coupon) {
+  // If not found in DB, check standard built-ins as graceful fallback
+  let coupon = dbCoupon;
+  if (!coupon && STANDARD_OFFERS[cleanCode]) {
+    coupon = {
+      id: Date.now(),
+      ...STANDARD_OFFERS[cleanCode],
+    };
+  }
+
+  if (!coupon) {
     return { error: "Invalid coupon code. Please check and try again." };
+  }
+
+  // Enforce category restrictions for the 3 flagship eyewear offers even if legacy DB row had "all"
+  if (["LENZ999", "LENZ599", "LENZ299"].includes(cleanCode)) {
+    coupon.applicable_to = "eyeglasses,sunglasses,accessories,lenses,computer-glasses,reading-glasses";
+  } else if (cleanCode === "CL200") {
+    coupon.applicable_to = "contact-lens";
   }
 
   // Check active state
@@ -142,48 +118,74 @@ export async function applyCoupon(code: string, subtotal: number, items: any[] =
     return { error: "This coupon has reached its usage limit." };
   }
 
-  // Check minimum order value
+  // Determine applicable categories & calculate qualifying items subtotal
+  const applicableTo = coupon.applicable_to || "all";
+  let qualifyingSubtotal = subtotal;
+
+  if (applicableTo !== "all" && Array.isArray(items) && items.length > 0) {
+    const qualifyingItems = items.filter((item) =>
+      checkItemMatchesApplicable(item, applicableTo)
+    );
+
+    // If no qualifying items in cart
+    if (qualifyingItems.length === 0) {
+      if (applicableTo.includes("contact-lens")) {
+        return {
+          error: `Code ${cleanCode} is valid only for Contact Lenses. Add contact lenses to your cart to use this offer.`,
+        };
+      }
+      if (
+        applicableTo.includes("eyeglasses") ||
+        applicableTo.includes("sunglasses") ||
+        applicableTo.includes("accessories") ||
+        applicableTo === "eyewear_accessories"
+      ) {
+        return {
+          error: `Code ${cleanCode} is valid for Spectacles, Sunglasses, and Accessories only. It cannot be applied to Contact Lenses.`,
+        };
+      }
+      return {
+        error: `This code applies to ${getCategoryLabel(applicableTo)} only. Add qualifying products to use it.`,
+      };
+    }
+
+    // Calculate qualifying subtotal strictly from qualifying items
+    qualifyingSubtotal = qualifyingItems.reduce((acc, item) => {
+      const pricing = getItemPricing(item);
+      return acc + pricing.totalPrice;
+    }, 0);
+  }
+
+  // Check minimum order value against qualifying subtotal
   const minOrder = Number(
     coupon.minimum_order_value && Number(coupon.minimum_order_value) > 0
       ? coupon.minimum_order_value
       : coupon.min_order || 0
   );
-  if (minOrder > 0 && subtotal < minOrder) {
-    return {
-      error: `Minimum order of ₹${minOrder.toLocaleString("en-IN")} required for this coupon.`,
-    };
-  }
 
-  // Check applicable category if items are provided and applicable_to is not 'all'
-  const applicableTo = coupon.applicable_to || "all";
-  if (applicableTo !== "all" && Array.isArray(items) && items.length > 0) {
-    const hasMatchingItem = items.some((item) =>
-      checkItemMatchesApplicable(item, applicableTo)
-    );
-    if (!hasMatchingItem) {
-      const categoryLabel = APPLIES_TO_NAMES[applicableTo] || applicableTo;
-      return {
-        error: `This code applies to ${categoryLabel} only. Add a qualifying product to use it.`,
-      };
-    }
+  if (minOrder > 0 && qualifyingSubtotal < minOrder) {
+    const categoryLabel = getCategoryLabel(applicableTo);
+    return {
+      error: `Minimum order of ₹${minOrder.toLocaleString("en-IN")} on qualifying ${categoryLabel} required for ${cleanCode} (current eligible: ₹${Math.round(qualifyingSubtotal).toLocaleString("en-IN")}).`,
+    };
   }
 
   // Calculate discount
   let discount = 0;
   if (coupon.discount_type === "percentage") {
-    discount = (subtotal * Number(coupon.discount_value)) / 100;
+    discount = (qualifyingSubtotal * Number(coupon.discount_value)) / 100;
     const maxDiscount = coupon.rules?.max_discount;
     if (maxDiscount && discount > maxDiscount) {
       discount = maxDiscount;
     }
   } else {
-    // flat
+    // flat discount
     discount = Number(coupon.discount_value);
   }
 
-  // Don't let discount exceed subtotal
-  if (discount > subtotal) {
-    discount = subtotal;
+  // Don't let discount exceed qualifying subtotal
+  if (discount > qualifyingSubtotal) {
+    discount = qualifyingSubtotal;
   }
 
   const roundedDiscount = Math.round(discount * 100) / 100;

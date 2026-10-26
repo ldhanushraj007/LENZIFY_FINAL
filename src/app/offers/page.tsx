@@ -9,6 +9,7 @@ import { Copy, Check, ArrowRight, Tag, Zap, Lock, Sparkles } from "lucide-react"
 import { toast } from "react-hot-toast";
 import { cn } from "@/lib/utils";
 import Link from "next/link";
+import { getCategoryLabel } from "@/lib/offers";
 
 const FILTER_TABS = [
   { value: "discounts", label: "Discounts" },
@@ -259,9 +260,7 @@ function OffersContent() {
                           <div className="flex items-center justify-between">
                             <span className="text-[#888888]">Applies to:</span>
                             <span className="font-medium text-[#111111]">
-                              {APPLIES_TO_MAP[item.applicable_to] ||
-                                item.applicable_to ||
-                                "All Products"}
+                              {getCategoryLabel(item.applicable_to)}
                             </span>
                           </div>
                         </div>

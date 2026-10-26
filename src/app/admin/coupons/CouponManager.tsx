@@ -32,16 +32,60 @@ import {
 } from "./actions";
 import { cn } from "@/lib/utils";
 
-const APPLIES_TO_OPTIONS = [
-  { value: "all", label: "All Products" },
-  { value: "eyeglasses", label: "Eyeglasses" },
-  { value: "sunglasses", label: "Sunglasses" },
-  { value: "contact-lens", label: "Contact Lenses" },
-  { value: "computer-glasses", label: "Computer Glasses" },
-  { value: "reading-glasses", label: "Reading Glasses" },
-  { value: "lenses", label: "Prescription Lenses" },
-  { value: "accessories", label: "Accessories" },
+export const CATEGORY_ITEMS = [
+  { id: "eyeglasses", label: "Eyeglasses / Frames" },
+  { id: "sunglasses", label: "Sunglasses" },
+  { id: "accessories", label: "Accessories" },
+  { id: "lenses", label: "Prescription Lenses" },
+  { id: "computer-glasses", label: "Computer Glasses" },
+  { id: "reading-glasses", label: "Reading Glasses" },
+  { id: "contact-lens", label: "Contact Lenses" },
 ];
+
+export const PRESETS = [
+  {
+    label: "All Products",
+    value: "all",
+    badge: "All Products",
+    desc: "Valid storewide on any product",
+  },
+  {
+    label: "Spectacles, Sunglasses & Accessories Only",
+    value: "eyeglasses,sunglasses,accessories,lenses,computer-glasses,reading-glasses",
+    badge: "Eyewear & Accessories (Excludes Contact Lenses)",
+    desc: "Strictly excludes Contact Lenses",
+  },
+  {
+    label: "Contact Lenses Only",
+    value: "contact-lens",
+    badge: "Contact Lenses Only",
+    desc: "Strictly excludes Eyewear & Accessories",
+  },
+];
+
+export function formatAppliesLabel(appliesTo?: string | null): { label: string; type: "all" | "contact" | "eyewear" | "custom" } {
+  if (!appliesTo || appliesTo === "all") return { label: "All Products", type: "all" };
+  if (appliesTo === "contact-lens") return { label: "Contact Lenses Only", type: "contact" };
+
+  const parts = appliesTo.split(",").map((s) => s.trim().toLowerCase());
+  const hasContact = parts.includes("contact-lens");
+  const hasEyewear = parts.some((p) => p !== "contact-lens");
+
+  if (!hasContact && hasEyewear) {
+    if (
+      parts.includes("eyeglasses") ||
+      parts.includes("sunglasses") ||
+      parts.includes("accessories")
+    ) {
+      return { label: "Spectacles, Sunglasses & Acc.", type: "eyewear" };
+    }
+  }
+
+  const names = parts
+    .map((p) => CATEGORY_ITEMS.find((c) => c.id === p)?.label || p)
+    .join(", ");
+  return { label: names, type: "custom" };
+}
 
 export interface CouponItem {
   id: number;
@@ -462,23 +506,114 @@ export default function CouponManager({ initialCoupons }: CouponManagerProps) {
                 />
               </div>
 
-              {/* Applies To dropdown */}
-              <div className="space-y-1.5">
-                <label className="text-[9px] font-bold uppercase tracking-[0.2em] text-white/70">
-                  Applies To
-                </label>
-                <select
-                  value={appliesTo}
-                  onChange={(e) => setAppliesTo(e.target.value)}
-                  className="w-full bg-brand-navy border border-white/15 px-4 py-3 text-sm sm:text-xs font-bold tracking-wider outline-none focus:border-secondary transition-all rounded-xl cursor-pointer text-white"
-                >
-                  {APPLIES_TO_OPTIONS.map((opt) => (
-                    <option key={opt.value} value={opt.value} className="bg-brand-navy text-white">
-                      {opt.label}
-                    </option>
-                  ))}
-                </select>
+              {/* Category Applicability Selector */}
+              <div className="space-y-3 pt-2 border-t border-white/10">
+                <div className="flex items-center justify-between">
+                  <label className="text-[9px] font-bold uppercase tracking-[0.2em] text-white/70">
+                    Category Applicability <span className="text-secondary">*</span>
+                  </label>
+                  <span className="text-[9px] font-mono font-semibold px-2 py-0.5 rounded bg-white/10 text-secondary">
+                    {appliesTo === "all"
+                      ? "All Products"
+                      : appliesTo === "contact-lens"
+                      ? "Contact Lenses Only"
+                      : "Restricted Category"}
+                  </span>
+                </div>
+
+                {/* Presets */}
+                <div className="space-y-1.5">
+                  <p className="text-[8px] uppercase tracking-wider text-white/40 font-bold">Quick Presets</p>
+                  <div className="grid grid-cols-1 sm:grid-cols-3 gap-2">
+                    {PRESETS.map((p) => {
+                      const isSelected = appliesTo === p.value;
+                      return (
+                        <button
+                          key={p.value}
+                          type="button"
+                          onClick={() => setAppliesTo(p.value)}
+                          className={cn(
+                            "px-3 py-2.5 rounded-xl text-left border transition-all flex flex-col justify-between cursor-pointer",
+                            isSelected
+                              ? "bg-secondary/20 border-secondary text-white shadow-sm ring-1 ring-secondary/40"
+                              : "bg-white/5 border-white/10 text-white/70 hover:bg-white/10 hover:text-white"
+                          )}
+                        >
+                          <span className="font-bold text-[11px] leading-tight flex items-center gap-1.5">
+                            {p.value === "all" && "🌐"}
+                            {p.value === "contact-lens" && "👁️"}
+                            {p.value.includes("eyeglasses") && "👓"}
+                            {p.label}
+                          </span>
+                          <span className="text-[9px] text-white/40 mt-1 font-normal">
+                            {p.desc}
+                          </span>
+                        </button>
+                      );
+                    })}
+                  </div>
+                </div>
+
+                {/* Individual Category Checkboxes */}
+                <div className="bg-white/5 border border-white/10 rounded-xl p-3 space-y-2">
+                  <p className="text-[8px] font-bold uppercase tracking-wider text-white/40">
+                    Or choose specific categories:
+                  </p>
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
+                    {CATEGORY_ITEMS.map((cat) => {
+                      const isChecked =
+                        appliesTo === "all" ||
+                        appliesTo
+                          .split(",")
+                          .map((s) => s.trim())
+                          .includes(cat.id);
+                      return (
+                        <label
+                          key={cat.id}
+                          className={cn(
+                            "flex items-center gap-2 p-2 rounded-lg text-xs cursor-pointer border transition-colors select-none",
+                            isChecked
+                              ? "bg-secondary/15 border-secondary/40 text-white font-medium"
+                              : "bg-black/20 border-transparent text-white/40 hover:text-white/70"
+                          )}
+                        >
+                          <input
+                            type="checkbox"
+                            checked={isChecked}
+                            onChange={() => {
+                              let currentList =
+                                appliesTo === "all"
+                                  ? CATEGORY_ITEMS.map((c) => c.id)
+                                  : appliesTo
+                                      .split(",")
+                                      .map((s) => s.trim())
+                                      .filter(Boolean);
+
+                              if (currentList.includes(cat.id)) {
+                                currentList = currentList.filter((id) => id !== cat.id);
+                              } else {
+                                currentList.push(cat.id);
+                              }
+
+                              if (
+                                currentList.length === CATEGORY_ITEMS.length ||
+                                currentList.length === 0
+                              ) {
+                                setAppliesTo("all");
+                              } else {
+                                setAppliesTo(currentList.join(","));
+                              }
+                            }}
+                            className="rounded border-white/30 text-secondary focus:ring-0 accent-secondary"
+                          />
+                          <span className="text-[11px] leading-tight">{cat.label}</span>
+                        </label>
+                      );
+                    })}
+                  </div>
+                </div>
               </div>
+
 
               {/* Dates */}
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
@@ -652,10 +787,7 @@ export default function CouponManager({ initialCoupons }: CouponManagerProps) {
               );
               const active = c.is_active ?? c.is_enabled ?? true;
               const onOffers = c.show_on_offers_page ?? true;
-              const appliesLabel =
-                APPLIES_TO_OPTIONS.find((o) => o.value === c.applicable_to)?.label ||
-                c.applicable_to ||
-                "All Products";
+              const appliesInfo = formatAppliesLabel(c.applicable_to);
 
               return (
                 <div
@@ -671,9 +803,20 @@ export default function CouponManager({ initialCoupons }: CouponManagerProps) {
                       <span className="font-mono text-base font-black tracking-wider uppercase text-brand-navy">
                         {c.code}
                       </span>
-                      <p className="text-[10px] text-brand-navy/50 font-bold uppercase tracking-wider mt-0.5">
-                        {appliesLabel}
-                      </p>
+                      <div className="mt-1">
+                        <span className={cn(
+                          "inline-flex items-center gap-1 text-[9px] font-bold uppercase tracking-wider px-2 py-0.5 rounded-full border",
+                          appliesInfo.type === "contact" ? "bg-cyan-50 text-cyan-800 border-cyan-200" :
+                          appliesInfo.type === "eyewear" ? "bg-indigo-50 text-indigo-800 border-indigo-200" :
+                          appliesInfo.type === "all" ? "bg-slate-50 text-slate-700 border-slate-200" :
+                          "bg-amber-50 text-amber-800 border-amber-200"
+                        )}>
+                          {appliesInfo.type === "contact" && "👁️ "}
+                          {appliesInfo.type === "eyewear" && "👓 "}
+                          {appliesInfo.type === "all" && "🌐 "}
+                          {appliesInfo.label}
+                        </span>
+                      </div>
                     </div>
 
                     {isExpired ? (
@@ -857,10 +1000,7 @@ export default function CouponManager({ initialCoupons }: CouponManagerProps) {
                     );
                     const active = c.is_active ?? c.is_enabled ?? true;
                     const onOffers = c.show_on_offers_page ?? true;
-                    const appliesLabel =
-                      APPLIES_TO_OPTIONS.find((o) => o.value === c.applicable_to)?.label ||
-                      c.applicable_to ||
-                      "All Products";
+                    const appliesInfo = formatAppliesLabel(c.applicable_to);
 
                     return (
                       <tr
@@ -928,8 +1068,22 @@ export default function CouponManager({ initialCoupons }: CouponManagerProps) {
 
                         {/* Applies To */}
                         <td className="py-4 px-4 whitespace-nowrap">
-                          <span className="text-[10px] font-semibold text-brand-navy/70 uppercase tracking-wider bg-gray-100 px-2 py-0.5 rounded-md">
-                            {appliesLabel}
+                          <span
+                            className={cn(
+                              "inline-flex items-center gap-1 text-[10px] font-bold uppercase tracking-wider px-2.5 py-1 rounded-md border",
+                              appliesInfo.type === "contact"
+                                ? "bg-cyan-50 text-cyan-800 border-cyan-200"
+                                : appliesInfo.type === "eyewear"
+                                ? "bg-indigo-50 text-indigo-800 border-indigo-200"
+                                : appliesInfo.type === "all"
+                                ? "bg-slate-50 text-slate-700 border-slate-200"
+                                : "bg-amber-50 text-amber-800 border-amber-200"
+                            )}
+                          >
+                            {appliesInfo.type === "contact" && "👁️ "}
+                            {appliesInfo.type === "eyewear" && "👓 "}
+                            {appliesInfo.type === "all" && "🌐 "}
+                            {appliesInfo.label}
                           </span>
                         </td>
 

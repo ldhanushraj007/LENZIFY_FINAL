@@ -29,6 +29,8 @@ export interface QualifiedCoupon {
   code: string;
   discount: number;
   message: string;
+  category?: string;
+  description?: string;
 }
 
 export interface NextTierNudge {
@@ -54,6 +56,7 @@ export interface OrderSummaryProps {
   footerNote?: React.ReactNode;
   className?: string;
   qualifiedCoupon?: QualifiedCoupon | null;
+  qualifiedCoupons?: QualifiedCoupon[] | null;
   onApplyQualifiedCoupon?: (code: string) => void;
   isCouponDismissed?: boolean;
   onDismissCoupon?: () => void;
@@ -76,6 +79,7 @@ export default function OrderSummary({
   footerNote,
   className,
   qualifiedCoupon,
+  qualifiedCoupons,
   onApplyQualifiedCoupon,
   isCouponDismissed = false,
   onDismissCoupon,
@@ -485,58 +489,88 @@ export default function OrderSummary({
       {/* Coupon Field */}
       {showCoupon && (
         <div className="border-t border-[#ECECEC] pt-4 space-y-3">
-          {/* Auto-suggested Qualification Banner */}
-          {!couponApplied && !isCouponDismissed && qualifiedCoupon && (
-            <div className="bg-[#F0FDF4] border-l-4 border-emerald-600 rounded-2xl p-4 shadow-sm space-y-3 transition-all">
-              <div className="flex items-start justify-between gap-2">
-                <div className="space-y-0.5">
-                  <div className="flex items-center gap-1.5 text-emerald-800 font-bold text-sm">
-                    <span>🎉</span>
-                    <span>{qualifiedCoupon.message}</span>
-                  </div>
-                  <p className="text-xs text-emerald-900/80">
-                    Use code <span className="font-mono font-bold text-emerald-950 bg-emerald-100/90 px-1.5 py-0.5 rounded border border-emerald-300/70">{qualifiedCoupon.code}</span> at checkout
-                  </p>
-                </div>
-                {onDismissCoupon && (
-                  <button
-                    type="button"
-                    onClick={onDismissCoupon}
-                    className="text-emerald-700/60 hover:text-emerald-950 p-1 rounded-lg hover:bg-emerald-100/60 transition-colors cursor-pointer"
-                    aria-label="Dismiss coupon banner"
-                  >
-                    <X size={15} />
-                  </button>
-                )}
+          {/* Next tier unlock progress nudge */}
+          {!couponApplied && nextTierNudge && (
+            <div className="bg-amber-50/90 border border-amber-200/90 rounded-2xl p-3.5 space-y-2 text-xs shadow-sm">
+              <div className="flex items-center gap-2 text-amber-900 font-bold">
+                <span className="text-sm">🎯</span>
+                <span>{nextTierNudge.message}</span>
               </div>
-              <div className="flex items-center justify-between pt-0.5">
-                <button
-                  type="button"
-                  onClick={() => {
-                    if (onApplyQualifiedCoupon) {
-                      onApplyQualifiedCoupon(qualifiedCoupon.code);
-                    } else if (onApplyCoupon) {
-                      if (onCouponCodeChange) onCouponCodeChange(qualifiedCoupon.code);
-                      onApplyCoupon(qualifiedCoupon.code);
-                    }
-                  }}
-                  disabled={applyingCoupon}
-                  className="bg-[#03173D] hover:bg-[#004AAD] text-white text-xs font-semibold px-4 py-2 rounded-xl transition-all flex items-center gap-1.5 shadow-sm hover:shadow cursor-pointer disabled:opacity-50"
-                >
-                  <span>Apply {qualifiedCoupon.code} →</span>
-                </button>
-                {onDismissCoupon && (
-                  <button
-                    type="button"
-                    onClick={onDismissCoupon}
-                    className="text-xs text-emerald-800/70 hover:text-emerald-950 font-medium px-2 py-1 rounded hover:bg-emerald-100/60 transition-colors cursor-pointer"
-                  >
-                    ✕ Dismiss
-                  </button>
-                )}
+              <div className="flex items-center justify-between text-[11px] text-amber-800 pt-0.5">
+                <span>Unlock <strong>₹{nextTierNudge.discount} OFF</strong></span>
+                <span className="font-mono font-bold bg-amber-200/70 text-amber-950 px-2 py-0.5 rounded border border-amber-300">
+                  {nextTierNudge.code}
+                </span>
               </div>
             </div>
           )}
+
+          {/* Auto-suggested Qualification Banners */}
+          {!couponApplied && !isCouponDismissed && (() => {
+            const offersToShow: QualifiedCoupon[] = (
+              qualifiedCoupons && qualifiedCoupons.length > 0
+                ? qualifiedCoupons
+                : qualifiedCoupon
+                ? [qualifiedCoupon]
+                : []
+            );
+
+            if (offersToShow.length === 0) return null;
+
+            return (
+              <div className="space-y-2.5">
+                {offersToShow.map((coupon) => (
+                  <div
+                    key={coupon.code}
+                    className="bg-[#F0FDF4] border-l-4 border-emerald-600 rounded-2xl p-3.5 shadow-sm space-y-2.5 transition-all"
+                  >
+                    <div className="flex items-start justify-between gap-2">
+                      <div className="space-y-0.5">
+                        <div className="flex items-center gap-1.5 text-emerald-800 font-bold text-xs sm:text-sm">
+                          <span>{coupon.category === "contact-lens" ? "👁️" : "👓"}</span>
+                          <span>{coupon.message}</span>
+                        </div>
+                        <p className="text-[11px] text-emerald-900/80">
+                          Use code <span className="font-mono font-bold text-emerald-950 bg-emerald-100/90 px-1.5 py-0.5 rounded border border-emerald-300/70">{coupon.code}</span> for ₹{coupon.discount} discount
+                        </p>
+                      </div>
+                      {onDismissCoupon && (
+                        <button
+                          type="button"
+                          onClick={onDismissCoupon}
+                          className="text-emerald-700/60 hover:text-emerald-950 p-1 rounded-lg hover:bg-emerald-100/60 transition-colors cursor-pointer"
+                          aria-label="Dismiss coupon banner"
+                        >
+                          <X size={14} />
+                        </button>
+                      )}
+                    </div>
+                    <div className="flex items-center justify-between pt-0.5">
+                      <button
+                        type="button"
+                        onClick={() => {
+                          if (onApplyQualifiedCoupon) {
+                            onApplyQualifiedCoupon(coupon.code);
+                          } else if (onApplyCoupon) {
+                            if (onCouponCodeChange) onCouponCodeChange(coupon.code);
+                            onApplyCoupon(coupon.code);
+                          }
+                        }}
+                        disabled={applyingCoupon}
+                        className="bg-[#03173D] hover:bg-[#004AAD] text-white text-xs font-semibold px-3.5 py-1.5 rounded-xl transition-all flex items-center gap-1.5 shadow-sm hover:shadow cursor-pointer disabled:opacity-50"
+                      >
+                        <span>Apply {coupon.code} →</span>
+                      </button>
+                      <span className="text-[9px] uppercase tracking-wider font-bold text-emerald-700 bg-emerald-100/70 px-2 py-0.5 rounded-full border border-emerald-200">
+                        {coupon.category === "contact-lens" ? "Contact Lenses" : "Eyewear & Accessories"}
+                      </span>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            );
+          })()}
+
 
           <p className="text-xs font-semibold uppercase tracking-widest text-[#666666]">
             Discount Coupon

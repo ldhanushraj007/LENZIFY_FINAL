@@ -14,6 +14,7 @@ import { toast } from "react-hot-toast";
 import OrderSummary from "@/components/checkout/OrderSummary";
 import { applyCoupon } from "@/lib/db/coupon_actions";
 import { getItemPricing } from "@/lib/pricing";
+import { evaluateCartOffers } from "@/lib/offers";
 import { ShoppingBag } from "lucide-react";
 import { resolveProductImage } from "@/lib/image_utils";
 
@@ -35,6 +36,10 @@ function CartPageContent() {
   const [couponApplied, setCouponApplied] = useState("");
   const [couponId, setCouponId] = useState<number | null>(null);
   const [applyingCoupon, setApplyingCoupon] = useState(false);
+
+  const cartOffers = useMemo(() => {
+    return evaluateCartOffers(items);
+  }, [items]);
 
   // Auto-apply or restore coupon from cartStore / sessionStorage
   useEffect(() => {
@@ -722,6 +727,9 @@ function CartPageContent() {
                 couponApplied={couponApplied}
                 couponDiscount={couponDiscount}
                 applyingCoupon={applyingCoupon}
+                qualifiedCoupons={cartOffers.allQualifiedOffers}
+                onApplyQualifiedCoupon={(code) => handleApplyCoupon(code)}
+                nextTierNudge={cartOffers.nextTierNudge}
                 actionButton={
                   <button
                     disabled={items.length === 0}

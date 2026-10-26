@@ -1,10 +1,13 @@
-import { createClient, createAdminClient } from "@/lib/supabase/server";
+import { createAdminClient } from "@/lib/supabase/server";
 import CouponManager from "./CouponManager";
-import { Tag } from "lucide-react";
+import { seedStandardOffers } from "./actions";
 
 export const dynamic = "force-dynamic";
 
 export default async function AdminCouponsPage() {
+  // Ensure CL200 and category-isolated standard offers exist
+  await seedStandardOffers();
+
   const supabase = await createAdminClient();
   const { data: coupons } = await supabase
     .from("coupons")
@@ -22,7 +25,7 @@ export default async function AdminCouponsPage() {
             Coupons <span className="text-secondary">&amp; Discounts</span>
           </h1>
           <p className="text-xs text-brand-navy/60 mt-2">
-            Create and manage promotional discount codes, validity limits, and visibility on the customer offers page.
+            Create and manage category-specific discount codes, validity limits, and visibility on the customer offers page.
           </p>
         </div>
       </header>

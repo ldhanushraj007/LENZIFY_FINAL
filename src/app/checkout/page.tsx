@@ -28,6 +28,7 @@ import { useCartStore } from "@/store/cartStore";
 import OrderSummary, { ItemPrescription } from "@/components/checkout/OrderSummary";
 import { getGSTRate, calculateCartGST } from "@/lib/gst";
 import { getItemPricing } from "@/lib/pricing";
+import { evaluateCartOffers } from "@/lib/offers";
 
 const STEPS = [
   { id: 1, label: "Address", icon: MapPin },
@@ -355,56 +356,6 @@ export default function CheckoutPage() {
     }
   };
 
-  const getQualifiedCoupon = (subtotal: number) => {
-    if (subtotal >= 2999) return {
-      code: 'LENZ999',
-      discount: 999,
-      message: 'You qualify for ₹999 off!'
-    };
-    if (subtotal >= 1999) return {
-      code: 'LENZ599', 
-      discount: 599,
-      message: 'You qualify for ₹599 off!'
-    };
-    if (subtotal >= 999) return {
-      code: 'LENZ299',
-      discount: 299,
-      message: 'You qualify for ₹299 off!'
-    };
-    return null;
-  };
-
-  const getNextTierNudge = (subtotal: number) => {
-    if (subtotal < 999) {
-      const diff = 999 - subtotal;
-      return {
-        amountNeeded: diff,
-        discount: 299,
-        code: 'LENZ299',
-        message: `Add ₹${diff.toLocaleString("en-IN")} more to unlock ₹299 off with LENZ299`,
-      };
-    }
-    if (subtotal < 1999) {
-      const diff = 1999 - subtotal;
-      return {
-        amountNeeded: diff,
-        discount: 599,
-        code: 'LENZ599',
-        message: `Add ₹${diff.toLocaleString("en-IN")} more to unlock ₹599 off with LENZ599`,
-      };
-    }
-    if (subtotal < 2999) {
-      const diff = 2999 - subtotal;
-      return {
-        amountNeeded: diff,
-        discount: 999,
-        code: 'LENZ999',
-        message: `Add ₹${diff.toLocaleString("en-IN")} more to unlock ₹999 off with LENZ999`,
-      };
-    }
-    return null;
-  };
-
   const cartSubtotal = useMemo(() => {
     return cartItems.reduce(
       (acc: number, item: any) =>
@@ -413,13 +364,12 @@ export default function CheckoutPage() {
     );
   }, [cartItems]);
 
-  const qualifiedCoupon = useMemo(() => {
-    return getQualifiedCoupon(cartSubtotal);
-  }, [cartSubtotal]);
+  const cartOffers = useMemo(() => {
+    return evaluateCartOffers(cartItems);
+  }, [cartItems]);
 
-  const nextTierNudge = useMemo(() => {
-    return getNextTierNudge(cartSubtotal);
-  }, [cartSubtotal]);
+  const qualifiedCoupons = cartOffers.allQualifiedOffers;
+  const nextTierNudge = cartOffers.nextTierNudge;
 
   const handleApplyCoupon = async (codeOverride?: string) => {
     const code = (typeof codeOverride === "string" ? codeOverride : couponCode).trim();
@@ -1222,7 +1172,7 @@ export default function CheckoutPage() {
               couponDiscount={couponDiscount}
               applyingCoupon={applyingCoupon}
               showCoupon={true}
-              qualifiedCoupon={qualifiedCoupon}
+              qualifiedCoupons={qualifiedCoupons}
               onApplyQualifiedCoupon={(code) => handleApplyCoupon(code)}
               isCouponDismissed={isCouponDismissed}
               onDismissCoupon={() => setIsCouponDismissed(true)}

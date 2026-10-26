@@ -501,6 +501,7 @@ interface HeroCoupon {
   discount_value: number;
   minimum_order_value?: number | null;
   min_order?: number | null;
+  applicable_to?: string | null;
 }
 
 function HeroOfferCards() {
@@ -514,12 +515,12 @@ function HeroOfferCards() {
         const now = new Date().toISOString();
         const { data, error } = await supabase
           .from("coupons")
-          .select("id, code, title, description, discount_type, discount_value, minimum_order_value, min_order")
+          .select("id, code, title, description, discount_type, discount_value, minimum_order_value, min_order, applicable_to")
           .eq("is_active", true)
           .eq("show_on_offers_page", true)
           .or(`valid_until.is.null,valid_until.gt.${now}`)
           .order("discount_value", { ascending: false })
-          .limit(3);
+          .limit(4);
 
         if (!error && data && data.length > 0) {
           setCoupons(data);
@@ -602,11 +603,11 @@ function HeroOfferCards() {
               </div>
 
               <div className="mt-4 pt-3 border-t border-white/10 flex items-center justify-between">
-                <span className="text-[10px] text-white/50 uppercase tracking-wider font-semibold">
-                  Active Offer
+                <span className="text-[10px] text-amber-300/80 uppercase tracking-wider font-semibold">
+                  {coupon.applicable_to === "contact-lens" ? "Contact Lenses Only" : "Eyewear & Accessories"}
                 </span>
                 <Link
-                  href="/products"
+                  href={coupon.applicable_to === "contact-lens" ? "/contact-lenses" : "/products"}
                   className="px-3 py-1.5 rounded-full text-[10px] font-bold uppercase tracking-wider text-white border border-white/30 hover:bg-white hover:text-black transition-all duration-200"
                 >
                   Shop Now →

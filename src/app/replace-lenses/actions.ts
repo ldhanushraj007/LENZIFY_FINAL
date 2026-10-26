@@ -43,6 +43,25 @@ export async function createReplacementOrder(orderData: any) {
     return { error: "Session expired. Please re-authenticate." };
   }
 
+  // Validate that pickup is inside Bangalore / Bengaluru
+  const isBangalore = (city?: string) => {
+    if (!city) return false;
+    const c = city.trim().toLowerCase();
+    return c.includes("bangalore") || c.includes("bengaluru") || c === "blr";
+  };
+
+  if (!isBangalore(orderData.pickup_address?.city)) {
+    return {
+      error: "Doorstep frame pickup for lens replacement is currently available only in Bangalore / Bengaluru.",
+    };
+  }
+
+  if (orderData.is_delivery_different && !isBangalore(orderData.delivery_address?.city)) {
+    return {
+      error: "Lens replacement delivery is currently available only in Bangalore / Bengaluru.",
+    };
+  }
+
   // Create the replacement order record
   const { data, error } = await supabase
     .from("lens_replacement_orders")

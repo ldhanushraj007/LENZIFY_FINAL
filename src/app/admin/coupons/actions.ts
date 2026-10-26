@@ -134,3 +134,111 @@ export async function deleteCoupon(id: number) {
     return { success: false, error: err.message };
   }
 }
+
+/**
+ * Seed or sync standard offers in DB:
+ * - CL200 (Contact Lenses only)
+ * - LENZ299, LENZ599, LENZ999 (Spectacles, Sunglasses & Accessories only)
+ */
+export async function seedStandardOffers() {
+  try {
+    const supabase = await createAdminClient();
+    const EYEWEAR_CATEGORIES = "eyeglasses,sunglasses,accessories,lenses,computer-glasses,reading-glasses";
+
+    const standardCoupons = [
+      {
+        code: "CL200",
+        title: "Save ₹200 on Contact Lenses",
+        description: "Flat ₹200 discount on Contact Lenses",
+        discount_type: "flat",
+        discount_value: 200,
+        minimum_order_value: 0,
+        min_order: 0,
+        applicable_to: "contact-lens",
+        applicable_category: "contact-lens",
+        is_active: true,
+        is_enabled: true,
+        show_on_offers_page: true,
+      },
+      {
+        code: "LENZ299",
+        title: "Save ₹299 on orders above ₹999",
+        description: "Valid on Spectacles, Sunglasses & Accessories (Excludes Contact Lenses)",
+        discount_type: "flat",
+        discount_value: 299,
+        minimum_order_value: 999,
+        min_order: 999,
+        applicable_to: EYEWEAR_CATEGORIES,
+        applicable_category: EYEWEAR_CATEGORIES,
+        is_active: true,
+        is_enabled: true,
+        show_on_offers_page: true,
+      },
+      {
+        code: "LENZ599",
+        title: "Save ₹599 on orders above ₹1999",
+        description: "Valid on Spectacles, Sunglasses & Accessories (Excludes Contact Lenses)",
+        discount_type: "flat",
+        discount_value: 599,
+        minimum_order_value: 1999,
+        min_order: 1999,
+        applicable_to: EYEWEAR_CATEGORIES,
+        applicable_category: EYEWEAR_CATEGORIES,
+        is_active: true,
+        is_enabled: true,
+        show_on_offers_page: true,
+      },
+      {
+        code: "LENZ999",
+        title: "Save ₹999 on orders above ₹2999",
+        description: "Valid on Spectacles, Sunglasses & Accessories (Excludes Contact Lenses)",
+        discount_type: "flat",
+        discount_value: 999,
+        minimum_order_value: 2999,
+        min_order: 2999,
+        applicable_to: EYEWEAR_CATEGORIES,
+        applicable_category: EYEWEAR_CATEGORIES,
+        is_active: true,
+        is_enabled: true,
+        show_on_offers_page: true,
+      },
+    ];
+
+    for (const c of standardCoupons) {
+      const { data: existing } = await supabase
+        .from("coupons")
+        .select("id, applicable_to")
+        .eq("code", c.code)
+        .maybeSingle();
+
+      if (existing) {
+        // Update applicable_to to ensure category isolation
+        await supabase
+          .from("coupons")
+          .update({
+            applicable_to: c.applicable_to,
+            applicable_category: c.applicable_category,
+            title: c.title,
+            description: c.description,
+            is_active: true,
+            is_enabled: true,
+          })
+          .eq("id", existing.id);
+      } else {
+        // Insert missing coupon
+        await supabase.from("coupons").insert({
+          ...c,
+          usage_count: 0,
+          created_at: new Date().toISOString(),
+        });
+      }
+    }
+
+    revalidatePath("/admin/coupons");
+    revalidatePath("/offers");
+    return { success: true };
+  } catch (err) {
+    console.error("Failed to seed standard offers:", err);
+    return { success: false, error: String(err) };
+  }
+}

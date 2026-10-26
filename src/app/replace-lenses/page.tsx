@@ -83,6 +83,12 @@ function ReplaceLensesContent() {
   const [pickupFee, setPickupFee] = useState(50);
   const [deliveryFee, setDeliveryFee] = useState(50);
 
+  const isBangaloreCity = (city?: string) => {
+    if (!city) return false;
+    const c = city.trim().toLowerCase();
+    return c.includes("bangalore") || c.includes("bengaluru") || c === "blr";
+  };
+
   const isRimless = (formData.frame_type || "").toLowerCase().includes("rimless");
 
   const maxSph = useMemo(() => {
@@ -347,8 +353,12 @@ function ReplaceLensesContent() {
     }
     if (currentStep === 4) {
       const addr = formData.pickup_address;
-      if (!addr.name || !addr.phone || !addr.address || !addr.pincode) {
-        toast.error("Please fill in all pickup address fields");
+      if (!addr.name || !addr.phone || !addr.address || !addr.city || !addr.pincode) {
+        toast.error("Please fill in all pickup address fields including city");
+        return;
+      }
+      if (!isBangaloreCity(addr.city)) {
+        toast.error("Doorstep pickup for lens replacement is currently available only in Bangalore / Bengaluru.");
         return;
       }
       if (!formData.pickup_date) {
@@ -369,8 +379,12 @@ function ReplaceLensesContent() {
 
       if (formData.is_delivery_different) {
         const dAddr = formData.delivery_address;
-        if (!dAddr.name || !dAddr.phone || !dAddr.address || !dAddr.pincode) {
-          toast.error("Please fill in all delivery address fields");
+        if (!dAddr.name || !dAddr.phone || !dAddr.address || !dAddr.city || !dAddr.pincode) {
+          toast.error("Please fill in all delivery address fields including city");
+          return;
+        }
+        if (!isBangaloreCity(dAddr.city)) {
+          toast.error("Lens replacement delivery is currently available only in Bangalore / Bengaluru.");
           return;
         }
       }
@@ -445,6 +459,16 @@ function ReplaceLensesContent() {
     if (!user) {
       toast.error("Please login to place an order");
       router.push("/auth/login?redirect=/replace-lenses");
+      return;
+    }
+
+    if (!isBangaloreCity(formData.pickup_address.city)) {
+      toast.error("Doorstep pickup for lens replacement is currently available only in Bangalore / Bengaluru.");
+      return;
+    }
+
+    if (formData.is_delivery_different && !isBangaloreCity(formData.delivery_address.city)) {
+      toast.error("Lens replacement delivery is currently available only in Bangalore / Bengaluru.");
       return;
     }
 
@@ -560,7 +584,12 @@ function ReplaceLensesContent() {
       {/* Hero */}
       <div className="bg-gradient-to-br from-[#03173D] via-[#004AAD] to-[#009DFF] pb-16 pt-8 mb-12">
         <div className="max-w-6xl mx-auto px-6 lg:px-12">
-          <p className="text-white/70 text-xs font-semibold uppercase tracking-widest mb-3">Lens Renewal Service</p>
+          <div className="flex flex-wrap items-center justify-between gap-3 mb-3">
+            <p className="text-white/70 text-xs font-semibold uppercase tracking-widest">Lens Renewal Service</p>
+            <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-[11px] font-bold tracking-wider uppercase bg-amber-400/20 text-amber-300 border border-amber-400/30">
+              📍 Doorstep Pickup in Bangalore (Bengaluru) Only
+            </span>
+          </div>
           <h1 className="font-[var(--font-hero)] italic text-white text-4xl md:text-6xl leading-none mb-3">
             Replace Your Lenses
           </h1>
@@ -1037,9 +1066,37 @@ function ReplaceLensesContent() {
 
               {/* STEP 4: LOGISTICS PLAN */}
               {currentStep === 4 && (
-                <motion.div key="s4" initial={{ opacity: 0, x: 20 }} animate={{ opacity: 1, x: 0 }} exit={{ opacity: 0, x: -20 }} className="space-y-10">
+                <motion.div key="s4" initial={{ opacity: 0, x: 20 }} animate={{ opacity: 1, x: 0 }} exit={{ opacity: 0, x: -20 }} className="space-y-8">
+                  {/* Service Availability Notice */}
+                  <div className="bg-amber-50/90 border border-amber-300 rounded-2xl p-4 sm:p-5 flex items-start gap-3.5 shadow-sm">
+                    <div className="w-9 h-9 rounded-xl bg-amber-500/20 text-amber-900 flex items-center justify-center shrink-0 mt-0.5 text-base font-bold">
+                      📍
+                    </div>
+                    <div className="space-y-1">
+                      <div className="flex flex-wrap items-center gap-2">
+                        <h4 className="text-xs sm:text-sm font-bold text-amber-950 uppercase tracking-wide">
+                          Bangalore (Bengaluru) Service Exclusive
+                        </h4>
+                        <span className="px-2 py-0.5 rounded-full text-[10px] font-black uppercase bg-amber-200/80 text-amber-900 border border-amber-400">
+                          Pickup & Delivery
+                        </span>
+                      </div>
+                      <p className="text-xs text-amber-900/90 leading-relaxed">
+                        Doorstep frame pickup & lens replacement is currently operational <strong>strictly within Bangalore (Bengaluru)</strong>. If your address is outside Bangalore, our delivery partners cannot pick up your frames.
+                      </p>
+                      <p className="text-[11px] text-amber-800/80 pt-0.5 font-medium">
+                        ✨ <em>Note: All our other products (Eyeglasses, Sunglasses, Contact Lenses, and Accessories) are delivered all across India!</em>
+                      </p>
+                    </div>
+                  </div>
+
                   <div className="space-y-5">
-                    <h3 className="text-[#004AAD] text-xs font-semibold uppercase tracking-widest">Pickup Address</h3>
+                    <div className="flex items-center justify-between">
+                      <h3 className="text-[#004AAD] text-xs font-semibold uppercase tracking-widest">Pickup Address</h3>
+                      <span className="text-[11px] font-bold text-amber-700 bg-amber-50 border border-amber-200 px-2.5 py-0.5 rounded-full">
+                        Bangalore Only
+                      </span>
+                    </div>
                     <div className="bg-[#F8F9FC] border border-[#E8EAF2] rounded-2xl p-8 space-y-5">
                       <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
                         <div className="space-y-2">
@@ -1067,17 +1124,47 @@ function ReplaceLensesContent() {
                           onChange={(e) => setFormData({ ...formData, pickup_address: { ...formData.pickup_address, address: e.target.value } })}
                         />
                       </div>
-                      <div className="grid grid-cols-2 md:grid-cols-3 gap-4">
-                        {["city", "state", "pincode"].map(field => (
-                          <div key={field} className="space-y-2">
-                            <label className="text-xs font-semibold text-[#666666] uppercase tracking-widest">{field} *</label>
-                            <input
-                              className="bg-white border border-[#E8EAF2] rounded-xl px-4 py-3 text-[#111111] focus:border-[#004AAD] focus:ring-2 focus:ring-[#004AAD]/10 outline-none w-full text-sm"
-                              value={(formData.pickup_address as any)[field]}
-                              onChange={(e) => setFormData({ ...formData, pickup_address: { ...formData.pickup_address, [field]: e.target.value } })}
-                            />
+                      <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                        <div className="space-y-1.5">
+                          <div className="flex items-center justify-between">
+                            <label className="text-xs font-semibold text-[#666666] uppercase tracking-widest">City *</label>
+                            <span className="text-[10px] font-bold text-[#004AAD]">BLR Only</span>
                           </div>
-                        ))}
+                          <input
+                            placeholder="Bangalore / Bengaluru"
+                            className={cn(
+                              "bg-white border rounded-xl px-4 py-3 text-[#111111] focus:ring-2 outline-none w-full text-sm transition-all",
+                              formData.pickup_address.city && !isBangaloreCity(formData.pickup_address.city)
+                                ? "border-red-400 focus:border-red-500 focus:ring-red-100"
+                                : "border-[#E8EAF2] focus:border-[#004AAD] focus:ring-[#004AAD]/10"
+                            )}
+                            value={formData.pickup_address.city}
+                            onChange={(e) => setFormData({ ...formData, pickup_address: { ...formData.pickup_address, city: e.target.value } })}
+                          />
+                          {formData.pickup_address.city && !isBangaloreCity(formData.pickup_address.city) && (
+                            <p className="text-[11px] text-red-600 font-medium">
+                              ⚠️ We cannot pick up frames outside Bangalore (Bengaluru).
+                            </p>
+                          )}
+                        </div>
+                        <div className="space-y-1.5">
+                          <label className="text-xs font-semibold text-[#666666] uppercase tracking-widest">State *</label>
+                          <input
+                            placeholder="Karnataka"
+                            className="bg-white border border-[#E8EAF2] rounded-xl px-4 py-3 text-[#111111] focus:border-[#004AAD] focus:ring-2 focus:ring-[#004AAD]/10 outline-none w-full text-sm"
+                            value={formData.pickup_address.state}
+                            onChange={(e) => setFormData({ ...formData, pickup_address: { ...formData.pickup_address, state: e.target.value } })}
+                          />
+                        </div>
+                        <div className="space-y-1.5">
+                          <label className="text-xs font-semibold text-[#666666] uppercase tracking-widest">Pincode *</label>
+                          <input
+                            placeholder="560001"
+                            className="bg-white border border-[#E8EAF2] rounded-xl px-4 py-3 text-[#111111] focus:border-[#004AAD] focus:ring-2 focus:ring-[#004AAD]/10 outline-none w-full text-sm"
+                            value={formData.pickup_address.pincode}
+                            onChange={(e) => setFormData({ ...formData, pickup_address: { ...formData.pickup_address, pincode: e.target.value } })}
+                          />
+                        </div>
                       </div>
                       <div className="space-y-2">
                         <label className="text-[#004AAD] text-xs font-semibold uppercase tracking-widest">Pickup Date *</label>
@@ -1142,17 +1229,47 @@ function ReplaceLensesContent() {
                             onChange={(e) => setFormData({ ...formData, delivery_address: { ...formData.delivery_address, address: e.target.value } })}
                           />
                         </div>
-                        <div className="grid grid-cols-2 md:grid-cols-3 gap-4">
-                          {["city", "state", "pincode"].map(field => (
-                            <div key={field} className="space-y-2">
-                              <label className="text-xs font-semibold text-[#666666] uppercase tracking-widest">{field} *</label>
-                              <input
-                                className="bg-white border border-[#E8EAF2] rounded-xl px-4 py-3 text-[#111111] focus:border-[#004AAD] focus:ring-2 focus:ring-[#004AAD]/10 outline-none w-full text-sm"
-                                value={(formData.delivery_address as any)[field]}
-                                onChange={(e) => setFormData({ ...formData, delivery_address: { ...formData.delivery_address, [field]: e.target.value } })}
-                              />
+                        <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                          <div className="space-y-1.5">
+                            <div className="flex items-center justify-between">
+                              <label className="text-xs font-semibold text-[#666666] uppercase tracking-widest">City *</label>
+                              <span className="text-[10px] font-bold text-[#004AAD]">BLR Only</span>
                             </div>
-                          ))}
+                            <input
+                              placeholder="Bangalore / Bengaluru"
+                              className={cn(
+                                "bg-white border rounded-xl px-4 py-3 text-[#111111] focus:ring-2 outline-none w-full text-sm transition-all",
+                                formData.delivery_address.city && !isBangaloreCity(formData.delivery_address.city)
+                                  ? "border-red-400 focus:border-red-500 focus:ring-red-100"
+                                  : "border-[#E8EAF2] focus:border-[#004AAD] focus:ring-[#004AAD]/10"
+                              )}
+                              value={formData.delivery_address.city}
+                              onChange={(e) => setFormData({ ...formData, delivery_address: { ...formData.delivery_address, city: e.target.value } })}
+                            />
+                            {formData.delivery_address.city && !isBangaloreCity(formData.delivery_address.city) && (
+                              <p className="text-[11px] text-red-600 font-medium">
+                                ⚠️ Replacement delivery is only available inside Bangalore (Bengaluru).
+                              </p>
+                            )}
+                          </div>
+                          <div className="space-y-1.5">
+                            <label className="text-xs font-semibold text-[#666666] uppercase tracking-widest">State *</label>
+                            <input
+                              placeholder="Karnataka"
+                              className="bg-white border border-[#E8EAF2] rounded-xl px-4 py-3 text-[#111111] focus:border-[#004AAD] focus:ring-2 focus:ring-[#004AAD]/10 outline-none w-full text-sm"
+                              value={formData.delivery_address.state}
+                              onChange={(e) => setFormData({ ...formData, delivery_address: { ...formData.delivery_address, state: e.target.value } })}
+                            />
+                          </div>
+                          <div className="space-y-1.5">
+                            <label className="text-xs font-semibold text-[#666666] uppercase tracking-widest">Pincode *</label>
+                            <input
+                              placeholder="560001"
+                              className="bg-white border border-[#E8EAF2] rounded-xl px-4 py-3 text-[#111111] focus:border-[#004AAD] focus:ring-2 focus:ring-[#004AAD]/10 outline-none w-full text-sm"
+                              value={formData.delivery_address.pincode}
+                              onChange={(e) => setFormData({ ...formData, delivery_address: { ...formData.delivery_address, pincode: e.target.value } })}
+                            />
+                          </div>
                         </div>
                       </motion.div>
                     ) : (

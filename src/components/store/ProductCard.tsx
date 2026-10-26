@@ -177,7 +177,7 @@ export default function ProductCard({ product }: ProductCardProps) {
         <div className="relative aspect-square bg-[#F8F9FC] overflow-hidden rounded-2xl m-3">
           <Image
             src={imgSrc}
-            alt={product.name}
+            alt={product?.name?.trim() || product?.brand?.trim() || product?.brand_name?.trim() || "Lenzify Product Image"}
             fill
             sizes="(max-width: 640px) 50vw, (max-width: 1024px) 33vw, 25vw"
             loading="lazy"
